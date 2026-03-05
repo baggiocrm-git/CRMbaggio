@@ -9,6 +9,7 @@ export const metadata: Metadata = {
   description: 'Professional CRM for construction project management, finances, and staff.',
 };
 
+// Root layout for the BuildFlow CRM application
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="en" className="dark">

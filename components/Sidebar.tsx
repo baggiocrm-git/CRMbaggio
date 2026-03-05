@@ -13,8 +13,10 @@ import {
   Settings, 
   HelpCircle,
   HardHat,
-  ChevronRight
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -27,6 +29,12 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // In a real app, you would clear cookies/session here
+    router.push('/login');
+  };
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101822] flex flex-col h-screen sticky top-0">
@@ -80,6 +88,13 @@ export default function Sidebar() {
             <HelpCircle size={20} className="text-slate-500" />
             <span className="text-sm font-semibold">Help Center</span>
           </Link>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all mt-2 group"
+          >
+            <LogOut size={20} className="text-red-500 group-hover:scale-110 transition-transform" />
+            <span className="text-sm font-bold">Log Off</span>
+          </button>
         </div>
       </nav>
 
