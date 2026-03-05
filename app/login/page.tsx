@@ -37,7 +37,7 @@ export default function LoginPage() {
 
       router.push('/dashboard');
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Invalid credentials';
+      const message = err instanceof Error ? err.message : 'Credenciais inválidas';
       setError(message);
     } finally {
       setLoading(false);

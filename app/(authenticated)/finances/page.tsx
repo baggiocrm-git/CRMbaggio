@@ -30,10 +30,10 @@ import { motion, AnimatePresence } from 'motion/react';
 interface FinanceRecord {
   id: string;
   title: string;
-  status: 'Pending' | 'Critical' | 'Scheduled' | 'Completed';
+  status: 'Pendente' | 'Crítico' | 'Agendado' | 'Concluído';
   amount: number;
   due_date: string;
-  type: 'Income' | 'Expense';
+  type: 'Receita' | 'Despesa';
   created_at: string;
 }
 
@@ -56,10 +56,10 @@ export default function FinancesPage() {
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
   const [formData, setFormData] = useState({
     title: '',
-    status: 'Pending' as FinanceRecord['status'],
+    status: 'Pendente' as FinanceRecord['status'],
     amount: 0,
     due_date: new Date().toISOString().split('T')[0],
-    type: 'Expense' as FinanceRecord['type'],
+    type: 'Despesa' as FinanceRecord['type'],
   });
 
   const fetchData = useCallback(async () => {
@@ -76,7 +76,7 @@ export default function FinancesPage() {
       setFinances(finRes.data || []);
       setProjects(projRes.data || []);
     } catch (error) {
-      console.error('Error fetching financial data:', error);
+      console.error('Erro ao buscar dados financeiros:', error);
     } finally {
       setIsLoading(false);
     }
@@ -86,14 +86,14 @@ export default function FinancesPage() {
     fetchData();
   }, [fetchData]);
 
-  const totalInflow = finances.filter(f => f.type === 'Income').reduce((acc, curr) => acc + curr.amount, 0);
-  const totalOutflow = finances.filter(f => f.type === 'Expense').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalInflow = finances.filter(f => f.type === 'Receita').reduce((acc, curr) => acc + curr.amount, 0);
+  const totalOutflow = finances.filter(f => f.type === 'Despesa').reduce((acc, curr) => acc + curr.amount, 0);
   const netBalance = totalInflow - totalOutflow;
 
   const stats = [
-    { label: 'Net Monthly Balance', value: `$${netBalance.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { label: 'Accounts Payable', value: `$${totalOutflow.toLocaleString()}`, change: `${finances.filter(f => f.type === 'Expense' && f.status !== 'Completed').length} Bills Due`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-    { label: 'Accounts Receivable', value: `$${totalInflow.toLocaleString()}`, change: `$${finances.filter(f => f.type === 'Income' && f.status !== 'Completed').length} Pending`, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Saldo Mensal Líquido', value: `R$${netBalance.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'Contas a Pagar', value: `R$${totalOutflow.toLocaleString()}`, change: `${finances.filter(f => f.type === 'Despesa' && f.status !== 'Concluído').length} Contas a Vencer`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { label: 'Contas a Receber', value: `R$${totalInflow.toLocaleString()}`, change: `${finances.filter(f => f.type === 'Receita' && f.status !== 'Concluído').length} Pendentes`, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
 
   const handleOpenModal = (record?: FinanceRecord) => {
@@ -110,10 +110,10 @@ export default function FinancesPage() {
       setEditingRecord(null);
       setFormData({
         title: '',
-        status: 'Pending',
+        status: 'Pendente',
         amount: 0,
         due_date: new Date().toISOString().split('T')[0],
-        type: 'Expense',
+        type: 'Despesa',
       });
     }
     setIsModalOpen(true);
@@ -142,13 +142,13 @@ export default function FinancesPage() {
       await fetchData();
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving finance record:', error);
-      alert('Failed to save finance record.');
+      console.error('Erro ao salvar registro financeiro:', error);
+      alert('Falha ao salvar registro financeiro.');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this transaction?')) {
+    if (confirm('Tem certeza que deseja excluir esta transação?')) {
       try {
         const { error } = await supabase
           .from('finances')
@@ -157,8 +157,8 @@ export default function FinancesPage() {
         if (error) throw error;
         await fetchData();
       } catch (error) {
-        console.error('Error deleting finance record:', error);
-        alert('Failed to delete finance record.');
+        console.error('Erro ao excluir registro financeiro:', error);
+        alert('Falha ao excluir registro financeiro.');
       }
     }
   };
@@ -166,9 +166,9 @@ export default function FinancesPage() {
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#101822]">
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Financial Cash Flow" 
-          subtitle="Manage construction project liquidity, payroll, and material invoices."
-          action={{ label: 'New Transaction', onClick: () => handleOpenModal() }}
+          title="Fluxo de Caixa Financeiro" 
+          subtitle="Gerencie a liquidez dos projetos de construção, folha de pagamento e faturas de materiais."
+          action={{ label: 'Nova Transação', onClick: () => handleOpenModal() }}
         />
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -194,7 +194,7 @@ export default function FinancesPage() {
                     {stat.change.startsWith('+') ? <ArrowUpRight size={12} /> : <AlertCircle size={12} />}
                     {stat.change}
                   </span>
-                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-tighter">vs last month</span>
+                  <span className="text-slate-400 text-[10px] font-bold uppercase tracking-tighter">vs mês passado</span>
                 </div>
               </motion.div>
             ))}
@@ -205,22 +205,22 @@ export default function FinancesPage() {
             <div className="lg:col-span-2 flex flex-col gap-6 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
               <div className="flex justify-between items-center">
                 <div>
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Cash Flow Trends</h3>
-                  <p className="text-xs text-slate-500 font-medium">Monthly operating revenue vs expenses</p>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Tendências de Fluxo de Caixa</h3>
+                  <p className="text-xs text-slate-500 font-medium">Receita operacional mensal vs despesas</p>
                 </div>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">6 Months</button>
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500">1 Year</button>
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">6 Meses</button>
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500">1 Ano</button>
                 </div>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={[
                     { name: 'Jan', inflow: 120000, outflow: 80000 },
-                    { name: 'Feb', inflow: 150000, outflow: 90000 },
+                    { name: 'Fev', inflow: 150000, outflow: 90000 },
                     { name: 'Mar', inflow: 130000, outflow: 100000 },
-                    { name: 'Apr', inflow: 180000, outflow: 110000 },
-                    { name: 'May', inflow: 210000, outflow: 120000 },
+                    { name: 'Abr', inflow: 180000, outflow: 110000 },
+                    { name: 'Mai', inflow: 210000, outflow: 120000 },
                     { name: 'Jun', inflow: totalInflow, outflow: totalOutflow },
                   ]}>
                     <defs>
@@ -247,15 +247,15 @@ export default function FinancesPage() {
                 <div className="flex items-center gap-3">
                   <div className="size-3 rounded-full bg-blue-600"></div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Inflow</p>
-                    <p className="text-sm font-black text-slate-900 dark:text-white">${totalInflow.toLocaleString()}</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entrada Total</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">R${totalInflow.toLocaleString()}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="size-3 rounded-full bg-rose-500/50"></div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Outflow</p>
-                    <p className="text-sm font-black text-slate-900 dark:text-white">${totalOutflow.toLocaleString()}</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Saída Total</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">R${totalOutflow.toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -264,45 +264,45 @@ export default function FinancesPage() {
             {/* Upcoming Operations */}
             <div className="flex flex-col gap-6 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Upcoming Operations</h3>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Próximas Operações</h3>
                 <div className="flex flex-wrap gap-2">
-                  <button className="bg-emerald-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Paid</button>
-                  <button className="bg-blue-600/10 text-blue-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-blue-600/20 uppercase tracking-widest">Pending</button>
-                  <button className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Overdue</button>
+                  <button className="bg-emerald-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Pago</button>
+                  <button className="bg-blue-600/10 text-blue-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-blue-600/20 uppercase tracking-widest">Pendente</button>
+                  <button className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Atrasado</button>
                 </div>
               </div>
               <div className="space-y-4 overflow-y-auto max-h-[350px] pr-2">
                 {isLoading ? (
                   <div className="py-20 flex flex-col items-center justify-center gap-4">
                     <Loader2 size={32} className="text-blue-600 animate-spin" />
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Loading operations...</p>
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando operações...</p>
                   </div>
                 ) : (
                   finances.map((op) => {
-                    const Icon = op.status === 'Completed' ? CheckCircle2 : op.status === 'Critical' ? AlertCircle : op.status === 'Scheduled' ? TrendingDown : FileText;
+                    const Icon = op.status === 'Concluído' ? CheckCircle2 : op.status === 'Crítico' ? AlertCircle : op.status === 'Agendado' ? TrendingDown : FileText;
                     return (
                       <div key={op.id} className="group flex items-center justify-between p-4 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer relative">
                         <div className="flex items-center gap-4">
                           <div className={`size-10 rounded-xl ${
-                            op.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-500' : 
-                            op.status === 'Critical' ? 'bg-rose-500/10 text-rose-500' : 
+                            op.status === 'Concluído' ? 'bg-emerald-500/10 text-emerald-500' : 
+                            op.status === 'Crítico' ? 'bg-rose-500/10 text-rose-500' : 
                             'bg-blue-500/10 text-blue-500'
                           } flex items-center justify-center`}>
                             <Icon size={20} />
                           </div>
                           <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{op.title}</p>
-                            <p className={`text-[10px] font-bold ${op.status === 'Critical' ? 'text-rose-500' : 'text-slate-500'} uppercase tracking-tighter`}>
-                              Due {new Date(op.due_date).toLocaleDateString()}
+                            <p className={`text-[10px] font-bold ${op.status === 'Crítico' ? 'text-rose-500' : 'text-slate-500'} uppercase tracking-tighter`}>
+                              Vencimento {new Date(op.due_date).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
                         <div className="text-right flex items-center gap-4">
                           <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">${op.amount.toLocaleString()}</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white">R${op.amount.toLocaleString()}</p>
                             <span className={`text-[10px] font-black uppercase tracking-widest ${
-                              op.status === 'Completed' ? 'text-emerald-500' : 
-                              op.status === 'Critical' ? 'text-rose-500' : 'text-amber-500'
+                              op.status === 'Concluído' ? 'text-emerald-500' : 
+                              op.status === 'Crítico' ? 'text-rose-500' : 'text-amber-500'
                             }`}>{op.status}</span>
                           </div>
                           <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -319,26 +319,26 @@ export default function FinancesPage() {
                   })
                 )}
               </div>
-              <button className="w-full text-center text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline py-2">View All Invoices</button>
+              <button className="w-full text-center text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline py-2">Ver Todas as Faturas</button>
             </div>
           </div>
 
           {/* Profitability Table */}
           <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Project Profitability Overview</h3>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Visão Geral da Lucratividade do Projeto</h3>
               <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={18} /></button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/30 text-[10px] uppercase font-black tracking-widest text-slate-500">
-                    <th className="px-6 py-4">Project Name</th>
+                    <th className="px-6 py-4">Nome do Projeto</th>
                     <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4">Budget</th>
-                    <th className="px-6 py-4">Spent</th>
-                    <th className="px-6 py-4">Balance</th>
-                    <th className="px-6 py-4 text-right">Liquidity Score</th>
+                    <th className="px-6 py-4">Orçamento</th>
+                    <th className="px-6 py-4">Gasto</th>
+                    <th className="px-6 py-4">Saldo</th>
+                    <th className="px-6 py-4 text-right">Pontuação de Liquidez</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -347,7 +347,7 @@ export default function FinancesPage() {
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 size={24} className="text-blue-600 animate-spin" />
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Loading projects...</p>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando projetos...</p>
                         </div>
                       </td>
                     </tr>
@@ -357,20 +357,20 @@ export default function FinancesPage() {
                         <td className="px-6 py-5">
                           <div className="flex flex-col">
                             <span className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{p.name}</span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Contract {p.contract_id}</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Contrato {p.contract_id}</span>
                           </div>
                         </td>
                         <td className="px-6 py-5">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            p.status === 'Active' ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'
+                            p.status === 'Ativo' || p.status === 'Active' ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'
                           }`}>
-                            <span className={`size-1.5 rounded-full ${p.status === 'Active' ? 'bg-blue-600 animate-pulse' : 'bg-amber-500'}`}></span>
-                            {p.status}
+                            <span className={`size-1.5 rounded-full ${p.status === 'Ativo' || p.status === 'Active' ? 'bg-blue-600 animate-pulse' : 'bg-amber-500'}`}></span>
+                            {p.status === 'Active' ? 'Ativo' : p.status}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-sm font-bold text-slate-900 dark:text-white">${p.budget.toLocaleString()}</td>
-                        <td className="px-6 py-5 text-sm font-bold text-slate-500">${p.spent.toLocaleString()}</td>
-                        <td className={`px-6 py-5 text-sm font-black ${p.balance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>${p.balance.toLocaleString()}</td>
+                        <td className="px-6 py-5 text-sm font-bold text-slate-900 dark:text-white">R${p.budget.toLocaleString()}</td>
+                        <td className="px-6 py-5 text-sm font-bold text-slate-500">R${p.spent.toLocaleString()}</td>
+                        <td className={`px-6 py-5 text-sm font-black ${p.balance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R${p.balance.toLocaleString()}</td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex items-center justify-end gap-3">
                             <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -406,7 +406,7 @@ export default function FinancesPage() {
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                    {editingRecord ? 'Edit Transaction' : 'New Transaction'}
+                    {editingRecord ? 'Editar Transação' : 'Nova Transação'}
                   </h3>
                   <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                     <X size={20} />
@@ -416,25 +416,25 @@ export default function FinancesPage() {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Title</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Título</label>
                       <input 
                         required
                         type="text" 
                         value={formData.title}
                         onChange={(e) => setFormData({...formData, title: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="e.g. Concrete Supply - #204"
+                        placeholder="ex: Fornecimento de Concreto - #204"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Type</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Tipo</label>
                       <select 
                         value={formData.type}
                         onChange={(e) => setFormData({...formData, type: e.target.value as FinanceRecord['type']})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
-                        <option value="Expense">Expense</option>
-                        <option value="Income">Income</option>
+                        <option value="Despesa">Despesa</option>
+                        <option value="Receita">Receita</option>
                       </select>
                     </div>
                     <div>
@@ -444,14 +444,14 @@ export default function FinancesPage() {
                         onChange={(e) => setFormData({...formData, status: e.target.value as FinanceRecord['status']})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
-                        <option value="Pending">Pending</option>
-                        <option value="Scheduled">Scheduled</option>
-                        <option value="Critical">Critical</option>
-                        <option value="Completed">Completed</option>
+                        <option value="Pendente">Pendente</option>
+                        <option value="Agendado">Agendado</option>
+                        <option value="Crítico">Crítico</option>
+                        <option value="Concluído">Concluído</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Amount ($)</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Valor (R$)</label>
                       <input 
                         required
                         type="number" 
@@ -461,7 +461,7 @@ export default function FinancesPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Due Date</label>
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Data de Vencimento</label>
                       <input 
                         required
                         type="date" 
@@ -478,13 +478,13 @@ export default function FinancesPage() {
                       onClick={handleCloseModal}
                       className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                     >
-                      Cancel
+                      Cancelar
                     </button>
                     <button 
                       type="submit"
                       className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all"
                     >
-                      {editingRecord ? 'Save Changes' : 'Create Transaction'}
+                      {editingRecord ? 'Salvar Alterações' : 'Criar Transação'}
                     </button>
                   </div>
                 </form>

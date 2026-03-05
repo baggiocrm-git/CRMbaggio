@@ -38,10 +38,10 @@ export default function ContactsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState('ALL CONTACTS');
-  const [statusFilter, setStatusFilter] = useState('ACTIVE');
-  const [categoryFilter, setCategoryFilter] = useState('ALL');
-  const [regionFilter, setRegionFilter] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('TODOS OS CONTATOS');
+  const [statusFilter, setStatusFilter] = useState('ATIVO');
+  const [categoryFilter, setCategoryFilter] = useState('TODOS');
+  const [regionFilter, setRegionFilter] = useState('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -49,8 +49,8 @@ export default function ContactsPage() {
   const [formData, setFormData] = useState({
     company: '',
     contact_person: '',
-    category: 'Client',
-    status: 'Active',
+    category: 'Cliente',
+    status: 'Ativo',
     email: '',
     phone: '',
   });
@@ -77,9 +77,9 @@ export default function ContactsPage() {
   }, [fetchContacts]);
 
   const stats = [
-    { label: 'Total Clients', value: contacts.filter(c => c.category === 'Client').length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-600/10' },
-    { label: 'Active Suppliers', value: contacts.filter(c => c.category === 'Supplier' && c.status === 'Active').length.toString(), icon: Truck, color: 'text-amber-600', bg: 'bg-amber-600/10' },
-    { label: 'Total Contacts', value: contacts.length.toString(), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-600/10' },
+    { label: 'Total de Clientes', value: contacts.filter(c => c.category === 'Cliente').length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-600/10' },
+    { label: 'Fornecedores Ativos', value: contacts.filter(c => c.category === 'Fornecedor' && c.status === 'Ativo').length.toString(), icon: Truck, color: 'text-amber-600', bg: 'bg-amber-600/10' },
+    { label: 'Total de Contatos', value: contacts.length.toString(), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-600/10' },
   ];
 
   const handleOpenModal = (contact?: Contact) => {
@@ -98,8 +98,8 @@ export default function ContactsPage() {
       setFormData({
         company: '',
         contact_person: '',
-        category: 'Client',
-        status: 'Active',
+        category: 'Cliente',
+        status: 'Ativo',
         email: '',
         phone: '',
       });
@@ -114,16 +114,16 @@ export default function ContactsPage() {
 
   const filteredContacts = contacts.filter(contact => {
     const matchesTab = 
-      activeTab === 'ALL CONTACTS' || 
-      (activeTab === 'CLIENTS' && contact.category === 'Client') ||
-      (activeTab === 'SUPPLIERS' && contact.category === 'Supplier') ||
-      (activeTab === 'PARTNERS' && contact.category === 'Partner') ||
-      (activeTab === 'ARCHIVED' && contact.status === 'Archived');
+      activeTab === 'TODOS OS CONTATOS' || 
+      (activeTab === 'CLIENTES' && contact.category === 'Cliente') ||
+      (activeTab === 'FORNECEDORES' && contact.category === 'Fornecedor') ||
+      (activeTab === 'PARCEIROS' && contact.category === 'Parceiro') ||
+      (activeTab === 'ARQUIVADOS' && contact.status === 'Arquivado');
 
-    const matchesStatus = statusFilter === 'ALL' || contact.status.toUpperCase() === statusFilter;
-    const matchesCategory = categoryFilter === 'ALL' || contact.category.toUpperCase() === categoryFilter;
+    const matchesStatus = statusFilter === 'TODOS' || contact.status.toUpperCase() === statusFilter;
+    const matchesCategory = categoryFilter === 'TODOS' || contact.category.toUpperCase() === categoryFilter;
     // Region is not in the schema yet, so we ignore it for now or assume it matches if 'ALL'
-    const matchesRegion = regionFilter === 'ALL';
+    const matchesRegion = regionFilter === 'TODOS';
 
     const matchesSearch = 
       contact.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -141,7 +141,7 @@ export default function ContactsPage() {
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
 
   const handleDownload = () => {
-    const headers = ['Company', 'Contact Person', 'Category', 'Status', 'Email', 'Phone'];
+    const headers = ['Empresa', 'Pessoa de Contato', 'Categoria', 'Status', 'E-mail', 'Telefone'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(c => [
@@ -158,7 +158,7 @@ export default function ContactsPage() {
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', 'contacts_export.csv');
+    link.setAttribute('download', 'exportacao_contatos.csv');
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -195,13 +195,13 @@ export default function ContactsPage() {
       await fetchContacts();
       handleCloseModal();
     } catch (error) {
-      console.error('Error saving contact:', error);
-      alert('Failed to save contact. Please check your Supabase configuration.');
+      console.error('Erro ao salvar contato:', error);
+      alert('Falha ao salvar contato. Por favor, verifique sua configuração do Supabase.');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this contact?')) {
+    if (confirm('Tem certeza que deseja excluir este contato?')) {
       try {
         const { error } = await supabase
           .from('contacts')
@@ -211,8 +211,8 @@ export default function ContactsPage() {
         if (error) throw error;
         await fetchContacts();
       } catch (error) {
-        console.error('Error deleting contact:', error);
-        alert('Failed to delete contact.');
+        console.error('Erro ao excluir contato:', error);
+        alert('Falha ao excluir contato.');
       }
     }
   };
@@ -220,17 +220,17 @@ export default function ContactsPage() {
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#101822]">
       <main className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Contacts & Suppliers" 
-          subtitle="Centralized management of engineering partners, material suppliers, and project clients."
+          title="Contatos e Fornecedores" 
+          subtitle="Gestão centralizada de parceiros de engenharia, fornecedores de materiais e clientes de projetos."
           searchValue={searchQuery}
           onSearch={setSearchQuery}
-          action={{ label: 'Add New Contact', onClick: () => handleOpenModal() }}
+          action={{ label: 'Adicionar Novo Contato', onClick: () => handleOpenModal() }}
         />
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
           {/* Tabs */}
           <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-8 overflow-x-auto">
-            {['ALL CONTACTS', 'CLIENTS', 'SUPPLIERS', 'PARTNERS', 'ARCHIVED'].map((tab) => (
+            {['TODOS OS CONTATOS', 'CLIENTES', 'FORNECEDORES', 'PARCEIROS', 'ARQUIVADOS'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => {
@@ -252,7 +252,7 @@ export default function ContactsPage() {
           <div className="flex flex-wrap gap-3 items-center">
             <div className="relative group">
               <button 
-                onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
+                onClick={() => setStatusFilter(statusFilter === 'ATIVO' ? 'TODOS' : 'ATIVO')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
               >
                 Status: {statusFilter}
@@ -261,19 +261,19 @@ export default function ContactsPage() {
             </div>
             <div className="relative group">
               <button 
-                onClick={() => setCategoryFilter(categoryFilter === 'ALL' ? 'CLIENT' : categoryFilter === 'CLIENT' ? 'SUPPLIER' : categoryFilter === 'SUPPLIER' ? 'PARTNER' : 'ALL')}
+                onClick={() => setCategoryFilter(categoryFilter === 'TODOS' ? 'CLIENTE' : categoryFilter === 'CLIENTE' ? 'FORNECEDOR' : categoryFilter === 'FORNECEDOR' ? 'PARCEIRO' : 'TODOS')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
               >
-                Category: {categoryFilter}
+                Categoria: {categoryFilter}
                 <ChevronRight size={14} className="rotate-90" />
               </button>
             </div>
             <div className="relative group">
               <button 
-                onClick={() => setRegionFilter(regionFilter === 'ALL' ? 'USA' : 'ALL')}
+                onClick={() => setRegionFilter(regionFilter === 'TODOS' ? 'BRASIL' : 'TODOS')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
               >
-                Region: {regionFilter}
+                Região: {regionFilter}
                 <ChevronRight size={14} className="rotate-90" />
               </button>
             </div>
@@ -296,11 +296,11 @@ export default function ContactsPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Company / Contact</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Category</th>
+                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Empresa / Contato</th>
+                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Categoria</th>
                     <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Contact Details</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Quick Actions</th>
+                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Detalhes de Contato</th>
+                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Ações Rápidas</th>
                     <th className="px-6 py-4 text-right"></th>
                   </tr>
                 </thead>
@@ -310,14 +310,14 @@ export default function ContactsPage() {
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <Loader2 size={24} className="text-blue-600 animate-spin" />
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Loading contacts...</p>
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando contatos...</p>
                         </div>
                       </td>
                     </tr>
                   ) : filteredContacts.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">No contacts found</p>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nenhum contato encontrado</p>
                       </td>
                     </tr>
                   ) : (
@@ -336,8 +336,8 @@ export default function ContactsPage() {
                         </td>
                         <td className="px-6 py-5">
                           <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                            contact.category === 'Client' ? 'bg-blue-600/10 text-blue-600' : 
-                            contact.category === 'Supplier' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
+                            contact.category === 'Cliente' ? 'bg-blue-600/10 text-blue-600' : 
+                            contact.category === 'Fornecedor' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
                             'bg-purple-600/10 text-purple-600'
                           }`}>
                             {contact.category}
@@ -346,12 +346,12 @@ export default function ContactsPage() {
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-2">
                             <span className={`size-2 rounded-full ${
-                              contact.status === 'Active' ? 'bg-emerald-500' : 
-                              contact.status === 'Pending' ? 'bg-amber-500' : 'bg-slate-400'
+                              contact.status === 'Ativo' ? 'bg-emerald-500' : 
+                              contact.status === 'Pendente' ? 'bg-amber-500' : 'bg-slate-400'
                             }`}></span>
                             <span className={`text-[10px] font-black uppercase tracking-widest ${
-                              contact.status === 'Active' ? 'text-emerald-600' : 
-                              contact.status === 'Pending' ? 'text-amber-600' : 'text-slate-500'
+                              contact.status === 'Ativo' ? 'text-emerald-600' : 
+                              contact.status === 'Pendente' ? 'text-amber-600' : 'text-slate-500'
                             }`}>{contact.status}</span>
                           </div>
                         </td>
@@ -399,7 +399,7 @@ export default function ContactsPage() {
             {/* Pagination */}
             <div className="px-6 py-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
               <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredContacts.length)} of {filteredContacts.length} contacts
+                Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contatos
               </p>
               <div className="flex items-center gap-2">
                 <button 
@@ -468,7 +468,7 @@ export default function ContactsPage() {
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <h3 className="text-lg font-black text-blue-600 tracking-tight">
-                    {editingContact ? 'Edit Contact' : 'Add New Contact'}
+                    {editingContact ? 'Editar Contato' : 'Adicionar Novo Contato'}
                   </h3>
                   <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
                     <X size={20} />
@@ -478,37 +478,37 @@ export default function ContactsPage() {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Company Name</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Nome da Empresa</label>
                       <input 
                         required
                         type="text" 
                         value={formData.company}
                         onChange={(e) => setFormData({...formData, company: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="e.g. Acme Construction"
+                        placeholder="ex: Acme Construções"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Primary Contact / Role</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Contato Principal / Cargo</label>
                       <input 
                         required
                         type="text" 
                         value={formData.contact_person}
                         onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="e.g. Project Manager"
+                        placeholder="ex: Gerente de Projetos"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Category</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Categoria</label>
                       <select 
                         value={formData.category}
                         onChange={(e) => setFormData({...formData, category: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
-                        <option value="Client">Client</option>
-                        <option value="Supplier">Supplier</option>
-                        <option value="Partner">Partner</option>
+                        <option value="Cliente">Cliente</option>
+                        <option value="Fornecedor">Fornecedor</option>
+                        <option value="Parceiro">Parceiro</option>
                       </select>
                     </div>
                     <div>
@@ -518,31 +518,32 @@ export default function ContactsPage() {
                         onChange={(e) => setFormData({...formData, status: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
-                        <option value="Active">Active</option>
-                        <option value="Pending">Pending</option>
-                        <option value="Inactive">Inactive</option>
+                        <option value="Ativo">Ativo</option>
+                        <option value="Pendente">Pendente</option>
+                        <option value="Inativo">Inativo</option>
+                        <option value="Arquivado">Arquivado</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Email Address</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
                       <input 
                         required
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="contact@company.com"
+                        placeholder="contato@empresa.com.br"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Phone Number</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Número de Telefone</label>
                       <input 
                         required
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="+1 555-0000"
+                        placeholder="(11) 99999-9999"
                       />
                     </div>
                   </div>
@@ -553,13 +554,13 @@ export default function ContactsPage() {
                       onClick={handleCloseModal}
                       className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
                     >
-                      Cancel
+                      Cancelar
                     </button>
                     <button 
                       type="submit"
                       className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all"
                     >
-                      {editingContact ? 'Save Changes' : 'Add Contact'}
+                      {editingContact ? 'Salvar Alterações' : 'Adicionar Contato'}
                     </button>
                   </div>
                 </form>
