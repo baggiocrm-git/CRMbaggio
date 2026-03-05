@@ -4,20 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import { supabase } from '@/lib/supabase';
 import { 
-  Plus, 
   Filter, 
   LayoutGrid, 
   List, 
   Calendar, 
   Map, 
   MoreHorizontal,
-  Paperclip,
-  MessageSquare,
-  HardHat,
   MapPin,
-  UploadCloud,
-  CheckCircle2,
-  AlertTriangle,
   Loader2,
   X,
   Trash2,

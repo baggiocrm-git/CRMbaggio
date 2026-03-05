@@ -4,16 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import { supabase } from '@/lib/supabase';
 import { 
-  UserPlus, 
   Mail, 
   Phone, 
   MessageSquare, 
-  MoreVertical, 
   Download, 
   Filter, 
   ChevronLeft, 
   ChevronRight,
-  Building2,
   Truck,
   TrendingUp,
   UserCheck,

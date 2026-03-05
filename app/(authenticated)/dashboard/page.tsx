@@ -11,8 +11,6 @@ import {
   DollarSign, 
   AlertCircle, 
   CheckCircle2, 
-  Clock,
-  MapPin,
   FileText,
   Loader2
 } from 'lucide-react';
@@ -20,8 +18,6 @@ import {
   BarChart, 
   Bar, 
   XAxis, 
-  YAxis, 
-  CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
   Cell
@@ -72,40 +68,40 @@ export default function DashboardPage() {
   }, [fetchData]);
 
   const kpis = [
-    { label: 'Active Projects', value: stats.activeProjects.toString(), change: '+2%', icon: Construction, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { label: 'Staff On-Site', value: stats.staffOnSite.toString(), change: '-5%', icon: Users, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { label: 'Receivable', value: `$${(stats.receivable / 1000).toFixed(1)}k`, change: '+8%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { label: 'Payable', value: `$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Projetos Ativos', value: stats.activeProjects.toString(), change: '+2%', icon: Construction, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Equipe no Local', value: stats.staffOnSite.toString(), change: '-5%', icon: Users, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+    { label: 'A Receber', value: `R$${(stats.receivable / 1000).toFixed(1)}k`, change: '+8%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'A Pagar', value: `R$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
 
   const performanceData = [
-    { name: 'Mon', value: 40 },
-    { name: 'Tue', value: 60 },
-    { name: 'Wed', value: 80 },
-    { name: 'Thu', value: 95 },
-    { name: 'Fri', value: 70 },
-    { name: 'Sat', value: 50 },
-    { name: 'Sun', value: 45 },
+    { name: 'Seg', value: 40 },
+    { name: 'Ter', value: 60 },
+    { name: 'Qua', value: 80 },
+    { name: 'Qui', value: 95 },
+    { name: 'Sex', value: 70 },
+    { name: 'Sáb', value: 50 },
+    { name: 'Dom', value: 45 },
   ];
 
   const highPriorityTasks = [
-    { id: 1, title: 'Concrete Pouring - Phase 4', site: 'North Tower Complex', status: 'Due Today', color: 'bg-red-500' },
-    { id: 2, title: 'Safety Inspection Audit', site: 'Riverside Bridge Site', status: 'Due Tomorrow', color: 'bg-orange-500' },
-    { id: 3, title: 'Equipment Reallocation', site: 'Multiple Sites', status: 'In Progress', color: 'bg-blue-500' },
+    { id: 1, title: 'Concretagem - Fase 4', site: 'Complexo Torre Norte', status: 'Vence Hoje', color: 'bg-red-500' },
+    { id: 2, title: 'Auditoria de Inspeção de Segurança', site: 'Ponte Riverside', status: 'Vence Amanhã', color: 'bg-orange-500' },
+    { id: 3, title: 'Realocação de Equipamentos', site: 'Múltiplos Locais', status: 'Em Andamento', color: 'bg-blue-500' },
   ];
 
   const recentActivity = [
-    { id: 1, type: 'upload', title: 'New Inspection Report', desc: "Sarah Jenkins uploaded 'Site-B_Struct_Final.pdf'", time: '12 minutes ago', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
-    { id: 2, type: 'milestone', title: 'Milestone Completed', desc: 'Excavation phase completed at Metro Tower', time: '2 hours ago', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
-    { id: 3, type: 'alert', title: 'Weather Delay Alert', desc: 'Crane operations suspended due to high winds', time: '5 hours ago', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
+    { id: 1, type: 'upload', title: 'Novo Relatório de Inspeção', desc: "Sarah Jenkins enviou 'Site-B_Struct_Final.pdf'", time: '12 minutos atrás', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
+    { id: 2, type: 'milestone', title: 'Marco Concluído', desc: 'Fase de escavação concluída na Metro Tower', time: '2 horas atrás', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
+    { id: 3, type: 'alert', title: 'Alerta de Atraso Climático', desc: 'Operações de guindaste suspensas devido a ventos fortes', time: '5 horas atrás', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
   ];
 
   return (
     <>
       <Header 
-        title="Operational Overview" 
-        subtitle={`Monitoring ${stats.activeProjects} active construction sites in real-time.`}
-        action={{ label: 'New Project', onClick: () => {} }}
+        title="Visão Geral Operacional" 
+        subtitle={`Monitorando ${stats.activeProjects} canteiros de obras ativos em tempo real.`}
+        action={{ label: 'Novo Projeto', onClick: () => {} }}
       />
       
       <div className="flex-1 overflow-y-auto p-8 space-y-8">
@@ -152,10 +148,10 @@ export default function DashboardPage() {
             {/* Performance Chart */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Project Performance</h3>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Desempenho do Projeto</h3>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500">Monthly</button>
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">Weekly</button>
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500">Mensal</button>
+                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">Semanal</button>
                 </div>
               </div>
               <div className="h-64 w-full">
@@ -183,7 +179,7 @@ export default function DashboardPage() {
 
             {/* High Priority Tasks */}
             <div className="space-y-4">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Active High-Priority Tasks</h3>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Tarefas Ativas de Alta Prioridade</h3>
               <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                 {highPriorityTasks.map((task) => (
                   <div key={task.id} className="p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
@@ -208,7 +204,7 @@ export default function DashboardPage() {
             {/* Site Map Card */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
               <div className="p-5 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Site Map</h3>
+                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Mapa do Local</h3>
               </div>
               <div className="aspect-square relative bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
                 <Image 
@@ -224,15 +220,15 @@ export default function DashboardPage() {
                   <div className="size-4 bg-orange-500 rounded-full absolute bottom-1/3 right-1/4 border-2 border-white shadow-lg shadow-orange-500/50"></div>
                 </div>
                 <div className="absolute bottom-4 left-4 right-4 bg-white/10 dark:bg-black/20 backdrop-blur-md p-4 rounded-xl border border-white/20 dark:border-white/5">
-                  <p className="text-xs font-black text-white uppercase tracking-widest">Project Locations</p>
-                  <p className="text-[10px] text-white/80 font-medium">Active tracking for 12 primary zones</p>
+                  <p className="text-xs font-black text-white uppercase tracking-widest">Localização dos Projetos</p>
+                  <p className="text-[10px] text-white/80 font-medium">Rastreamento ativo para 12 zonas primárias</p>
                 </div>
               </div>
             </div>
 
             {/* Recent Activity */}
             <div className="space-y-4">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Recent Activity</h3>
+              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Atividade Recente</h3>
               <div className="space-y-6">
                 {recentActivity.map((activity, idx) => (
                   <div key={activity.id} className="flex gap-4 relative">

@@ -8,10 +8,7 @@ import {
   Users, 
   FileText, 
   ShieldCheck, 
-  Clock, 
   Download, 
-  Filter, 
-  MoreHorizontal,
   CheckCircle2,
   Circle,
   Info,
@@ -19,8 +16,7 @@ import {
   Loader2,
   X,
   Trash2,
-  Edit2,
-  Plus
+  Edit2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -46,7 +42,7 @@ interface Document {
   created_at: string;
 }
 
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, React.ElementType> = {
   FileText,
   ShieldCheck,
   HardHat,

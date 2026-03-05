@@ -10,7 +10,7 @@ export default function NotFound() {
       
       <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight mb-2">404</h1>
       <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-center max-w-md">
-        The page you are looking for doesn&apos;t exist or has been moved.
+        A página que você está procurando não existe ou foi movida.
       </p>
       
       <Link 
@@ -18,7 +18,7 @@ export default function NotFound() {
         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-600/20"
       >
         <ChevronLeft size={20} />
-        Back to Dashboard
+        Voltar para o Dashboard
       </Link>
     </div>
   );

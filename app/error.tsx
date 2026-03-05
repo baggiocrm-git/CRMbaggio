@@ -21,10 +21,10 @@ export default function Error({
       </div>
       
       <h1 className="text-2xl font-black text-slate-900 dark:text-white tracking-tight mb-2 text-center">
-        Something went wrong
+        Algo deu errado
       </h1>
       <p className="text-slate-500 dark:text-slate-400 font-medium mb-8 text-center max-w-md">
-        An unexpected error occurred while processing your request.
+        Ocorreu um erro inesperado ao processar sua solicitação.
       </p>
       
       <button
@@ -32,7 +32,7 @@ export default function Error({
         className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-slate-900/10"
       >
         <RefreshCcw size={20} />
-        Try again
+        Tentar novamente
       </button>
     </div>
   );

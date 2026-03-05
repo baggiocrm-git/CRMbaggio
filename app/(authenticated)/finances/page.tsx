@@ -8,12 +8,8 @@ import {
   TrendingDown, 
   DollarSign, 
   ArrowUpRight, 
-  ArrowDownRight, 
-  Clock, 
   AlertCircle, 
   FileText, 
-  Download,
-  PlusCircle,
   CheckCircle2,
   MoreHorizontal,
   Loader2,
@@ -25,7 +21,6 @@ import {
   AreaChart, 
   Area, 
   XAxis, 
-  YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer 
@@ -52,13 +47,6 @@ interface Project {
   balance: number;
   liquidity: number;
 }
-
-const iconMap: Record<string, any> = {
-  FileText,
-  AlertCircle,
-  TrendingDown,
-  CheckCircle2,
-};
 
 export default function FinancesPage() {
   const [finances, setFinances] = useState<FinanceRecord[]>([]);

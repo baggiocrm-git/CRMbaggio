@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, Bell, Settings, Plus } from 'lucide-react';
+import { Search, Bell, Plus } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -25,7 +25,7 @@ export default function Header({ title, subtitle, action }: HeaderProps) {
           <Search size={18} className="text-slate-400" />
           <input 
             type="text" 
-            placeholder="Search everything..." 
+            placeholder="Pesquisar..." 
             className="bg-transparent border-none focus:ring-0 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 w-64"
           />
         </div>
