@@ -6,13 +6,15 @@ import { Search, Bell, Plus } from 'lucide-react';
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  searchValue?: string;
+  onSearch?: (value: string) => void;
   action?: {
     label: string;
     onClick: () => void;
   };
 }
 
-export default function Header({ title, subtitle, action }: HeaderProps) {
+export default function Header({ title, subtitle, searchValue, onSearch, action }: HeaderProps) {
   return (
     <header className="h-20 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101822] px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md bg-opacity-80 dark:bg-opacity-80">
       <div className="flex flex-col">
@@ -26,6 +28,8 @@ export default function Header({ title, subtitle, action }: HeaderProps) {
           <input 
             type="text" 
             placeholder="Pesquisar..." 
+            value={searchValue}
+            onChange={(e) => onSearch?.(e.target.value)}
             className="bg-transparent border-none focus:ring-0 text-sm text-slate-900 dark:text-white placeholder:text-slate-500 w-64"
           />
         </div>

@@ -38,6 +38,14 @@ export default function ContactsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [activeTab, setActiveTab] = useState('ALL CONTACTS');
+  const [statusFilter, setStatusFilter] = useState('ACTIVE');
+  const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [regionFilter, setRegionFilter] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [formData, setFormData] = useState({
     company: '',
     contact_person: '',
@@ -104,6 +112,59 @@ export default function ContactsPage() {
     setEditingContact(null);
   };
 
+  const filteredContacts = contacts.filter(contact => {
+    const matchesTab = 
+      activeTab === 'ALL CONTACTS' || 
+      (activeTab === 'CLIENTS' && contact.category === 'Client') ||
+      (activeTab === 'SUPPLIERS' && contact.category === 'Supplier') ||
+      (activeTab === 'PARTNERS' && contact.category === 'Partner') ||
+      (activeTab === 'ARCHIVED' && contact.status === 'Archived');
+
+    const matchesStatus = statusFilter === 'ALL' || contact.status.toUpperCase() === statusFilter;
+    const matchesCategory = categoryFilter === 'ALL' || contact.category.toUpperCase() === categoryFilter;
+    // Region is not in the schema yet, so we ignore it for now or assume it matches if 'ALL'
+    const matchesRegion = regionFilter === 'ALL';
+
+    const matchesSearch = 
+      contact.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.contact_person.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.email.toLowerCase().includes(searchQuery.toLowerCase());
+
+    return matchesTab && matchesStatus && matchesCategory && matchesRegion && matchesSearch;
+  });
+
+  const paginatedContacts = filteredContacts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
+
+  const handleDownload = () => {
+    const headers = ['Company', 'Contact Person', 'Category', 'Status', 'Email', 'Phone'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredContacts.map(c => [
+        `"${c.company}"`,
+        `"${c.contact_person}"`,
+        `"${c.category}"`,
+        `"${c.status}"`,
+        `"${c.email}"`,
+        `"${c.phone}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'contacts_export.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const initials = formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -161,38 +222,69 @@ export default function ContactsPage() {
         <Header 
           title="Contacts & Suppliers" 
           subtitle="Centralized management of engineering partners, material suppliers, and project clients."
+          searchValue={searchQuery}
+          onSearch={setSearchQuery}
           action={{ label: 'Add New Contact', onClick: () => handleOpenModal() }}
         />
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
           {/* Tabs */}
           <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-8 overflow-x-auto">
-            <button className="pb-4 border-b-2 border-blue-600 text-blue-600 font-black text-sm uppercase tracking-widest">All Contacts</button>
-            <button className="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-sm uppercase tracking-widest transition-colors">Clients</button>
-            <button className="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-sm uppercase tracking-widest transition-colors">Suppliers</button>
-            <button className="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-sm uppercase tracking-widest transition-colors">Partners</button>
-            <button className="pb-4 border-b-2 border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 font-bold text-sm uppercase tracking-widest transition-colors">Archived</button>
+            {['ALL CONTACTS', 'CLIENTS', 'SUPPLIERS', 'PARTNERS', 'ARCHIVED'].map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setCurrentPage(1);
+                }}
+                className={`pb-4 border-b-2 font-black text-sm uppercase tracking-widest transition-all ${
+                  activeTab === tab 
+                    ? 'border-blue-600 text-blue-600' 
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-center">
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-              Status: Active
-              <ChevronRight size={14} className="rotate-90" />
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-              Category: All
-              <ChevronRight size={14} className="rotate-90" />
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
-              Region: All
-              <ChevronRight size={14} className="rotate-90" />
-            </button>
+            <div className="relative group">
+              <button 
+                onClick={() => setStatusFilter(statusFilter === 'ACTIVE' ? 'ALL' : 'ACTIVE')}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+              >
+                Status: {statusFilter}
+                <ChevronRight size={14} className="rotate-90" />
+              </button>
+            </div>
+            <div className="relative group">
+              <button 
+                onClick={() => setCategoryFilter(categoryFilter === 'ALL' ? 'CLIENT' : categoryFilter === 'CLIENT' ? 'SUPPLIER' : categoryFilter === 'SUPPLIER' ? 'PARTNER' : 'ALL')}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+              >
+                Category: {categoryFilter}
+                <ChevronRight size={14} className="rotate-90" />
+              </button>
+            </div>
+            <div className="relative group">
+              <button 
+                onClick={() => setRegionFilter(regionFilter === 'ALL' ? 'USA' : 'ALL')}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+              >
+                Region: {regionFilter}
+                <ChevronRight size={14} className="rotate-90" />
+              </button>
+            </div>
             <div className="ml-auto flex items-center gap-4">
               <button className="p-2 text-slate-500 hover:text-blue-600 transition-colors">
                 <Filter size={20} />
               </button>
-              <button className="p-2 text-slate-500 hover:text-blue-600 transition-colors">
+              <button 
+                onClick={handleDownload}
+                className="p-2 text-slate-500 hover:text-blue-600 transition-colors"
+              >
                 <Download size={20} />
               </button>
             </div>
@@ -222,14 +314,14 @@ export default function ContactsPage() {
                         </div>
                       </td>
                     </tr>
-                  ) : contacts.length === 0 ? (
+                  ) : filteredContacts.length === 0 ? (
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">No contacts found</p>
                       </td>
                     </tr>
                   ) : (
-                    contacts.map((contact) => (
+                    paginatedContacts.map((contact) => (
                       <tr key={contact.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-4">
@@ -306,15 +398,35 @@ export default function ContactsPage() {
             </div>
             {/* Pagination */}
             <div className="px-6 py-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Showing 1 to 4 of 128 contacts</p>
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, filteredContacts.length)} of {filteredContacts.length} contacts
+              </p>
               <div className="flex items-center gap-2">
-                <button className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all">
+                <button 
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all disabled:opacity-50"
+                >
                   <ChevronLeft size={16} />
                 </button>
-                <button className="size-8 rounded-lg bg-blue-600 text-white text-[10px] font-black">1</button>
-                <button className="size-8 rounded-lg text-slate-600 dark:text-slate-400 text-[10px] font-black hover:bg-slate-200 dark:hover:bg-slate-800 transition-all">2</button>
-                <button className="size-8 rounded-lg text-slate-600 dark:text-slate-400 text-[10px] font-black hover:bg-slate-200 dark:hover:bg-slate-800 transition-all">3</button>
-                <button className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button 
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`size-8 rounded-lg text-[10px] font-black transition-all ${
+                      currentPage === page 
+                        ? 'bg-blue-600 text-white' 
+                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+                <button 
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all disabled:opacity-50"
+                >
                   <ChevronRight size={16} />
                 </button>
               </div>
