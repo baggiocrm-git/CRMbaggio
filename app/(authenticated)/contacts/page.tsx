@@ -355,7 +355,7 @@ export default function ContactsPage() {
                 className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
               >
                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                  <h3 className="text-lg font-black text-blue-600 tracking-tight">
                     {editingContact ? 'Edit Contact' : 'Add New Contact'}
                   </h3>
                   <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -366,33 +366,33 @@ export default function ContactsPage() {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Company Name</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Company Name</label>
                       <input 
                         required
                         type="text" 
                         value={formData.company}
                         onChange={(e) => setFormData({...formData, company: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="e.g. Acme Construction"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Primary Contact / Role</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Primary Contact / Role</label>
                       <input 
                         required
                         type="text" 
                         value={formData.contact_person}
                         onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="e.g. Project Manager"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Category</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Category</label>
                       <select 
                         value={formData.category}
                         onChange={(e) => setFormData({...formData, category: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         <option value="Client">Client</option>
                         <option value="Supplier">Supplier</option>
@@ -400,11 +400,11 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Status</label>
                       <select 
                         value={formData.status}
                         onChange={(e) => setFormData({...formData, status: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         <option value="Active">Active</option>
                         <option value="Pending">Pending</option>
@@ -412,24 +412,24 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Email Address</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Email Address</label>
                       <input 
                         required
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="contact@company.com"
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Phone Number</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Phone Number</label>
                       <input 
                         required
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-blue-600 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="+1 555-0000"
                       />
                     </div>
