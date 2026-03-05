@@ -1,7 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
+import { supabase } from '@/lib/supabase';
 import Image from 'next/image';
 import { 
   Construction, 
@@ -12,7 +13,8 @@ import {
   CheckCircle2, 
   Clock,
   MapPin,
-  FileText
+  FileText,
+  Loader2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -26,72 +28,122 @@ import {
 } from 'recharts';
 import { motion } from 'motion/react';
 
-const kpis = [
-  { label: 'Active Projects', value: '24', change: '+2%', icon: Construction, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-  { label: 'Staff On-Site', value: '142', change: '-5%', icon: Users, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-  { label: 'Receivable', value: '$125.5k', change: '+8%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-  { label: 'Payable', value: '$84.2k', change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-];
-
-const performanceData = [
-  { name: 'Mon', value: 40 },
-  { name: 'Tue', value: 60 },
-  { name: 'Wed', value: 80 },
-  { name: 'Thu', value: 95 },
-  { name: 'Fri', value: 70 },
-  { name: 'Sat', value: 50 },
-  { name: 'Sun', value: 45 },
-];
-
-const highPriorityTasks = [
-  { id: 1, title: 'Concrete Pouring - Phase 4', site: 'North Tower Complex', status: 'Due Today', color: 'bg-red-500' },
-  { id: 2, title: 'Safety Inspection Audit', site: 'Riverside Bridge Site', status: 'Due Tomorrow', color: 'bg-orange-500' },
-  { id: 3, title: 'Equipment Reallocation', site: 'Multiple Sites', status: 'In Progress', color: 'bg-blue-500' },
-];
-
-const recentActivity = [
-  { id: 1, type: 'upload', title: 'New Inspection Report', desc: "Sarah Jenkins uploaded 'Site-B_Struct_Final.pdf'", time: '12 minutes ago', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
-  { id: 2, type: 'milestone', title: 'Milestone Completed', desc: 'Excavation phase completed at Metro Tower', time: '2 hours ago', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
-  { id: 3, type: 'alert', title: 'Weather Delay Alert', desc: 'Crane operations suspended due to high winds', time: '5 hours ago', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
-];
-
 export default function DashboardPage() {
+  const [stats, setStats] = useState({
+    activeProjects: 0,
+    staffOnSite: 0,
+    receivable: 0,
+    payable: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const [projectsRes, staffRes, financesRes] = await Promise.all([
+        supabase.from('projects').select('id', { count: 'exact' }).neq('status', 'Completed'),
+        supabase.from('staff').select('id', { count: 'exact' }).eq('status', 'Active'),
+        supabase.from('finances').select('amount, type, status')
+      ]);
+
+      const receivable = financesRes.data
+        ?.filter(f => f.type === 'Income' && f.status !== 'Completed')
+        .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+      
+      const payable = financesRes.data
+        ?.filter(f => f.type === 'Expense' && f.status !== 'Completed')
+        .reduce((acc, curr) => acc + Number(curr.amount), 0) || 0;
+
+      setStats({
+        activeProjects: projectsRes.count || 0,
+        staffOnSite: staffRes.count || 0,
+        receivable,
+        payable,
+      });
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const kpis = [
+    { label: 'Active Projects', value: stats.activeProjects.toString(), change: '+2%', icon: Construction, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Staff On-Site', value: stats.staffOnSite.toString(), change: '-5%', icon: Users, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+    { label: 'Receivable', value: `$${(stats.receivable / 1000).toFixed(1)}k`, change: '+8%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'Payable', value: `$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  ];
+
+  const performanceData = [
+    { name: 'Mon', value: 40 },
+    { name: 'Tue', value: 60 },
+    { name: 'Wed', value: 80 },
+    { name: 'Thu', value: 95 },
+    { name: 'Fri', value: 70 },
+    { name: 'Sat', value: 50 },
+    { name: 'Sun', value: 45 },
+  ];
+
+  const highPriorityTasks = [
+    { id: 1, title: 'Concrete Pouring - Phase 4', site: 'North Tower Complex', status: 'Due Today', color: 'bg-red-500' },
+    { id: 2, title: 'Safety Inspection Audit', site: 'Riverside Bridge Site', status: 'Due Tomorrow', color: 'bg-orange-500' },
+    { id: 3, title: 'Equipment Reallocation', site: 'Multiple Sites', status: 'In Progress', color: 'bg-blue-500' },
+  ];
+
+  const recentActivity = [
+    { id: 1, type: 'upload', title: 'New Inspection Report', desc: "Sarah Jenkins uploaded 'Site-B_Struct_Final.pdf'", time: '12 minutes ago', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
+    { id: 2, type: 'milestone', title: 'Milestone Completed', desc: 'Excavation phase completed at Metro Tower', time: '2 hours ago', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
+    { id: 3, type: 'alert', title: 'Weather Delay Alert', desc: 'Crane operations suspended due to high winds', time: '5 hours ago', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
+  ];
+
   return (
     <>
       <Header 
         title="Operational Overview" 
-        subtitle="Monitoring 24 active construction sites in real-time."
+        subtitle={`Monitoring ${stats.activeProjects} active construction sites in real-time.`}
         action={{ label: 'New Project', onClick: () => {} }}
       />
       
       <div className="flex-1 overflow-y-auto p-8 space-y-8">
         {/* KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {kpis.map((kpi, idx) => (
-            <motion.div 
-              key={kpi.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{kpi.label}</span>
-                <div className={`p-2 rounded-xl ${kpi.bg} ${kpi.color}`}>
-                  <kpi.icon size={20} />
+          {isLoading ? (
+            Array(4).fill(0).map((_, i) => (
+              <div key={i} className="h-32 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-pulse flex items-center justify-center">
+                <Loader2 size={24} className="text-blue-600/20 animate-spin" />
+              </div>
+            ))
+          ) : (
+            kpis.map((kpi, idx) => (
+              <motion.div 
+                key={kpi.label}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <span className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{kpi.label}</span>
+                  <div className={`p-2 rounded-xl ${kpi.bg} ${kpi.color}`}>
+                    <kpi.icon size={20} />
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{kpi.value}</span>
-                <span className={`text-xs font-bold ${kpi.change.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
-                  {kpi.change}
-                </span>
-              </div>
-              <div className="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div className={`h-full ${kpi.color.replace('text', 'bg')} w-3/4 opacity-80`}></div>
-              </div>
-            </motion.div>
-          ))}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{kpi.value}</span>
+                  <span className={`text-xs font-bold ${kpi.change.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
+                    {kpi.change}
+                  </span>
+                </div>
+                <div className="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className={`h-full ${kpi.color.replace('text', 'bg')} w-3/4 opacity-80`}></div>
+                </div>
+              </motion.div>
+            ))
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
+import { supabase } from '@/lib/supabase';
 import { 
   UserPlus, 
   Mail, 
@@ -18,14 +19,15 @@ import {
   UserCheck,
   X,
   Trash2,
-  Edit2
+  Edit2,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface Contact {
-  id: number;
+  id: string; // UUID from Supabase
   company: string;
-  contact: string;
+  contact_person: string;
   category: string;
   status: string;
   email: string;
@@ -34,25 +36,40 @@ interface Contact {
   color: string;
 }
 
-const initialContacts: Contact[] = [
-  { id: 1, company: 'Acme Construction', contact: 'Commercial Infrastructure', category: 'Client', status: 'Active', email: 'contact@acme.com', phone: '+1 555-0101', initials: 'AC', color: 'bg-blue-100 text-blue-600' },
-  { id: 2, company: 'BuildRight Supplies', contact: 'Raw Materials & Concrete', category: 'Supplier', status: 'Pending', email: 'sales@buildright.com', phone: '+1 555-0202', initials: 'BS', color: 'bg-amber-100 text-amber-600' },
-  { id: 3, company: 'Steel & Iron Co.', contact: 'Structural Components', category: 'Supplier', status: 'Active', email: 'info@steeliron.com', phone: '+1 555-0303', initials: 'SI', color: 'bg-slate-100 text-slate-600' },
-  { id: 4, company: 'Design Partners LLC', contact: 'Architectural Services', category: 'Partner', status: 'Inactive', email: 'hello@designparts.com', phone: '+1 555-0404', initials: 'DP', color: 'bg-purple-100 text-purple-600' },
-];
-
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>(initialContacts);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [formData, setFormData] = useState({
     company: '',
-    contact: '',
+    contact_person: '',
     category: 'Client',
     status: 'Active',
     email: '',
     phone: '',
   });
+
+  const fetchContacts = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('contacts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setContacts(data || []);
+    } catch (error) {
+      console.error('Error fetching contacts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchContacts();
+  }, [fetchContacts]);
 
   const stats = [
     { label: 'Total Clients', value: contacts.filter(c => c.category === 'Client').length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-600/10' },
@@ -65,7 +82,7 @@ export default function ContactsPage() {
       setEditingContact(contact);
       setFormData({
         company: contact.company,
-        contact: contact.contact,
+        contact_person: contact.contact_person,
         category: contact.category,
         status: contact.status,
         email: contact.email,
@@ -75,7 +92,7 @@ export default function ContactsPage() {
       setEditingContact(null);
       setFormData({
         company: '',
-        contact: '',
+        contact_person: '',
         category: 'Client',
         status: 'Active',
         email: '',
@@ -90,29 +107,55 @@ export default function ContactsPage() {
     setEditingContact(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingContact) {
-      setContacts(contacts.map(c => c.id === editingContact.id ? {
-        ...c,
-        ...formData,
-        initials: formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-      } : c));
-    } else {
-      const newContact: Contact = {
-        id: Date.now(),
-        ...formData,
-        initials: formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2),
-        color: 'bg-blue-100 text-blue-600' // Default color for new contacts
-      };
-      setContacts([...contacts, newContact]);
+    const initials = formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    
+    try {
+      if (editingContact) {
+        const { error } = await supabase
+          .from('contacts')
+          .update({
+            ...formData,
+            initials
+          })
+          .eq('id', editingContact.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('contacts')
+          .insert([{
+            ...formData,
+            initials,
+            color: 'bg-blue-100 text-blue-600' // Default color
+          }]);
+
+        if (error) throw error;
+      }
+      
+      await fetchContacts();
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error saving contact:', error);
+      alert('Failed to save contact. Please check your Supabase configuration.');
     }
-    handleCloseModal();
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this contact?')) {
-      setContacts(contacts.filter(c => c.id !== id));
+      try {
+        const { error } = await supabase
+          .from('contacts')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+        await fetchContacts();
+      } catch (error) {
+        console.error('Error deleting contact:', error);
+        alert('Failed to delete contact.');
+      }
     }
   };
   return (
@@ -173,77 +216,94 @@ export default function ContactsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {contacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-4">
-                          <div className={`size-10 rounded-xl ${contact.color} flex items-center justify-center font-black text-sm`}>
-                            {contact.initials}
-                          </div>
-                          <div>
-                            <p className="font-black text-sm text-slate-900 dark:text-white tracking-tight">{contact.company}</p>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.contact}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                          contact.category === 'Client' ? 'bg-blue-600/10 text-blue-600' : 
-                          contact.category === 'Supplier' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
-                          'bg-purple-600/10 text-purple-600'
-                        }`}>
-                          {contact.category}
-                        </span>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex items-center gap-2">
-                          <span className={`size-2 rounded-full ${
-                            contact.status === 'Active' ? 'bg-emerald-500' : 
-                            contact.status === 'Pending' ? 'bg-amber-500' : 'bg-slate-400'
-                          }`}></span>
-                          <span className={`text-[10px] font-black uppercase tracking-widest ${
-                            contact.status === 'Active' ? 'text-emerald-600' : 
-                            contact.status === 'Pending' ? 'text-amber-600' : 'text-slate-500'
-                          }`}>{contact.status}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="text-xs font-bold">
-                          <p className="text-slate-700 dark:text-slate-300">{contact.email}</p>
-                          <p className="text-slate-400 mt-0.5">{contact.phone}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5">
-                        <div className="flex gap-2">
-                          <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
-                            <Mail size={18} />
-                          </button>
-                          <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
-                            <Phone size={18} />
-                          </button>
-                          <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
-                            <MessageSquare size={18} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-5 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button 
-                            onClick={() => handleOpenModal(contact)}
-                            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-all"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(contact.id)}
-                            className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-500 hover:text-rose-600 transition-all"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <Loader2 size={24} className="text-blue-600 animate-spin" />
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Loading contacts...</p>
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : contacts.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">No contacts found</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    contacts.map((contact) => (
+                      <tr key={contact.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-4">
+                            <div className={`size-10 rounded-xl ${contact.color} flex items-center justify-center font-black text-sm`}>
+                              {contact.initials}
+                            </div>
+                            <div>
+                              <p className="font-black text-sm text-slate-900 dark:text-white tracking-tight">{contact.company}</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.contact_person}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                            contact.category === 'Client' ? 'bg-blue-600/10 text-blue-600' : 
+                            contact.category === 'Supplier' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
+                            'bg-purple-600/10 text-purple-600'
+                          }`}>
+                            {contact.category}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex items-center gap-2">
+                            <span className={`size-2 rounded-full ${
+                              contact.status === 'Active' ? 'bg-emerald-500' : 
+                              contact.status === 'Pending' ? 'bg-amber-500' : 'bg-slate-400'
+                            }`}></span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${
+                              contact.status === 'Active' ? 'text-emerald-600' : 
+                              contact.status === 'Pending' ? 'text-amber-600' : 'text-slate-500'
+                            }`}>{contact.status}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="text-xs font-bold">
+                            <p className="text-slate-700 dark:text-slate-300">{contact.email}</p>
+                            <p className="text-slate-400 mt-0.5">{contact.phone}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <div className="flex gap-2">
+                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                              <Mail size={18} />
+                            </button>
+                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                              <Phone size={18} />
+                            </button>
+                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                              <MessageSquare size={18} />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-5 text-right">
+                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => handleOpenModal(contact)}
+                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-all"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(contact.id)}
+                              className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-500 hover:text-rose-600 transition-all"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -324,8 +384,8 @@ export default function ContactsPage() {
                       <input 
                         required
                         type="text" 
-                        value={formData.contact}
-                        onChange={(e) => setFormData({...formData, contact: e.target.value})}
+                        value={formData.contact_person}
+                        onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="e.g. Project Manager"
                       />
