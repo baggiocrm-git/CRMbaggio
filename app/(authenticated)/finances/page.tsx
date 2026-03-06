@@ -15,7 +15,10 @@ import {
   Loader2,
   X,
   Trash2,
-  Edit2
+  Edit2,
+  Download,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -54,11 +57,18 @@ export default function FinancesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
+  const [activeTab, setActiveTab] = useState('TODAS AS OPERAÇÕES');
+  const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [typeFilter, setTypeFilter] = useState('TODOS');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
+
   const [formData, setFormData] = useState({
     title: '',
     status: 'Pendente' as FinanceRecord['status'],
     amount: 0,
-    due_date: new Date().toISOString().split('T')[0],
+    due_date: '',
     type: 'Despesa' as FinanceRecord['type'],
   });
 
@@ -75,6 +85,12 @@ export default function FinancesPage() {
 
       setFinances(finRes.data || []);
       setProjects(projRes.data || []);
+      
+      // Initialize date only on client side to avoid hydration mismatch
+      setFormData(prev => ({
+        ...prev,
+        due_date: new Date().toISOString().split('T')[0]
+      }));
     } catch (error) {
       console.error('Erro ao buscar dados financeiros:', error);
     } finally {
@@ -89,6 +105,55 @@ export default function FinancesPage() {
   const totalInflow = finances.filter(f => f.type === 'Receita').reduce((acc, curr) => acc + curr.amount, 0);
   const totalOutflow = finances.filter(f => f.type === 'Despesa').reduce((acc, curr) => acc + curr.amount, 0);
   const netBalance = totalInflow - totalOutflow;
+
+  const filteredFinances = finances.filter(record => {
+    const matchesTab = 
+      activeTab === 'TODAS AS OPERAÇÕES' || 
+      (activeTab === 'RECEITAS' && record.type === 'Receita') ||
+      (activeTab === 'DESPESAS' && record.type === 'Despesa') ||
+      (activeTab === 'PENDENTES' && record.status !== 'Concluído') ||
+      (activeTab === 'CONCLUÍDOS' && record.status === 'Concluído');
+
+    const matchesStatus = statusFilter === 'TODOS' || record.status.toUpperCase() === statusFilter;
+    const matchesType = typeFilter === 'TODOS' || record.type.toUpperCase() === typeFilter;
+    
+    const matchesSearch = 
+      record.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      record.amount.toString().includes(searchQuery);
+
+    return matchesTab && matchesStatus && matchesType && matchesSearch;
+  });
+
+  const paginatedFinances = filteredFinances.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  const totalPages = Math.ceil(filteredFinances.length / itemsPerPage);
+
+  const handleDownload = () => {
+    const headers = ['Título', 'Tipo', 'Status', 'Valor', 'Data de Vencimento'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredFinances.map(f => [
+        `"${f.title}"`,
+        `"${f.type}"`,
+        `"${f.status}"`,
+        `"${f.amount}"`,
+        `"${f.due_date}"`
+      ].join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'relatorio_financeiro.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const stats = [
     { label: 'Saldo Mensal Líquido', value: `R$${netBalance.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
@@ -168,6 +233,8 @@ export default function FinancesPage() {
         <Header 
           title="Fluxo de Caixa Financeiro" 
           subtitle="Gerencie a liquidez dos projetos de construção, folha de pagamento e faturas de materiais."
+          searchValue={searchQuery}
+          onSearch={setSearchQuery}
           action={{ label: 'Nova Transação', onClick: () => handleOpenModal() }}
         />
 
@@ -198,6 +265,51 @@ export default function FinancesPage() {
                 </div>
               </motion.div>
             ))}
+          </div>
+
+          {/* Tabs */}
+          <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-8 overflow-x-auto">
+            {['TODAS AS OPERAÇÕES', 'RECEITAS', 'DESPESAS', 'PENDENTES', 'CONCLUÍDOS'].map((tab) => (
+              <button 
+                key={tab}
+                onClick={() => {
+                  setActiveTab(tab);
+                  setCurrentPage(1);
+                }}
+                className={`pb-4 border-b-2 font-black text-sm uppercase tracking-widest transition-all ${
+                  activeTab === tab 
+                    ? 'border-blue-600 text-blue-600' 
+                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Filters & Download */}
+          <div className="flex flex-wrap gap-3 items-center">
+            <button 
+              onClick={() => setStatusFilter(statusFilter === 'PENDENTE' ? 'TODOS' : 'PENDENTE')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              Status: {statusFilter}
+            </button>
+            <button 
+              onClick={() => setTypeFilter(typeFilter === 'RECEITA' ? 'DESPESA' : typeFilter === 'DESPESA' ? 'TODOS' : 'RECEITA')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            >
+              Tipo: {typeFilter}
+            </button>
+            <div className="ml-auto flex items-center gap-4">
+              <button 
+                onClick={handleDownload}
+                className="p-2 text-slate-500 hover:text-blue-600 transition-colors"
+                title="Baixar Relatório"
+              >
+                <Download size={20} />
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -264,21 +376,20 @@ export default function FinancesPage() {
             {/* Upcoming Operations */}
             <div className="flex flex-col gap-6 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
               <div className="flex flex-col gap-4">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Próximas Operações</h3>
-                <div className="flex flex-wrap gap-2">
-                  <button className="bg-emerald-500 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Pago</button>
-                  <button className="bg-blue-600/10 text-blue-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-blue-600/20 uppercase tracking-widest">Pendente</button>
-                  <button className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">Atrasado</button>
-                </div>
+                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Operações Financeiras</h3>
               </div>
-              <div className="space-y-4 overflow-y-auto max-h-[350px] pr-2">
+              <div className="space-y-4 overflow-y-auto max-h-[500px] pr-2">
                 {isLoading ? (
                   <div className="py-20 flex flex-col items-center justify-center gap-4">
                     <Loader2 size={32} className="text-blue-600 animate-spin" />
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando operações...</p>
                   </div>
+                ) : filteredFinances.length === 0 ? (
+                  <div className="py-20 text-center">
+                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nenhuma operação encontrada</p>
+                  </div>
                 ) : (
-                  finances.map((op) => {
+                  paginatedFinances.map((op) => {
                     const Icon = op.status === 'Concluído' ? CheckCircle2 : op.status === 'Crítico' ? AlertCircle : op.status === 'Agendado' ? TrendingDown : FileText;
                     return (
                       <div key={op.id} className="group flex items-center justify-between p-4 rounded-xl border border-transparent hover:border-slate-200 dark:hover:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all cursor-pointer relative">
@@ -293,13 +404,15 @@ export default function FinancesPage() {
                           <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{op.title}</p>
                             <p className={`text-[10px] font-bold ${op.status === 'Crítico' ? 'text-rose-500' : 'text-slate-500'} uppercase tracking-tighter`}>
-                              Vencimento {new Date(op.due_date).toLocaleDateString()}
+                              {op.type} • Vencimento {new Date(op.due_date).toLocaleDateString()}
                             </p>
                           </div>
                         </div>
                         <div className="text-right flex items-center gap-4">
                           <div>
-                            <p className="text-sm font-black text-slate-900 dark:text-white">R${op.amount.toLocaleString()}</p>
+                            <p className={`text-sm font-black ${op.type === 'Receita' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                              {op.type === 'Receita' ? '+' : '-'} R${op.amount.toLocaleString()}
+                            </p>
                             <span className={`text-[10px] font-black uppercase tracking-widest ${
                               op.status === 'Concluído' ? 'text-emerald-500' : 
                               op.status === 'Crítico' ? 'text-rose-500' : 'text-amber-500'
@@ -319,7 +432,27 @@ export default function FinancesPage() {
                   })
                 )}
               </div>
-              <button className="w-full text-center text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline py-2">Ver Todas as Faturas</button>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
+                  <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Página {currentPage} de {totalPages}</span>
+                  <button 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -362,10 +495,10 @@ export default function FinancesPage() {
                         </td>
                         <td className="px-6 py-5">
                           <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                            p.status === 'Ativo' || p.status === 'Active' ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'
+                            p.status === 'Ativo' ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'
                           }`}>
-                            <span className={`size-1.5 rounded-full ${p.status === 'Ativo' || p.status === 'Active' ? 'bg-blue-600 animate-pulse' : 'bg-amber-500'}`}></span>
-                            {p.status === 'Active' ? 'Ativo' : p.status}
+                            <span className={`size-1.5 rounded-full ${p.status === 'Ativo' ? 'bg-blue-600 animate-pulse' : 'bg-amber-500'}`}></span>
+                            {p.status}
                           </span>
                         </td>
                         <td className="px-6 py-5 text-sm font-bold text-slate-900 dark:text-white">R${p.budget.toLocaleString()}</td>
@@ -422,7 +555,7 @@ export default function FinancesPage() {
                         type="text" 
                         value={formData.title}
                         onChange={(e) => setFormData({...formData, title: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Fornecimento de Concreto - #204"
                       />
                     </div>
@@ -431,7 +564,7 @@ export default function FinancesPage() {
                       <select 
                         value={formData.type}
                         onChange={(e) => setFormData({...formData, type: e.target.value as FinanceRecord['type']})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         <option value="Despesa">Despesa</option>
                         <option value="Receita">Receita</option>
@@ -442,7 +575,7 @@ export default function FinancesPage() {
                       <select 
                         value={formData.status}
                         onChange={(e) => setFormData({...formData, status: e.target.value as FinanceRecord['status']})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         <option value="Pendente">Pendente</option>
                         <option value="Agendado">Agendado</option>
@@ -457,7 +590,7 @@ export default function FinancesPage() {
                         type="number" 
                         value={formData.amount}
                         onChange={(e) => setFormData({...formData, amount: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       />
                     </div>
                     <div>
@@ -467,7 +600,7 @@ export default function FinancesPage() {
                         type="date" 
                         value={formData.due_date}
                         onChange={(e) => setFormData({...formData, due_date: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       />
                     </div>
                   </div>

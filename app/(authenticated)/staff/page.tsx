@@ -88,7 +88,7 @@ export default function StaffPage() {
   }, [fetchData]);
 
   const stats = [
-    { label: 'Total de Equipe Ativa', value: staffList.filter(s => s.status === 'Ativo' || s.status === 'Active').length.toString(), change: '+4 este mês', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Total de Equipe Ativa', value: staffList.filter(s => s.status === 'Ativo').length.toString(), change: '+4 este mês', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
     { label: 'Contratos Pendentes', value: '12', change: 'Revisão necessária', icon: FileText, color: 'text-orange-500', bg: 'bg-orange-500/10' },
     { label: 'Certificações de Segurança', value: '89%', change: '8 expirando', icon: ShieldCheck, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
@@ -101,7 +101,7 @@ export default function StaffPage() {
         emp_id: member.emp_id,
         role: member.role,
         department: member.department,
-        status: member.status === 'Active' ? 'Ativo' : member.status === 'On Leave' ? 'Em Licença' : member.status === 'Inactive' ? 'Inativo' : member.status as StaffMember['status'],
+        status: member.status,
         img_url: member.img_url || '',
       });
     } else {
@@ -247,9 +247,9 @@ export default function StaffPage() {
                             </td>
                             <td className="px-6 py-5">
                               <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                                person.status === 'Ativo' || person.status === 'Active' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-orange-500/10 text-orange-600'
+                                person.status === 'Ativo' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-orange-500/10 text-orange-600'
                               }`}>
-                                {person.status === 'Active' ? 'Ativo' : person.status === 'On Leave' ? 'Em Licença' : person.status === 'Inactive' ? 'Inativo' : person.status}
+                                {person.status}
                               </span>
                             </td>
                             <td className="px-6 py-5">
@@ -373,7 +373,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Roberto Silva"
                       />
                     </div>
@@ -384,7 +384,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.emp_id}
                         onChange={(e) => setFormData({...formData, emp_id: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="E294"
                       />
                     </div>
@@ -393,7 +393,7 @@ export default function StaffPage() {
                       <select 
                         value={formData.status}
                         onChange={(e) => setFormData({...formData, status: e.target.value as StaffMember['status']})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         <option value="Ativo">Ativo</option>
                         <option value="Em Licença">Em Licença</option>
@@ -407,7 +407,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.role}
                         onChange={(e) => setFormData({...formData, role: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Eng. Civil Sênior"
                       />
                     </div>
@@ -418,7 +418,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.department}
                         onChange={(e) => setFormData({...formData, department: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Divisão Estrutural"
                       />
                     </div>
@@ -428,7 +428,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.img_url}
                         onChange={(e) => setFormData({...formData, img_url: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="https://picsum.photos/..."
                       />
                     </div>

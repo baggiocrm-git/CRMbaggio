@@ -199,25 +199,25 @@ export default function ProjectsPage() {
                       <div className={`size-2 rounded-full ${col.color}`}></div>
                       <h3 className="font-black text-xs text-slate-700 dark:text-slate-300 uppercase tracking-widest">{col.name}</h3>
                       <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-lg font-black">
-                        {projects.filter(p => p.status === col.id || (col.id === 'Planejamento' && p.status === 'Planning') || (col.id === 'Em Andamento' && p.status === 'In Progress') || (col.id === 'Atrasado' && p.status === 'Delayed') || (col.id === 'Concluído' && p.status === 'Completed')).length}
+                        {projects.filter(p => p.status === col.id).length}
                       </span>
                     </div>
                     <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={16} /></button>
                   </div>
 
                   <div className="flex flex-col gap-4">
-                    {projects.filter(p => p.status === col.id || (col.id === 'Planejamento' && p.status === 'Planning') || (col.id === 'Em Andamento' && p.status === 'In Progress') || (col.id === 'Atrasado' && p.status === 'Delayed') || (col.id === 'Concluído' && p.status === 'Completed')).map((project) => (
+                    {projects.filter(p => p.status === col.id).map((project) => (
                       <motion.div 
                         key={project.id}
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
-                        className={`bg-white dark:bg-slate-900 border ${project.status === 'Delayed' || project.status === 'Atrasado' ? 'border-rose-200 dark:border-rose-900/50' : 'border-slate-200 dark:border-slate-800'} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group cursor-pointer relative`}
+                        className={`bg-white dark:bg-slate-900 border ${project.status === 'Atrasado' ? 'border-rose-200 dark:border-rose-900/50' : 'border-slate-200 dark:border-slate-800'} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group cursor-pointer relative`}
                       >
                         <div className="flex justify-between items-start mb-4">
                           <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
-                            project.status === 'Planejamento' || project.status === 'Planning' ? 'bg-slate-500/10 text-slate-600' :
-                            project.status === 'Em Andamento' || project.status === 'In Progress' ? 'bg-blue-500/10 text-blue-600' :
-                            project.status === 'Atrasado' || project.status === 'Delayed' ? 'bg-rose-500/10 text-rose-600' :
+                            project.status === 'Planejamento' ? 'bg-slate-500/10 text-slate-600' :
+                            project.status === 'Em Andamento' ? 'bg-blue-500/10 text-blue-600' :
+                            project.status === 'Atrasado' ? 'bg-rose-500/10 text-rose-600' :
                             'bg-emerald-500/10 text-emerald-600'
                           }`}>
                             {project.phase}
@@ -242,13 +242,13 @@ export default function ProjectsPage() {
                         <div className="flex flex-col gap-2 mb-4">
                           <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                             <span>Progresso</span>
-                            <span className={project.status === 'Delayed' || project.status === 'Atrasado' ? 'text-rose-500' : 'text-blue-600'}>
+                            <span className={project.status === 'Atrasado' ? 'text-rose-500' : 'text-blue-600'}>
                               {Math.round((project.spent / project.budget) * 100) || 0}%
                             </span>
                           </div>
                           <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                             <div 
-                              className={`h-full ${project.status === 'Delayed' || project.status === 'Atrasado' ? 'bg-rose-500' : 'bg-blue-600'}`} 
+                              className={`h-full ${project.status === 'Atrasado' ? 'bg-rose-500' : 'bg-blue-600'}`} 
                               style={{ width: `${Math.min(100, (project.spent / project.budget) * 100)}%` }}
                             ></div>
                           </div>
@@ -308,7 +308,7 @@ export default function ProjectsPage() {
                         type="text" 
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Torre de Escritórios Skyline"
                       />
                     </div>
@@ -319,7 +319,7 @@ export default function ProjectsPage() {
                         type="text" 
                         value={formData.contract_id}
                         onChange={(e) => setFormData({...formData, contract_id: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="#299-A"
                       />
                     </div>
@@ -328,7 +328,7 @@ export default function ProjectsPage() {
                       <select 
                         value={formData.status}
                         onChange={(e) => setFormData({...formData, status: e.target.value as Project['status']})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       >
                         {columns.map(col => (
                           <option key={col.id} value={col.id}>{col.name}</option>
@@ -342,7 +342,7 @@ export default function ProjectsPage() {
                         type="number" 
                         value={formData.budget}
                         onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       />
                     </div>
                     <div>
@@ -352,7 +352,7 @@ export default function ProjectsPage() {
                         type="number" 
                         value={formData.spent}
                         onChange={(e) => setFormData({...formData, spent: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       />
                     </div>
                     <div>
@@ -364,7 +364,7 @@ export default function ProjectsPage() {
                         max="100"
                         value={formData.liquidity}
                         onChange={(e) => setFormData({...formData, liquidity: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                       />
                     </div>
                     <div>
@@ -374,7 +374,7 @@ export default function ProjectsPage() {
                         type="text" 
                         value={formData.phase}
                         onChange={(e) => setFormData({...formData, phase: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Fase Estrutural"
                       />
                     </div>
@@ -385,7 +385,7 @@ export default function ProjectsPage() {
                         type="text" 
                         value={formData.location}
                         onChange={(e) => setFormData({...formData, location: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: São Paulo, SP"
                       />
                     </div>
