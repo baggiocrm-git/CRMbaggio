@@ -28,7 +28,7 @@ interface Project {
   balance: number;
   liquidity: number;
   location: string;
-  phase: string;
+  fase: string;
   created_at: string;
 }
 
@@ -42,6 +42,7 @@ const columns = [
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState({
@@ -52,19 +53,34 @@ export default function ProjectsPage() {
     spent: 0,
     liquidity: 0,
     location: '',
-    phase: '',
+    fase: '',
   });
 
   const fetchProjects = useCallback(async () => {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('projects')
+        .from('projetos')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setProjects(data || []);
+      
+      const mappedProjects = (data || []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        name: p.nome as string,
+        contract_id: p.id_contrato as string,
+        status: p.status as Project['status'],
+        budget: Number(p.orcamento),
+        spent: Number(p.gasto),
+        balance: Number(p.saldo),
+        liquidity: p.liquidez as number,
+        location: p.localizacao as string,
+        fase: p.fase as string,
+        created_at: p.created_at as string
+      }));
+
+      setProjects(mappedProjects);
     } catch (error) {
       console.error('Erro ao buscar projetos:', error);
     } finally {
@@ -73,6 +89,7 @@ export default function ProjectsPage() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
     fetchProjects();
   }, [fetchProjects]);
 
@@ -87,7 +104,7 @@ export default function ProjectsPage() {
         spent: project.spent,
         liquidity: project.liquidity,
         location: project.location,
-        phase: project.phase,
+        fase: project.fase,
       });
     } else {
       setEditingProject(null);
@@ -99,7 +116,7 @@ export default function ProjectsPage() {
         spent: 0,
         liquidity: 0,
         location: '',
-        phase: '',
+        fase: '',
       });
     }
     setIsModalOpen(true);
@@ -113,16 +130,27 @@ export default function ProjectsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        nome: formData.name,
+        id_contrato: formData.contract_id,
+        status: formData.status,
+        orcamento: formData.budget,
+        gasto: formData.spent,
+        liquidez: formData.liquidity,
+        localizacao: formData.location,
+        fase: formData.fase,
+      };
+
       if (editingProject) {
         const { error } = await supabase
-          .from('projects')
-          .update(formData)
+          .from('projetos')
+          .update(payload)
           .eq('id', editingProject.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('projects')
-          .insert([formData]);
+          .from('projetos')
+          .insert([payload]);
         if (error) throw error;
       }
       await fetchProjects();
@@ -137,7 +165,7 @@ export default function ProjectsPage() {
     if (confirm('Tem certeza que deseja excluir este projeto?')) {
       try {
         const { error } = await supabase
-          .from('projects')
+          .from('projetos')
           .delete()
           .eq('id', id);
         if (error) throw error;
@@ -220,7 +248,7 @@ export default function ProjectsPage() {
                             project.status === 'Atrasado' ? 'bg-rose-500/10 text-rose-600' :
                             'bg-emerald-500/10 text-emerald-600'
                           }`}>
-                            {project.phase}
+                            {project.fase}
                           </span>
                           <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={(e) => { e.stopPropagation(); handleOpenModal(project); }} className="p-1 hover:text-blue-600 transition-colors">
@@ -257,7 +285,7 @@ export default function ProjectsPage() {
                         <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                           <div className="flex flex-col">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Orçamento</span>
-                            <span className="text-xs font-black text-slate-900 dark:text-white">R${project.budget.toLocaleString()}</span>
+                            <span className="text-xs font-black text-slate-900 dark:text-white">R${isMounted ? project.budget.toLocaleString() : '...'}</span>
                           </div>
                           <div className="flex flex-col text-right">
                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Liquidez</span>
@@ -372,8 +400,8 @@ export default function ProjectsPage() {
                       <input 
                         required
                         type="text" 
-                        value={formData.phase}
-                        onChange={(e) => setFormData({...formData, phase: e.target.value})}
+                        value={formData.fase}
+                        onChange={(e) => setFormData({...formData, fase: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Fase Estrutural"
                       />

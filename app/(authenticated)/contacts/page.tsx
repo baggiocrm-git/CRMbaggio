@@ -59,12 +59,25 @@ export default function ContactsPage() {
     try {
       setIsLoading(true);
       const { data, error } = await supabase
-        .from('contacts')
+        .from('contatos')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContacts(data || []);
+      
+      const mappedContacts = (data || []).map((c: Record<string, unknown>) => ({
+        id: c.id as string,
+        company: c.empresa as string,
+        contact_person: c.pessoa_contato as string,
+        category: c.categoria as string,
+        status: c.status as string,
+        email: c.email as string,
+        phone: c.telefone as string,
+        initials: c.iniciais as string,
+        color: c.cor as string
+      }));
+
+      setContacts(mappedContacts);
     } catch (error) {
       console.error('Error fetching contacts:', error);
     } finally {
@@ -170,23 +183,29 @@ export default function ContactsPage() {
     const initials = formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
     
     try {
+      const payload = {
+        empresa: formData.company,
+        pessoa_contato: formData.contact_person,
+        categoria: formData.category,
+        status: formData.status,
+        email: formData.email,
+        telefone: formData.phone,
+        iniciais: initials
+      };
+
       if (editingContact) {
         const { error } = await supabase
-          .from('contacts')
-          .update({
-            ...formData,
-            initials
-          })
+          .from('contatos')
+          .update(payload)
           .eq('id', editingContact.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('contacts')
+          .from('contatos')
           .insert([{
-            ...formData,
-            initials,
-            color: 'bg-blue-100 text-blue-600' // Default color
+            ...payload,
+            cor: 'bg-blue-100 text-blue-600' // Default color
           }]);
 
         if (error) throw error;
@@ -204,7 +223,7 @@ export default function ContactsPage() {
     if (confirm('Tem certeza que deseja excluir este contato?')) {
       try {
         const { error } = await supabase
-          .from('contacts')
+          .from('contatos')
           .delete()
           .eq('id', id);
 

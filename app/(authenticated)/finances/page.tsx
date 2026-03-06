@@ -55,6 +55,7 @@ export default function FinancesPage() {
   const [finances, setFinances] = useState<FinanceRecord[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<FinanceRecord | null>(null);
   const [activeTab, setActiveTab] = useState('TODAS AS OPERAÇÕES');
@@ -76,15 +77,38 @@ export default function FinancesPage() {
     try {
       setIsLoading(true);
       const [finRes, projRes] = await Promise.all([
-        supabase.from('finances').select('*').order('due_date', { ascending: true }),
-        supabase.from('projects').select('*').order('created_at', { ascending: false })
+        supabase.from('financas').select('*').order('data_vencimento', { ascending: true }),
+        supabase.from('projetos').select('*').order('created_at', { ascending: false })
       ]);
 
       if (finRes.error) throw finRes.error;
       if (projRes.error) throw projRes.error;
 
-      setFinances(finRes.data || []);
-      setProjects(projRes.data || []);
+      // Map column names if necessary, but here we assume the select * returns the new names
+      // We need to map them back to the interface if they differ
+      const mappedFinances = (finRes.data || []).map((f: Record<string, unknown>) => ({
+        id: f.id as string,
+        title: f.titulo as string,
+        status: f.status as FinanceRecord['status'],
+        amount: Number(f.valor),
+        due_date: f.data_vencimento as string,
+        type: f.tipo as FinanceRecord['type'],
+        created_at: f.created_at as string
+      }));
+
+      const mappedProjects = (projRes.data || []).map((p: Record<string, unknown>) => ({
+        id: p.id as string,
+        name: p.nome as string,
+        contract_id: p.id_contrato as string,
+        status: p.status as string,
+        budget: Number(p.orcamento),
+        spent: Number(p.gasto),
+        balance: Number(p.saldo),
+        liquidity: p.liquidez as number
+      }));
+
+      setFinances(mappedFinances);
+      setProjects(mappedProjects);
       
       // Initialize date only on client side to avoid hydration mismatch
       setFormData(prev => ({
@@ -99,6 +123,7 @@ export default function FinancesPage() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
     fetchData();
   }, [fetchData]);
 
@@ -156,9 +181,9 @@ export default function FinancesPage() {
   };
 
   const stats = [
-    { label: 'Saldo Mensal Líquido', value: `R$${netBalance.toLocaleString()}`, change: '+12.5%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
-    { label: 'Contas a Pagar', value: `R$${totalOutflow.toLocaleString()}`, change: `${finances.filter(f => f.type === 'Despesa' && f.status !== 'Concluído').length} Contas a Vencer`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-500/10' },
-    { label: 'Contas a Receber', value: `R$${totalInflow.toLocaleString()}`, change: `${finances.filter(f => f.type === 'Receita' && f.status !== 'Concluído').length} Pendentes`, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'Saldo Mensal Líquido', value: `R$${isMounted ? netBalance.toLocaleString() : '...' }`, change: '+12.5%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
+    { label: 'Contas a Pagar', value: `R$${isMounted ? totalOutflow.toLocaleString() : '...' }`, change: `${finances.filter(f => f.type === 'Despesa' && f.status !== 'Concluído').length} Contas a Vencer`, icon: TrendingDown, color: 'text-rose-500', bg: 'bg-rose-500/10' },
+    { label: 'Contas a Receber', value: `R$${isMounted ? totalInflow.toLocaleString() : '...' }`, change: `${finances.filter(f => f.type === 'Receita' && f.status !== 'Concluído').length} Pendentes`, icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
 
   const handleOpenModal = (record?: FinanceRecord) => {
@@ -192,16 +217,27 @@ export default function FinancesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        titulo: formData.title,
+        status: formData.status,
+        valor: formData.amount,
+        data_vencimento: formData.due_date,
+        tipo: formData.type,
+        nome_icone: formData.type === 'Receita' ? 'TrendingUp' : 'TrendingDown',
+        classe_cor: formData.type === 'Receita' ? 'text-emerald-500' : 'text-rose-500',
+        classe_fundo: formData.type === 'Receita' ? 'bg-emerald-500/10' : 'bg-rose-500/10'
+      };
+
       if (editingRecord) {
         const { error } = await supabase
-          .from('finances')
-          .update(formData)
+          .from('financas')
+          .update(payload)
           .eq('id', editingRecord.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('finances')
-          .insert([formData]);
+          .from('financas')
+          .insert([payload]);
         if (error) throw error;
       }
       await fetchData();
@@ -216,7 +252,7 @@ export default function FinancesPage() {
     if (confirm('Tem certeza que deseja excluir esta transação?')) {
       try {
         const { error } = await supabase
-          .from('finances')
+          .from('financas')
           .delete()
           .eq('id', id);
         if (error) throw error;
@@ -360,14 +396,14 @@ export default function FinancesPage() {
                   <div className="size-3 rounded-full bg-blue-600"></div>
                   <div>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Entrada Total</p>
-                    <p className="text-sm font-black text-slate-900 dark:text-white">R${totalInflow.toLocaleString()}</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">R${isMounted ? totalInflow.toLocaleString() : '...'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="size-3 rounded-full bg-rose-500/50"></div>
                   <div>
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Saída Total</p>
-                    <p className="text-sm font-black text-slate-900 dark:text-white">R${totalOutflow.toLocaleString()}</p>
+                    <p className="text-sm font-black text-slate-900 dark:text-white">R${isMounted ? totalOutflow.toLocaleString() : '...'}</p>
                   </div>
                 </div>
               </div>
@@ -404,14 +440,14 @@ export default function FinancesPage() {
                           <div>
                             <p className="text-sm font-black text-slate-900 dark:text-white tracking-tight">{op.title}</p>
                             <p className={`text-[10px] font-bold ${op.status === 'Crítico' ? 'text-rose-500' : 'text-slate-500'} uppercase tracking-tighter`}>
-                              {op.type} • Vencimento {new Date(op.due_date).toLocaleDateString()}
+                              {op.type} • Vencimento {isMounted ? new Date(op.due_date).toLocaleDateString() : ''}
                             </p>
                           </div>
                         </div>
                         <div className="text-right flex items-center gap-4">
                           <div>
                             <p className={`text-sm font-black ${op.type === 'Receita' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                              {op.type === 'Receita' ? '+' : '-'} R${op.amount.toLocaleString()}
+                              {op.type === 'Receita' ? '+' : '-'} R${isMounted ? op.amount.toLocaleString() : '...'}
                             </p>
                             <span className={`text-[10px] font-black uppercase tracking-widest ${
                               op.status === 'Concluído' ? 'text-emerald-500' : 
@@ -501,9 +537,9 @@ export default function FinancesPage() {
                             {p.status}
                           </span>
                         </td>
-                        <td className="px-6 py-5 text-sm font-bold text-slate-900 dark:text-white">R${p.budget.toLocaleString()}</td>
-                        <td className="px-6 py-5 text-sm font-bold text-slate-500">R${p.spent.toLocaleString()}</td>
-                        <td className={`px-6 py-5 text-sm font-black ${p.balance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R${p.balance.toLocaleString()}</td>
+                        <td className="px-6 py-5 text-sm font-bold text-slate-900 dark:text-white">R${isMounted ? p.budget.toLocaleString() : '...'}</td>
+                        <td className="px-6 py-5 text-sm font-bold text-slate-500">R${isMounted ? p.spent.toLocaleString() : '...'}</td>
+                        <td className={`px-6 py-5 text-sm font-black ${p.balance < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R${isMounted ? p.balance.toLocaleString() : '...'}</td>
                         <td className="px-6 py-5 text-right">
                           <div className="flex items-center justify-end gap-3">
                             <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">

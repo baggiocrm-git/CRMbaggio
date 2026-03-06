@@ -52,6 +52,7 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState({
@@ -67,8 +68,8 @@ export default function StaffPage() {
     try {
       setIsLoading(true);
       const [staffRes, docsRes] = await Promise.all([
-        supabase.from('staff').select('*').order('created_at', { ascending: false }),
-        supabase.from('documents').select('*').order('created_at', { ascending: false })
+        supabase.from('equipe').select('*').order('created_at', { ascending: false }),
+        supabase.from('documentos').select('*').order('created_at', { ascending: false })
       ]);
 
       if (staffRes.error) throw staffRes.error;
@@ -84,6 +85,7 @@ export default function StaffPage() {
   }, []);
 
   useEffect(() => {
+    setIsMounted(true);
     fetchData();
   }, [fetchData]);
 
@@ -128,14 +130,28 @@ export default function StaffPage() {
     try {
       if (editingMember) {
         const { error } = await supabase
-          .from('staff')
-          .update(formData)
+          .from('equipe')
+          .update({
+            nome: formData.name,
+            id_funcionario: formData.emp_id,
+            cargo: formData.role,
+            departamento: formData.department,
+            status: formData.status,
+            url_imagem: formData.img_url
+          })
           .eq('id', editingMember.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from('staff')
-          .insert([formData]);
+          .from('equipe')
+          .insert([{
+            nome: formData.name,
+            id_funcionario: formData.emp_id,
+            cargo: formData.role,
+            departamento: formData.department,
+            status: formData.status,
+            url_imagem: formData.img_url
+          }]);
         if (error) throw error;
       }
       await fetchData();
@@ -150,7 +166,7 @@ export default function StaffPage() {
     if (confirm('Tem certeza que deseja excluir este membro da equipe?')) {
       try {
         const { error } = await supabase
-          .from('staff')
+          .from('equipe')
           .delete()
           .eq('id', id);
         if (error) throw error;
@@ -308,7 +324,9 @@ export default function StaffPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{doc.name}</p>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{doc.file_type} • {doc.file_size} • Atualizado {new Date(doc.created_at).toLocaleDateString()}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                              {doc.file_type} • {doc.file_size} • Atualizado {isMounted ? new Date(doc.created_at).toLocaleDateString() : ''}
+                            </p>
                           </div>
                           <Download size={16} className="text-slate-400 group-hover:text-blue-600 transition-colors" />
                         </div>
