@@ -17,7 +17,9 @@ import {
   X,
   Trash2,
   Edit2,
-  Loader2
+  Loader2,
+  Upload,
+  FileText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -43,6 +45,7 @@ export default function ContactsPage() {
   const [categoryFilter, setCategoryFilter] = useState('TODOS');
   const [regionFilter, setRegionFilter] = useState('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -130,8 +133,7 @@ export default function ContactsPage() {
       activeTab === 'TODOS OS CONTATOS' || 
       (activeTab === 'CLIENTES' && contact.category === 'Cliente') ||
       (activeTab === 'FORNECEDORES' && contact.category === 'Fornecedor') ||
-      (activeTab === 'PARCEIROS' && contact.category === 'Parceiro') ||
-      (activeTab === 'ARQUIVADOS' && contact.status === 'Arquivado');
+      (activeTab === 'DIVERSOS' && contact.category === 'Diversos');
 
     const matchesStatus = statusFilter === 'TODOS' || contact.status.toUpperCase() === statusFilter;
     const matchesCategory = categoryFilter === 'TODOS' || contact.category.toUpperCase() === categoryFilter;
@@ -176,6 +178,95 @@ export default function ContactsPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['Empresa', 'Pessoa de Contato', 'Categoria', 'Status', 'E-mail', 'Telefone'];
+    const content = headers.join(',');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'modelo_importacao_contatos.txt');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim() !== '');
+        
+        if (lines.length <= 1) {
+          alert('O arquivo está vazio ou contém apenas o cabeçalho.');
+          setIsImporting(false);
+          return;
+        }
+
+        // Detectar delimitador (vírgula ou ponto e vírgula)
+        const firstLine = lines[0];
+        const delimiter = firstLine.includes(';') ? ';' : ',';
+
+        // Skip header
+        const dataLines = lines.slice(1);
+        const newContacts = dataLines.map((line, index) => {
+          const parts = line.split(delimiter).map(s => s.trim().replace(/^"|"$/g, ''));
+          const [company, contact_person, category, status, email, phone] = parts;
+          
+          if (!company) {
+            console.warn(`Linha ${index + 2} ignorada: Nome da empresa não encontrado.`);
+            return null;
+          }
+
+          const initials = company
+            .split(' ')
+            .filter(word => word.length > 0)
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .slice(0, 2) || company.slice(0, 2).toUpperCase() || '??';
+
+          return {
+            empresa: company,
+            pessoa_contato: contact_person || '',
+            categoria: category || 'Diversos',
+            status: status || 'Ativo',
+            email: email || '',
+            telefone: phone || '',
+            iniciais: initials,
+            cor: 'bg-blue-100 text-blue-600'
+          };
+        }).filter(Boolean);
+
+        if (newContacts.length > 0) {
+          const { error } = await supabase.from('contatos').insert(newContacts);
+          if (error) throw error;
+          alert(`${newContacts.length} contatos importados com sucesso!`);
+          await fetchContacts();
+        } else {
+          alert('Nenhum contato válido encontrado para importação.');
+        }
+      } catch (err: unknown) {
+        console.error('Erro detalhado na importação:', err);
+        const errorMessage = err instanceof Error ? err.message : 
+                           (err as { message?: string })?.message || 
+                           (err as { details?: string })?.details || 
+                           'Erro desconhecido';
+        alert(`Erro ao importar arquivo: ${errorMessage}. Verifique se o formato está correto.`);
+      } finally {
+        setIsImporting(false);
+        e.target.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -249,7 +340,7 @@ export default function ContactsPage() {
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
           {/* Tabs */}
           <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-8 overflow-x-auto">
-            {['TODOS OS CONTATOS', 'CLIENTES', 'FORNECEDORES', 'PARCEIROS', 'ARQUIVADOS'].map((tab) => (
+            {['TODOS OS CONTATOS', 'CLIENTES', 'FORNECEDORES', 'DIVERSOS'].map((tab) => (
               <button 
                 key={tab}
                 onClick={() => {
@@ -280,7 +371,7 @@ export default function ContactsPage() {
             </div>
             <div className="relative group">
               <button 
-                onClick={() => setCategoryFilter(categoryFilter === 'TODOS' ? 'CLIENTE' : categoryFilter === 'CLIENTE' ? 'FORNECEDOR' : categoryFilter === 'FORNECEDOR' ? 'PARCEIRO' : 'TODOS')}
+                onClick={() => setCategoryFilter(categoryFilter === 'TODOS' ? 'CLIENTE' : categoryFilter === 'CLIENTE' ? 'FORNECEDOR' : categoryFilter === 'FORNECEDOR' ? 'DIVERSOS' : 'TODOS')}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
               >
                 Categoria: {categoryFilter}
@@ -297,6 +388,19 @@ export default function ContactsPage() {
               </button>
             </div>
             <div className="ml-auto flex items-center gap-4">
+              <button 
+                onClick={handleDownloadTemplate}
+                title="Baixar Modelo de Importação (.txt)"
+                className="p-2 text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-2"
+              >
+                <FileText size={20} />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Modelo</span>
+              </button>
+              <label className="p-2 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer flex items-center gap-2">
+                {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Importar</span>
+                <input type="file" accept=".txt,.csv" onChange={handleImport} className="hidden" disabled={isImporting} />
+              </label>
               <button className="p-2 text-slate-500 hover:text-blue-600 transition-colors">
                 <Filter size={20} />
               </button>
@@ -359,7 +463,7 @@ export default function ContactsPage() {
                             contact.category === 'Fornecedor' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
                             'bg-purple-600/10 text-purple-600'
                           }`}>
-                            {contact.category}
+                            {contact.category === 'Parceiro' ? 'Diversos' : contact.category}
                           </span>
                         </td>
                         <td className="px-6 py-5">
@@ -527,7 +631,7 @@ export default function ContactsPage() {
                       >
                         <option value="Cliente">Cliente</option>
                         <option value="Fornecedor">Fornecedor</option>
-                        <option value="Parceiro">Parceiro</option>
+                        <option value="Diversos">Diversos</option>
                       </select>
                     </div>
                     <div>
@@ -540,13 +644,11 @@ export default function ContactsPage() {
                         <option value="Ativo">Ativo</option>
                         <option value="Pendente">Pendente</option>
                         <option value="Inativo">Inativo</option>
-                        <option value="Arquivado">Arquivado</option>
                       </select>
                     </div>
                     <div>
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
                       <input 
-                        required
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -557,7 +659,6 @@ export default function ContactsPage() {
                     <div>
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Número de Telefone</label>
                       <input 
-                        required
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}

@@ -12,8 +12,8 @@ export const metadata: Metadata = {
 // Root layout for the BuildFlow CRM application
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
-    <html lang="pt-BR" className="dark">
-      <body className={inter.className} suppressHydrationWarning>
+    <html lang="pt-BR" className="dark" suppressHydrationWarning>
+      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         {children}
       </body>
     </html>
