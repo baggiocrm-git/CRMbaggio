@@ -29,6 +29,7 @@ interface Contact {
   category: string;
   email: string;
   phone: string;
+  cellphone: string;
   info: string;
   initials: string;
   color: string;
@@ -52,6 +53,7 @@ export default function ContactsPage() {
     category: 'Cliente',
     email: '',
     phone: '',
+    cellphone: '',
     info: '',
   });
 
@@ -61,7 +63,7 @@ export default function ContactsPage() {
       const { data, error } = await supabase
         .from('contatos')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('nome', { ascending: true });
 
       if (error) throw error;
       
@@ -85,6 +87,7 @@ export default function ContactsPage() {
           category: (c.categoria || '') as string,
           email: (c.email || '') as string,
           phone: (c.telefone || '') as string,
+          cellphone: (c.celular || '') as string,
           info: (c.notas || '') as string,
           initials: initials,
           color: 'bg-blue-100 text-blue-600'
@@ -118,6 +121,7 @@ export default function ContactsPage() {
         category: contact.category,
         email: contact.email,
         phone: contact.phone,
+        cellphone: contact.cellphone,
         info: contact.info,
       });
     } else {
@@ -128,6 +132,7 @@ export default function ContactsPage() {
         category: 'Cliente',
         email: '',
         phone: '',
+        cellphone: '',
         info: '',
       });
     }
@@ -161,6 +166,21 @@ export default function ContactsPage() {
     }
 
     return matchesCategory && matchesSearch;
+  }).sort((a, b) => {
+    let fieldA = a.name.toLowerCase();
+    let fieldB = b.name.toLowerCase();
+
+    if (filterType === 'EMPRESA') {
+      fieldA = (a.company || a.name).toLowerCase();
+      fieldB = (b.company || b.name).toLowerCase();
+    } else if (filterType === 'TELEFONE') {
+      fieldA = a.phone.toLowerCase();
+      fieldB = b.phone.toLowerCase();
+    }
+
+    if (fieldA < fieldB) return -1;
+    if (fieldA > fieldB) return 1;
+    return 0;
   });
 
   const paginatedContacts = filteredContacts.slice(
@@ -171,13 +191,14 @@ export default function ContactsPage() {
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
 
   const handleDownload = () => {
-    const headers = ['Empresa', 'Nome', 'Telefone', 'E-mail', 'Categoria', 'Notas'];
+    const headers = ['Empresa', 'Nome', 'Telefone', 'Celular', 'E-mail', 'Categoria', 'Notas'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(c => [
         `"${c.company}"`,
         `"${c.name}"`,
         `"${c.phone}"`,
+        `"${c.cellphone}"`,
         `"${c.email}"`,
         `"${c.category}"`,
         `"${c.info}"`
@@ -196,7 +217,7 @@ export default function ContactsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Nome', 'Empresa', 'Telefone', 'E-mail', 'Categoria', 'Notas'];
+    const headers = ['Nome', 'Empresa', 'Telefone', 'Celular', 'E-mail', 'Categoria', 'Notas'];
     const content = headers.join(',');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement('a');
@@ -239,7 +260,7 @@ export default function ContactsPage() {
           const regex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
           const parts = line.split(regex).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
           
-          const [name, company, phone, email, category, info] = parts;
+          const [name, company, phone, cellphone, email, category, info] = parts;
           
           if (!name && !company) {
             console.warn(`Linha ${index + 2} ignorada: Nome ou Empresa não encontrado.`);
@@ -256,6 +277,7 @@ export default function ContactsPage() {
             nome: contactName,
             empresa: contactCompany,
             telefone: phone || '',
+            celular: cellphone || '',
             email: email || '',
             categoria: finalCategory,
             notas: info || ''
@@ -299,6 +321,7 @@ export default function ContactsPage() {
         nome: formData.name,
         empresa: formData.company,
         telefone: formData.phone,
+        celular: formData.cellphone,
         email: formData.email,
         categoria: formData.category,
         notas: formData.info
@@ -467,7 +490,7 @@ export default function ContactsPage() {
                         <td className="px-6 py-5">
                           <div className="text-xs font-bold">
                             <p className="text-slate-700 dark:text-slate-300">{contact.email}</p>
-                            <p className="text-slate-400 mt-0.5">{contact.phone}</p>
+                            <p className="text-slate-400 mt-0.5">{contact.phone}{contact.cellphone ? ` / ${contact.cellphone}` : ''}</p>
                           </div>
                         </td>
                         <td className="px-6 py-5">
@@ -489,11 +512,11 @@ export default function ContactsPage() {
                             </a>
                             <button 
                               onClick={() => {
-                                const cleanPhone = contact.phone.replace(/\D/g, '');
+                                const cleanPhone = (contact.cellphone || contact.phone).replace(/\D/g, '');
                                 if (cleanPhone) {
                                   window.open(`https://wa.me/${cleanPhone}`, '_blank');
                                 } else {
-                                  alert('Telefone não cadastrado ou inválido.');
+                                  alert('Telefone/Celular não cadastrado ou inválido.');
                                 }
                               }}
                               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-600/10 hover:text-emerald-600 transition-all"
@@ -502,13 +525,13 @@ export default function ContactsPage() {
                               <Phone size={18} />
                             </button>
                             <a 
-                              href={contact.phone ? `sms:${contact.phone}` : '#'}
+                              href={contact.cellphone || contact.phone ? `sms:${contact.cellphone || contact.phone}` : '#'}
                               target="_blank"
                               rel="noopener noreferrer"
                               onClick={(e) => {
-                                if (!contact.phone) {
+                                if (!contact.cellphone && !contact.phone) {
                                   e.preventDefault();
-                                  alert('Telefone não cadastrado.');
+                                  alert('Telefone/Celular não cadastrado.');
                                 }
                               }}
                               className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all"
@@ -644,7 +667,7 @@ export default function ContactsPage() {
                         placeholder="ex: Acme Construções"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1">
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Categoria</label>
                       <select 
                         value={formData.category}
@@ -656,7 +679,17 @@ export default function ContactsPage() {
                         <option value="Diversos">Diversos</option>
                       </select>
                     </div>
-                    <div>
+                    <div className="col-span-1">
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Número de Telefone</label>
+                      <input 
+                        type="text" 
+                        value={formData.phone}
+                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div className="col-span-1">
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
                       <input 
                         type="email" 
@@ -666,12 +699,12 @@ export default function ContactsPage() {
                         placeholder="contato@empresa.com.br"
                       />
                     </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Número de Telefone</label>
+                    <div className="col-span-1">
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5 text-blue-600">Celular</label>
                       <input 
                         type="text" 
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        value={formData.cellphone}
+                        onChange={(e) => setFormData({...formData, cellphone: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="(11) 99999-9999"
                       />
