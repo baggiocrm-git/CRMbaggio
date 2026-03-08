@@ -82,7 +82,7 @@ export default function ProjectsPage() {
 
       setProjects(mappedProjects);
     } catch (error) {
-      console.error('Erro ao buscar projetos:', error);
+      console.error('Erro ao buscar projetos:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +156,7 @@ export default function ProjectsPage() {
       await fetchProjects();
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar projeto:', error);
+      console.error('Erro ao salvar projeto:', error instanceof Error ? error.message : String(error));
       alert('Falha ao salvar projeto.');
     }
   };
@@ -171,7 +171,7 @@ export default function ProjectsPage() {
         if (error) throw error;
         await fetchProjects();
       } catch (error) {
-        console.error('Erro ao excluir projeto:', error);
+        console.error('Erro ao excluir projeto:', error instanceof Error ? error.message : String(error));
         alert('Falha ao excluir projeto.');
       }
     }

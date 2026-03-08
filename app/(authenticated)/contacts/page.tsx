@@ -8,7 +8,6 @@ import {
   Phone, 
   MessageSquare, 
   Download, 
-  Filter, 
   ChevronLeft, 
   ChevronRight,
   Truck,
@@ -28,7 +27,6 @@ interface Contact {
   company: string;
   name: string;
   category: string;
-  status: string;
   email: string;
   phone: string;
   info: string;
@@ -41,11 +39,9 @@ export default function ContactsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [activeTab, setActiveTab] = useState('TODOS OS CONTATOS');
-  const [statusFilter, setStatusFilter] = useState('ATIVO');
-  const [categoryFilter, setCategoryFilter] = useState('TODOS');
-  const [regionFilter, setRegionFilter] = useState('TODOS');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState<'TODOS' | 'NOME' | 'EMPRESA' | 'TELEFONE'>('TODOS');
+  const [categoryFilter, setCategoryFilter] = useState('TODOS');
   const [isImporting, setIsImporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -54,7 +50,6 @@ export default function ContactsPage() {
     company: '',
     name: '',
     category: 'Cliente',
-    status: 'Ativo',
     email: '',
     phone: '',
     info: '',
@@ -71,11 +66,11 @@ export default function ContactsPage() {
       if (error) throw error;
       
       const mappedContacts = (data || []).map((c: Record<string, unknown>) => {
-        const name = (c.pessoa_contato || '') as string;
+        const name = (c.nome || '') as string;
         const company = (c.empresa || '') as string;
         
-        // Generate initials on the fly if not present in DB
-        const initials = (c.iniciais as string) || (name || company || '??')
+        // Generate initials on the fly
+        const initials = (name || company || '??')
           .split(' ')
           .filter(word => word.length > 0)
           .map(n => n[0])
@@ -88,18 +83,17 @@ export default function ContactsPage() {
           company: company,
           name: name,
           category: (c.categoria || '') as string,
-          status: (c.status || 'Ativo') as string,
           email: (c.email || '') as string,
           phone: (c.telefone || '') as string,
-          info: (c.info || '') as string,
+          info: (c.notas || '') as string,
           initials: initials,
-          color: (c.cor as string) || 'bg-blue-100 text-blue-600'
+          color: 'bg-blue-100 text-blue-600'
         };
       });
 
       setContacts(mappedContacts);
     } catch (error) {
-      console.error('Error fetching contacts:', error);
+      console.error('Error fetching contacts:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +105,7 @@ export default function ContactsPage() {
 
   const stats = [
     { label: 'Total de Clientes', value: contacts.filter(c => c.category === 'Cliente').length.toString(), icon: UserCheck, color: 'text-blue-600', bg: 'bg-blue-600/10' },
-    { label: 'Fornecedores Ativos', value: contacts.filter(c => c.category === 'Fornecedor' && c.status === 'Ativo').length.toString(), icon: Truck, color: 'text-amber-600', bg: 'bg-amber-600/10' },
+    { label: 'Fornecedores', value: contacts.filter(c => c.category === 'Fornecedor').length.toString(), icon: Truck, color: 'text-amber-600', bg: 'bg-amber-600/10' },
     { label: 'Total de Contatos', value: contacts.length.toString(), icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-600/10' },
   ];
 
@@ -122,7 +116,6 @@ export default function ContactsPage() {
         company: contact.company,
         name: contact.name,
         category: contact.category,
-        status: contact.status,
         email: contact.email,
         phone: contact.phone,
         info: contact.info,
@@ -133,7 +126,6 @@ export default function ContactsPage() {
         company: '',
         name: '',
         category: 'Cliente',
-        status: 'Ativo',
         email: '',
         phone: '',
         info: '',
@@ -148,23 +140,27 @@ export default function ContactsPage() {
   };
 
   const filteredContacts = contacts.filter(contact => {
-    const matchesTab = 
-      activeTab === 'TODOS OS CONTATOS' || 
-      (activeTab === 'CLIENTES' && contact.category === 'Cliente') ||
-      (activeTab === 'FORNECEDORES' && contact.category === 'Fornecedor') ||
-      (activeTab === 'DIVERSOS' && contact.category === 'Diversos');
+    const matchesCategory = categoryFilter === 'TODOS' || contact.category.toUpperCase() === categoryFilter.toUpperCase();
 
-    const matchesStatus = statusFilter === 'TODOS' || contact.status.toUpperCase() === statusFilter;
-    const matchesCategory = categoryFilter === 'TODOS' || contact.category.toUpperCase() === categoryFilter;
-    // Region is not in the schema yet, so we ignore it for now or assume it matches if 'ALL'
-    const matchesRegion = regionFilter === 'TODOS';
+    let matchesSearch = true;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (filterType === 'TODOS') {
+        matchesSearch = 
+          contact.company.toLowerCase().includes(query) ||
+          contact.name.toLowerCase().includes(query) ||
+          contact.phone.toLowerCase().includes(query) ||
+          contact.email.toLowerCase().includes(query);
+      } else if (filterType === 'NOME') {
+        matchesSearch = contact.name.toLowerCase().includes(query);
+      } else if (filterType === 'EMPRESA') {
+        matchesSearch = contact.company.toLowerCase().includes(query);
+      } else if (filterType === 'TELEFONE') {
+        matchesSearch = contact.phone.toLowerCase().includes(query);
+      }
+    }
 
-    const matchesSearch = 
-      contact.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchQuery.toLowerCase());
-
-    return matchesTab && matchesStatus && matchesCategory && matchesRegion && matchesSearch;
+    return matchesCategory && matchesSearch;
   });
 
   const paginatedContacts = filteredContacts.slice(
@@ -175,7 +171,7 @@ export default function ContactsPage() {
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
 
   const handleDownload = () => {
-    const headers = ['Empresa', 'Nome', 'Telefone', 'E-mail', 'Categoria', 'Info', 'Status'];
+    const headers = ['Empresa', 'Nome', 'Telefone', 'E-mail', 'Categoria', 'Notas'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(c => [
@@ -184,8 +180,7 @@ export default function ContactsPage() {
         `"${c.phone}"`,
         `"${c.email}"`,
         `"${c.category}"`,
-        `"${c.info}"`,
-        `"${c.status}"`
+        `"${c.info}"`
       ].join(','))
     ].join('\n');
 
@@ -201,7 +196,7 @@ export default function ContactsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Nome', 'Empresa', 'Telefone', 'E-mail', 'Categoria', 'Info'];
+    const headers = ['Nome', 'Empresa', 'Telefone', 'E-mail', 'Categoria', 'Notas'];
     const content = headers.join(',');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement('a');
@@ -254,34 +249,23 @@ export default function ContactsPage() {
           const contactName = name || '';
           const contactCompany = company || '';
           
-          const initials = (contactName || contactCompany || '??')
-            .split(' ')
-            .filter(word => word.length > 0)
-            .map(n => n[0])
-            .join('')
-            .toUpperCase()
-            .slice(0, 2);
-
           const validCategories = ['Cliente', 'Fornecedor', 'Parceiro'];
           const finalCategory = validCategories.includes(category) ? category : 'Cliente';
 
           return {
-            pessoa_contato: contactName,
+            nome: contactName,
             empresa: contactCompany,
             telefone: phone || '',
             email: email || '',
             categoria: finalCategory,
-            info: info || '',
-            status: 'Ativo',
-            iniciais: initials,
-            cor: 'bg-blue-100 text-blue-600'
+            notas: info || ''
           };
         }).filter(Boolean);
 
         if (newContacts.length > 0) {
           const { error } = await supabase.from('contatos').insert(newContacts);
           if (error) {
-            console.error('Erro do Supabase na inserção:', error.message || error);
+            console.error('Erro do Supabase na inserção:', error instanceof Error ? error.message : String(error));
             throw error;
           }
           alert(`${newContacts.length} contatos importados com sucesso!`);
@@ -311,24 +295,13 @@ export default function ContactsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const initials = (formData.name || formData.company || '??')
-        .split(' ')
-        .filter(word => word.length > 0)
-        .map(n => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-
       const payload = {
-        pessoa_contato: formData.name,
+        nome: formData.name,
         empresa: formData.company,
         telefone: formData.phone,
         email: formData.email,
         categoria: formData.category,
-        info: formData.info,
-        status: formData.status,
-        iniciais: initials,
-        cor: editingContact?.color || 'bg-blue-100 text-blue-600'
+        notas: formData.info
       };
 
       if (editingContact) {
@@ -349,13 +322,13 @@ export default function ContactsPage() {
       await fetchContacts();
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar contato:', error);
+      console.error('Erro ao salvar contato:', error instanceof Error ? error.message : String(error));
       alert('Falha ao salvar contato. Por favor, verifique sua configuração do Supabase.');
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este contato?')) {
+    if (window.confirm('Tem certeza que deseja excluir este contato? Esta ação não pode ser desfeita.')) {
       try {
         const { error } = await supabase
           .from('contatos')
@@ -363,10 +336,13 @@ export default function ContactsPage() {
           .eq('id', id);
 
         if (error) throw error;
-        await fetchContacts();
+        
+        // Update local state immediately for better UX
+        setContacts(prev => prev.filter(c => c.id !== id));
+        alert('Contato excluído com sucesso.');
       } catch (error) {
-        console.error('Erro ao excluir contato:', error);
-        alert('Falha ao excluir contato.');
+        console.error('Erro ao excluir contato:', error instanceof Error ? error.message : String(error));
+        alert('Falha ao excluir contato. Verifique se você tem permissão para esta ação.');
       }
     }
   };
@@ -382,55 +358,36 @@ export default function ContactsPage() {
         />
 
         <div className="flex-1 overflow-y-auto p-8 space-y-8">
-          {/* Tabs */}
-          <div className="border-b border-slate-200 dark:border-slate-800 flex items-center gap-8 overflow-x-auto">
-            {['TODOS OS CONTATOS', 'CLIENTES', 'FORNECEDORES', 'DIVERSOS'].map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => {
-                  setActiveTab(tab);
-                  setCurrentPage(1);
-                }}
-                className={`pb-4 border-b-2 font-black text-sm uppercase tracking-widest transition-all ${
-                  activeTab === tab 
-                    ? 'border-blue-600 text-blue-600' 
-                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
           {/* Filters */}
           <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative group">
-              <button 
-                onClick={() => setStatusFilter(statusFilter === 'ATIVO' ? 'TODOS' : 'ATIVO')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtrar por:</span>
+              <select 
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as 'TODOS' | 'NOME' | 'EMPRESA' | 'TELEFONE')}
+                className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
               >
-                Status: {statusFilter}
-                <ChevronRight size={14} className="rotate-90" />
-              </button>
+                <option value="TODOS">Todos os Campos</option>
+                <option value="NOME">Nome</option>
+                <option value="EMPRESA">Empresa</option>
+                <option value="TELEFONE">Telefone</option>
+              </select>
             </div>
-            <div className="relative group">
-              <button 
-                onClick={() => setCategoryFilter(categoryFilter === 'TODOS' ? 'CLIENTE' : categoryFilter === 'CLIENTE' ? 'FORNECEDOR' : categoryFilter === 'FORNECEDOR' ? 'DIVERSOS' : 'TODOS')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+
+            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Categoria:</span>
+              <select 
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
               >
-                Categoria: {categoryFilter}
-                <ChevronRight size={14} className="rotate-90" />
-              </button>
+                <option value="TODOS">Todas</option>
+                <option value="CLIENTE">Clientes</option>
+                <option value="FORNECEDOR">Fornecedores</option>
+                <option value="DIVERSOS">Diversos</option>
+              </select>
             </div>
-            <div className="relative group">
-              <button 
-                onClick={() => setRegionFilter(regionFilter === 'TODOS' ? 'BRASIL' : 'TODOS')}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-              >
-                Região: {regionFilter}
-                <ChevronRight size={14} className="rotate-90" />
-              </button>
-            </div>
+
             <div className="ml-auto flex items-center gap-4">
               <button 
                 onClick={handleDownloadTemplate}
@@ -445,12 +402,10 @@ export default function ContactsPage() {
                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Importar</span>
                 <input type="file" accept=".txt,.csv" onChange={handleImport} className="hidden" disabled={isImporting} />
               </label>
-              <button className="p-2 text-slate-500 hover:text-blue-600 transition-colors">
-                <Filter size={20} />
-              </button>
               <button 
                 onClick={handleDownload}
                 className="p-2 text-slate-500 hover:text-blue-600 transition-colors"
+                title="Exportar CSV"
               >
                 <Download size={20} />
               </button>
@@ -465,7 +420,6 @@ export default function ContactsPage() {
                   <tr className="bg-slate-50 dark:bg-slate-800/50">
                     <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Empresa / Contato</th>
                     <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Categoria</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Status</th>
                     <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Detalhes de Contato</th>
                     <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Ações Rápidas</th>
                     <th className="px-6 py-4 text-right"></th>
@@ -511,18 +465,6 @@ export default function ContactsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="flex items-center gap-2">
-                            <span className={`size-2 rounded-full ${
-                              contact.status === 'Ativo' ? 'bg-emerald-500' : 
-                              contact.status === 'Pendente' ? 'bg-amber-500' : 'bg-slate-400'
-                            }`}></span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${
-                              contact.status === 'Ativo' ? 'text-emerald-600' : 
-                              contact.status === 'Pendente' ? 'text-amber-600' : 'text-slate-500'
-                            }`}>{contact.status}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
                           <div className="text-xs font-bold">
                             <p className="text-slate-700 dark:text-slate-300">{contact.email}</p>
                             <p className="text-slate-400 mt-0.5">{contact.phone}</p>
@@ -530,28 +472,65 @@ export default function ContactsPage() {
                         </td>
                         <td className="px-6 py-5">
                           <div className="flex gap-2">
-                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                            <a 
+                              href={contact.email ? `mailto:${contact.email}` : '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                if (!contact.email) {
+                                  e.preventDefault();
+                                  alert('E-mail não cadastrado.');
+                                }
+                              }}
+                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all"
+                              title="Enviar E-mail"
+                            >
                               <Mail size={18} />
-                            </button>
-                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                            </a>
+                            <button 
+                              onClick={() => {
+                                const cleanPhone = contact.phone.replace(/\D/g, '');
+                                if (cleanPhone) {
+                                  window.open(`https://wa.me/${cleanPhone}`, '_blank');
+                                } else {
+                                  alert('Telefone não cadastrado ou inválido.');
+                                }
+                              }}
+                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-600/10 hover:text-emerald-600 transition-all"
+                              title="WhatsApp Web"
+                            >
                               <Phone size={18} />
                             </button>
-                            <button className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all">
+                            <a 
+                              href={contact.phone ? `sms:${contact.phone}` : '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => {
+                                if (!contact.phone) {
+                                  e.preventDefault();
+                                  alert('Telefone não cadastrado.');
+                                }
+                              }}
+                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all"
+                              title="Enviar SMS"
+                            >
                               <MessageSquare size={18} />
-                            </button>
+                            </a>
                           </div>
                         </td>
                         <td className="px-6 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                             <button 
                               onClick={() => handleOpenModal(contact)}
                               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-all"
+                              title="Editar"
                             >
                               <Edit2 size={16} />
                             </button>
                             <button 
                               onClick={() => handleDelete(contact.id)}
                               className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-500 hover:text-rose-600 transition-all"
+                              title="Excluir"
                             >
                               <Trash2 size={16} />
                             </button>
@@ -651,22 +630,21 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: João Silva"
                       />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Empresa</label>
                       <input 
-                        required
                         type="text" 
                         value={formData.company}
                         onChange={(e) => setFormData({...formData, company: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Acme Construções"
                       />
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Categoria</label>
                       <select 
                         value={formData.category}
@@ -679,24 +657,12 @@ export default function ContactsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Status</label>
-                      <select 
-                        value={formData.status}
-                        onChange={(e) => setFormData({...formData, status: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      >
-                        <option value="Ativo">Ativo</option>
-                        <option value="Pendente">Pendente</option>
-                        <option value="Inativo">Inativo</option>
-                      </select>
-                    </div>
-                    <div>
                       <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
                       <input 
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="contato@empresa.com.br"
                       />
                     </div>
@@ -706,16 +672,16 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="(11) 99999-9999"
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Informações Adicionais (Info)</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Notas</label>
                       <textarea 
                         value={formData.info}
                         onChange={(e) => setFormData({...formData, info: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
                         placeholder="Notas, observações ou detalhes adicionais..."
                       />
                     </div>

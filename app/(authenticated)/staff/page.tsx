@@ -78,7 +78,7 @@ export default function StaffPage() {
       setStaffList(staffRes.data || []);
       setDocuments(docsRes.data || []);
     } catch (error) {
-      console.error('Erro ao buscar dados da equipe:', error);
+      console.error('Erro ao buscar dados da equipe:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -157,7 +157,7 @@ export default function StaffPage() {
       await fetchData();
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar membro da equipe:', error);
+      console.error('Erro ao salvar membro da equipe:', error instanceof Error ? error.message : String(error));
       alert('Falha ao salvar membro da equipe.');
     }
   };
@@ -172,7 +172,7 @@ export default function StaffPage() {
         if (error) throw error;
         await fetchData();
       } catch (error) {
-        console.error('Erro ao excluir membro da equipe:', error);
+        console.error('Erro ao excluir membro da equipe:', error instanceof Error ? error.message : String(error));
         alert('Falha ao excluir membro da equipe.');
       }
     }

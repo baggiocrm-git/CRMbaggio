@@ -116,7 +116,7 @@ export default function FinancesPage() {
         due_date: new Date().toISOString().split('T')[0]
       }));
     } catch (error) {
-      console.error('Erro ao buscar dados financeiros:', error);
+      console.error('Erro ao buscar dados financeiros:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
@@ -243,7 +243,7 @@ export default function FinancesPage() {
       await fetchData();
       handleCloseModal();
     } catch (error) {
-      console.error('Erro ao salvar registro financeiro:', error);
+      console.error('Erro ao salvar registro financeiro:', error instanceof Error ? error.message : String(error));
       alert('Falha ao salvar registro financeiro.');
     }
   };
@@ -258,7 +258,7 @@ export default function FinancesPage() {
         if (error) throw error;
         await fetchData();
       } catch (error) {
-        console.error('Erro ao excluir registro financeiro:', error);
+        console.error('Erro ao excluir registro financeiro:', error instanceof Error ? error.message : String(error));
         alert('Falha ao excluir registro financeiro.');
       }
     }

@@ -57,7 +57,7 @@ export default function DashboardPage() {
         payable,
       });
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching dashboard data:', error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }

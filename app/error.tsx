@@ -10,7 +10,14 @@ export default function Error({
   reset: () => void;
 }) {
   React.useEffect(() => {
-    console.error(error);
+    // Log only safe parts of the error to avoid circular structure issues in some environments
+    if (error) {
+      console.error('Application Error:', {
+        message: error.message,
+        stack: error.stack,
+        digest: error.digest
+      });
+    }
   }, [error]);
 
   return (
