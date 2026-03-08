@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { HardHat, Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import Image from 'next/image';
+import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 
@@ -52,10 +53,16 @@ export default function LoginPage() {
         className="w-full max-w-md bg-[#1a2430] border border-slate-800 rounded-2xl p-8 shadow-2xl"
       >
         <div className="flex flex-col items-center mb-8">
-          <div className="size-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-lg shadow-blue-600/20">
-            <HardHat size={32} />
+          <div className="size-24 flex items-center justify-center overflow-hidden mb-4 relative">
+            <Image 
+              src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
+              alt="Logo" 
+              fill
+              className="object-contain"
+              referrerPolicy="no-referrer"
+            />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">BuildFlow CRM</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">CBSL CRM</h1>
           <p className="text-slate-400 text-sm mt-1 text-center">Sistema de Gestão de Engenharia e Construção</p>
         </div>
 
@@ -126,7 +133,7 @@ export default function LoginPage() {
 
         <div className="mt-8 pt-8 border-t border-slate-800 text-center">
           <p className="text-slate-500 text-xs">
-            © 2024 BuildFlow Engineering CRM. Todos os direitos reservados.
+            © 2024 CBSL Engineering CRM. Todos os direitos reservados.
           </p>
         </div>
       </motion.div>

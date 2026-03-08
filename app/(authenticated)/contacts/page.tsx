@@ -95,8 +95,13 @@ export default function ContactsPage() {
       });
 
       setContacts(mappedContacts);
-    } catch (error) {
-      console.error('Error fetching contacts:', error instanceof Error ? error.message : String(error));
+    } catch (error: unknown) {
+      console.error('Error fetching contacts:', error);
+      let errorMessage = String(error);
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      }
+      alert(`Erro ao carregar contatos:\n${errorMessage}`);
     } finally {
       setIsLoading(false);
     }
@@ -344,9 +349,13 @@ export default function ContactsPage() {
       
       await fetchContacts();
       handleCloseModal();
-    } catch (error) {
-      console.error('Erro ao salvar contato:', error instanceof Error ? error.message : String(error));
-      alert('Falha ao salvar contato. Por favor, verifique sua configuração do Supabase.');
+    } catch (error: unknown) {
+      console.error('Erro ao salvar contato:', error);
+      let errorMessage = String(error);
+      if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = (error as { message: string }).message;
+      }
+      alert(`Erro ao salvar contato:\n${errorMessage}`);
     }
   };
 
@@ -363,9 +372,13 @@ export default function ContactsPage() {
         // Update local state immediately for better UX
         setContacts(prev => prev.filter(c => c.id !== id));
         alert('Contato excluído com sucesso.');
-      } catch (error) {
-        console.error('Erro ao excluir contato:', error instanceof Error ? error.message : String(error));
-        alert('Falha ao excluir contato. Verifique se você tem permissão para esta ação.');
+      } catch (error: unknown) {
+        console.error('Erro ao excluir contato:', error);
+        let errorMessage = String(error);
+        if (error && typeof error === 'object' && 'message' in error) {
+          errorMessage = (error as { message: string }).message;
+        }
+        alert(`Erro ao excluir contato:\n${errorMessage}`);
       }
     }
   };

@@ -12,7 +12,6 @@ import {
   Contact, 
   Settings, 
   HelpCircle,
-  HardHat,
   ChevronRight,
   LogOut
 } from 'lucide-react';
@@ -40,11 +39,17 @@ export default function Sidebar() {
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-[#101822] flex flex-col h-screen sticky top-0">
       <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3">
-        <div className="size-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-600/20">
-          <HardHat size={24} />
+        <div className="size-10 flex items-center justify-center overflow-hidden relative">
+          <Image 
+            src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
+            alt="Logo" 
+            fill
+            className="object-contain"
+            referrerPolicy="no-referrer"
+          />
         </div>
         <div className="flex flex-col">
-          <h1 className="font-black text-lg tracking-tight text-slate-900 dark:text-white">BuildFlow</h1>
+          <h1 className="font-black text-lg tracking-tight text-slate-900 dark:text-white">CBSL CRM</h1>
           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">CRM de Engenharia</span>
         </div>
       </div>

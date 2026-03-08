@@ -1,4 +1,4 @@
--- Initial schema for BuildFlow CRM in Portuguese
+-- Initial schema for CBSL CRM in Portuguese
 -- This script creates the tables from scratch with Portuguese names
 
 -- 1. Contatos (Clientes, Fornecedores, Parceiros)

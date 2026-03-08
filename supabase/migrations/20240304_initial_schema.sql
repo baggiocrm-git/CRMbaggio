@@ -1,4 +1,4 @@
--- Create tables for BuildFlow CRM
+-- Create tables for CBSL CRM
 
 -- 1. Contacts (Clients, Suppliers, Partners)
 CREATE TABLE IF NOT EXISTS contacts (

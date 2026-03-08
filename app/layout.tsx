@@ -5,11 +5,11 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'BuildFlow CRM | Gestão de Engenharia e Construção',
+  title: 'CBSL CRM | Gestão de Engenharia e Construção',
   description: 'CRM profissional para gestão de projetos de construção, finanças e pessoal.',
 };
 
-// Root layout for the BuildFlow CRM application
+// Root layout for the CBSL CRM application
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
