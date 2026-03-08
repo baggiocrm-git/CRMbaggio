@@ -26,11 +26,12 @@ import { motion, AnimatePresence } from 'motion/react';
 interface Contact {
   id: string; // UUID from Supabase
   company: string;
-  contact_person: string;
+  name: string;
   category: string;
   status: string;
   email: string;
   phone: string;
+  info: string;
   initials: string;
   color: string;
 }
@@ -51,11 +52,12 @@ export default function ContactsPage() {
 
   const [formData, setFormData] = useState({
     company: '',
-    contact_person: '',
+    name: '',
     category: 'Cliente',
     status: 'Ativo',
     email: '',
     phone: '',
+    info: '',
   });
 
   const fetchContacts = useCallback(async () => {
@@ -68,17 +70,32 @@ export default function ContactsPage() {
 
       if (error) throw error;
       
-      const mappedContacts = (data || []).map((c: Record<string, unknown>) => ({
-        id: c.id as string,
-        company: c.empresa as string,
-        contact_person: c.pessoa_contato as string,
-        category: c.categoria as string,
-        status: c.status as string,
-        email: c.email as string,
-        phone: c.telefone as string,
-        initials: c.iniciais as string,
-        color: c.cor as string
-      }));
+      const mappedContacts = (data || []).map((c: Record<string, unknown>) => {
+        const name = (c.pessoa_contato || '') as string;
+        const company = (c.empresa || '') as string;
+        
+        // Generate initials on the fly if not present in DB
+        const initials = (c.iniciais as string) || (name || company || '??')
+          .split(' ')
+          .filter(word => word.length > 0)
+          .map(n => n[0])
+          .join('')
+          .toUpperCase()
+          .slice(0, 2);
+
+        return {
+          id: c.id as string,
+          company: company,
+          name: name,
+          category: (c.categoria || '') as string,
+          status: (c.status || 'Ativo') as string,
+          email: (c.email || '') as string,
+          phone: (c.telefone || '') as string,
+          info: (c.info || '') as string,
+          initials: initials,
+          color: (c.cor as string) || 'bg-blue-100 text-blue-600'
+        };
+      });
 
       setContacts(mappedContacts);
     } catch (error) {
@@ -103,21 +120,23 @@ export default function ContactsPage() {
       setEditingContact(contact);
       setFormData({
         company: contact.company,
-        contact_person: contact.contact_person,
+        name: contact.name,
         category: contact.category,
         status: contact.status,
         email: contact.email,
         phone: contact.phone,
+        info: contact.info,
       });
     } else {
       setEditingContact(null);
       setFormData({
         company: '',
-        contact_person: '',
+        name: '',
         category: 'Cliente',
         status: 'Ativo',
         email: '',
         phone: '',
+        info: '',
       });
     }
     setIsModalOpen(true);
@@ -142,7 +161,7 @@ export default function ContactsPage() {
 
     const matchesSearch = 
       contact.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      contact.contact_person.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      contact.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       contact.email.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesTab && matchesStatus && matchesCategory && matchesRegion && matchesSearch;
@@ -156,16 +175,17 @@ export default function ContactsPage() {
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
 
   const handleDownload = () => {
-    const headers = ['Empresa', 'Pessoa de Contato', 'Categoria', 'Status', 'E-mail', 'Telefone'];
+    const headers = ['Empresa', 'Nome', 'Telefone', 'E-mail', 'Categoria', 'Info', 'Status'];
     const csvContent = [
       headers.join(','),
       ...filteredContacts.map(c => [
         `"${c.company}"`,
-        `"${c.contact_person}"`,
-        `"${c.category}"`,
-        `"${c.status}"`,
+        `"${c.name}"`,
+        `"${c.phone}"`,
         `"${c.email}"`,
-        `"${c.phone}"`
+        `"${c.category}"`,
+        `"${c.info}"`,
+        `"${c.status}"`
       ].join(','))
     ].join('\n');
 
@@ -181,7 +201,7 @@ export default function ContactsPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const headers = ['Empresa', 'Pessoa de Contato', 'Categoria', 'Status', 'E-mail', 'Telefone'];
+    const headers = ['Nome', 'Empresa', 'Telefone', 'E-mail', 'Categoria', 'Info'];
     const content = headers.join(',');
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8;' });
     const link = document.createElement('a');
@@ -213,34 +233,46 @@ export default function ContactsPage() {
 
         // Detectar delimitador (vírgula ou ponto e vírgula)
         const firstLine = lines[0];
-        const delimiter = firstLine.includes(';') ? ';' : ',';
+        const countSemicolon = (firstLine.match(/;/g) || []).length;
+        const countComma = (firstLine.match(/,/g) || []).length;
+        const delimiter = countSemicolon > countComma ? ';' : ',';
 
         // Skip header
         const dataLines = lines.slice(1);
         const newContacts = dataLines.map((line, index) => {
-          const parts = line.split(delimiter).map(s => s.trim().replace(/^"|"$/g, ''));
-          const [company, contact_person, category, status, email, phone] = parts;
+          // Robust CSV split that handles quotes
+          const regex = new RegExp(`${delimiter}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+          const parts = line.split(regex).map(s => s.trim().replace(/^"|"$/g, '').replace(/""/g, '"'));
           
-          if (!company) {
-            console.warn(`Linha ${index + 2} ignorada: Nome da empresa não encontrado.`);
+          const [name, company, phone, email, category, info] = parts;
+          
+          if (!name && !company) {
+            console.warn(`Linha ${index + 2} ignorada: Nome ou Empresa não encontrado.`);
             return null;
           }
 
-          const initials = company
+          const contactName = name || '';
+          const contactCompany = company || '';
+          
+          const initials = (contactName || contactCompany || '??')
             .split(' ')
             .filter(word => word.length > 0)
             .map(n => n[0])
             .join('')
             .toUpperCase()
-            .slice(0, 2) || company.slice(0, 2).toUpperCase() || '??';
+            .slice(0, 2);
+
+          const validCategories = ['Cliente', 'Fornecedor', 'Parceiro'];
+          const finalCategory = validCategories.includes(category) ? category : 'Cliente';
 
           return {
-            empresa: company,
-            pessoa_contato: contact_person || '',
-            categoria: category || 'Diversos',
-            status: status || 'Ativo',
-            email: email || '',
+            pessoa_contato: contactName,
+            empresa: contactCompany,
             telefone: phone || '',
+            email: email || '',
+            categoria: finalCategory,
+            info: info || '',
+            status: 'Ativo',
             iniciais: initials,
             cor: 'bg-blue-100 text-blue-600'
           };
@@ -248,18 +280,25 @@ export default function ContactsPage() {
 
         if (newContacts.length > 0) {
           const { error } = await supabase.from('contatos').insert(newContacts);
-          if (error) throw error;
+          if (error) {
+            console.error('Erro do Supabase na inserção:', error.message || error);
+            throw error;
+          }
           alert(`${newContacts.length} contatos importados com sucesso!`);
           await fetchContacts();
         } else {
           alert('Nenhum contato válido encontrado para importação.');
         }
       } catch (err: unknown) {
-        console.error('Erro detalhado na importação:', err);
-        const errorMessage = err instanceof Error ? err.message : 
-                           (err as { message?: string })?.message || 
-                           (err as { details?: string })?.details || 
-                           'Erro desconhecido';
+        let errorMessage = 'Erro desconhecido na importação';
+        if (err instanceof Error) {
+          errorMessage = err.message;
+        } else if (typeof err === 'object' && err !== null) {
+          const obj = err as Record<string, unknown>;
+          if (typeof obj.message === 'string') errorMessage = obj.message;
+          else if (typeof obj.details === 'string') errorMessage = obj.details;
+        }
+        console.error('Erro detalhado na importação:', errorMessage);
         alert(`Erro ao importar arquivo: ${errorMessage}. Verifique se o formato está correto.`);
       } finally {
         setIsImporting(false);
@@ -271,17 +310,25 @@ export default function ContactsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const initials = formData.company.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    
     try {
+      const initials = (formData.name || formData.company || '??')
+        .split(' ')
+        .filter(word => word.length > 0)
+        .map(n => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+
       const payload = {
+        pessoa_contato: formData.name,
         empresa: formData.company,
-        pessoa_contato: formData.contact_person,
-        categoria: formData.category,
-        status: formData.status,
-        email: formData.email,
         telefone: formData.phone,
-        iniciais: initials
+        email: formData.email,
+        categoria: formData.category,
+        info: formData.info,
+        status: formData.status,
+        iniciais: initials,
+        cor: editingContact?.color || 'bg-blue-100 text-blue-600'
       };
 
       if (editingContact) {
@@ -294,10 +341,7 @@ export default function ContactsPage() {
       } else {
         const { error } = await supabase
           .from('contatos')
-          .insert([{
-            ...payload,
-            cor: 'bg-blue-100 text-blue-600' // Default color
-          }]);
+          .insert([payload]);
 
         if (error) throw error;
       }
@@ -453,7 +497,7 @@ export default function ContactsPage() {
                             </div>
                             <div>
                               <p className="font-black text-sm text-slate-900 dark:text-white tracking-tight">{contact.company}</p>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.contact_person}</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.name}</p>
                             </div>
                           </div>
                         </td>
@@ -601,7 +645,18 @@ export default function ContactsPage() {
                 <form onSubmit={handleSubmit} className="p-6 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Nome da Empresa</label>
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Nome Completo</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={formData.name}
+                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        placeholder="ex: João Silva"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Empresa</label>
                       <input 
                         required
                         type="text" 
@@ -609,17 +664,6 @@ export default function ContactsPage() {
                         onChange={(e) => setFormData({...formData, company: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Acme Construções"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Contato Principal / Cargo</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.contact_person}
-                        onChange={(e) => setFormData({...formData, contact_person: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: Gerente de Projetos"
                       />
                     </div>
                     <div>
@@ -664,6 +708,15 @@ export default function ContactsPage() {
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="(11) 99999-9999"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Informações Adicionais (Info)</label>
+                      <textarea 
+                        value={formData.info}
+                        onChange={(e) => setFormData({...formData, info: e.target.value})}
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
+                        placeholder="Notas, observações ou detalhes adicionais..."
                       />
                     </div>
                   </div>
