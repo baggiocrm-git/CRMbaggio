@@ -1,445 +1,230 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import Header from '@/components/Header';
-import { supabase } from '@/lib/supabase';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Filter, 
   LayoutGrid, 
   List, 
-  Calendar, 
-  Map, 
-  MoreHorizontal,
-  MapPin,
+  Filter,
   Loader2,
-  X,
-  Trash2,
-  Edit2
+  AlertCircle
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
+import { supabase } from '@/lib/supabase';
+import ProjectCard from '@/components/projects/ProjectCard';
+import ProjectList from '@/components/projects/ProjectList';
+import ProjectModal from '@/components/projects/ProjectModal';
+import Header from '@/components/Header';
+import { Project, ProjectStatus } from '@/lib/types';
 
-interface Project {
-  id: string;
-  name: string;
-  contract_id: string;
-  status: 'Planejamento' | 'Em Andamento' | 'Atrasado' | 'Concluído';
-  budget: number;
-  spent: number;
-  balance: number;
-  liquidity: number;
-  location: string;
-  fase: string;
-  created_at: string;
-}
-
-const columns = [
-  { id: 'Planejamento', name: 'Planejamento', color: 'bg-slate-400' },
-  { id: 'Em Andamento', name: 'Em Andamento', color: 'bg-blue-500' },
-  { id: 'Atrasado', name: 'Atrasado', color: 'bg-rose-500' },
-  { id: 'Concluído', name: 'Concluído', color: 'bg-emerald-500' },
-];
+const COLUMNS: ProjectStatus[] = ['Planejamento', 'Em Andamento', 'Atrasado', 'Concluído'];
 
 export default function ProjectsPage() {
+  const [view, setView] = useState<'kanban' | 'list'>('kanban');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    contract_id: '',
-    status: 'Planejamento' as Project['status'],
-    budget: 0,
-    spent: 0,
-    liquidity: 0,
-    location: '',
-    fase: '',
-  });
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const fetchProjects = useCallback(async () => {
+  const fetchProjects = async () => {
+    setLoading(true);
     try {
-      setIsLoading(true);
       const { data, error } = await supabase
         .from('projetos')
         .select('*')
         .order('created_at', { ascending: false });
-
-      if (error) throw error;
       
-      const mappedProjects = (data || []).map((p: Record<string, unknown>) => ({
-        id: p.id as string,
-        name: p.nome as string,
-        contract_id: p.id_contrato as string,
-        status: p.status as Project['status'],
-        budget: Number(p.orcamento),
-        spent: Number(p.gasto),
-        balance: Number(p.saldo),
-        liquidity: p.liquidez as number,
-        location: p.localizacao as string,
-        fase: p.fase as string,
-        created_at: p.created_at as string
-      }));
-
-      setProjects(mappedProjects);
+      if (error) throw error;
+      setProjects(data || []);
     } catch (error) {
-      console.error('Erro ao buscar projetos:', error instanceof Error ? error.message : String(error));
+      console.error('Error fetching projects:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    setIsMounted(true);
     fetchProjects();
-  }, [fetchProjects]);
+  }, []);
 
-  const handleOpenModal = (project?: Project) => {
-    if (project) {
-      setEditingProject(project);
-      setFormData({
-        name: project.name,
-        contract_id: project.contract_id,
-        status: project.status,
-        budget: project.budget,
-        spent: project.spent,
-        liquidity: project.liquidity,
-        location: project.location,
-        fase: project.fase,
-      });
-    } else {
-      setEditingProject(null);
-      setFormData({
-        name: '',
-        contract_id: '',
-        status: 'Planejamento',
-        budget: 0,
-        spent: 0,
-        liquidity: 0,
-        location: '',
-        fase: '',
-      });
-    }
-    setIsModalOpen(true);
-  };
+  const filteredProjects = useMemo(() => {
+    return projects.filter(p => 
+      p.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.id_contrato && p.id_contrato.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+  }, [projects, searchQuery]);
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingProject(null);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const payload = {
-        nome: formData.name,
-        id_contrato: formData.contract_id,
-        status: formData.status,
-        orcamento: formData.budget,
-        gasto: formData.spent,
-        liquidez: formData.liquidity,
-        localizacao: formData.location,
-        fase: formData.fase,
-      };
-
-      if (editingProject) {
-        const { error } = await supabase
-          .from('projetos')
-          .update(payload)
-          .eq('id', editingProject.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('projetos')
-          .insert([payload]);
-        if (error) throw error;
+  const projectsByStatus = useMemo(() => {
+    const grouped: Record<ProjectStatus, Project[]> = {
+      'Planejamento': [],
+      'Em Andamento': [],
+      'Atrasado': [],
+      'Concluído': []
+    };
+    filteredProjects.forEach(p => {
+      if (grouped[p.status]) {
+        grouped[p.status].push(p);
       }
-      await fetchProjects();
-      handleCloseModal();
-    } catch (error) {
-      console.error('Erro ao salvar projeto:', error instanceof Error ? error.message : String(error));
-      alert('Falha ao salvar projeto.');
+    });
+    return grouped;
+  }, [filteredProjects]);
+
+  const onDragEnd = async (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    const newStatus = destination.droppableId as ProjectStatus;
+    
+    // Optimistic update
+    const updatedProjects = projects.map(p => 
+      p.id === draggableId ? { ...p, status: newStatus } : p
+    );
+    setProjects(updatedProjects);
+
+    // Persist to database
+    const { error } = await supabase
+      .from('projetos')
+      .update({ status: newStatus })
+      .eq('id', draggableId);
+
+    if (error) {
+      console.error('Error updating project status:', error);
+      fetchProjects(); // Rollback on error
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este projeto?')) {
-      try {
-        const { error } = await supabase
-          .from('projetos')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
-        await fetchProjects();
-      } catch (error) {
-        console.error('Erro ao excluir projeto:', error instanceof Error ? error.message : String(error));
-        alert('Falha ao excluir projeto.');
-      }
+    if (!confirm('Tem certeza que deseja excluir este projeto?')) return;
+
+    const { error } = await supabase
+      .from('projetos')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting project:', error);
+      alert('Erro ao excluir projeto.');
+    } else {
+      fetchProjects();
     }
   };
-  return (
-    <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#101822]">
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Gestão de Projetos de Construção" 
-          subtitle="Gerencie canteiros de obras, cronogramas e documentação técnica em todas as regiões ativas."
-          action={{ label: 'Novo Projeto', onClick: () => handleOpenModal() }}
-        />
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-6">
-          {/* View Tabs */}
-          <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-            <div className="flex gap-8">
-              <button className="flex items-center gap-2 border-b-2 border-blue-600 text-blue-600 pb-4 font-bold text-sm">
-                <LayoutGrid size={16} />
-                Quadro Kanban
-              </button>
-              <button className="flex items-center gap-2 border-b-2 border-transparent text-slate-500 pb-4 font-bold text-sm hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-                <List size={16} />
-                Visualização em Lista
-              </button>
-              <button className="flex items-center gap-2 border-b-2 border-transparent text-slate-500 pb-4 font-bold text-sm hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-                <Calendar size={16} />
-                Cronograma (Gantt)
-              </button>
-              <button className="flex items-center gap-2 border-b-2 border-transparent text-slate-500 pb-4 font-bold text-sm hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-                <Map size={16} />
-                Mapa do Local
-              </button>
-            </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all mb-2">
-              <Filter size={16} />
-              Filtros
+  const handleEdit = (project: Project) => {
+    setSelectedProject(project);
+    setIsModalOpen(true);
+  };
+
+  const handleCreate = () => {
+    setSelectedProject(null);
+    setIsModalOpen(true);
+  };
+
+  return (
+    <>
+      <Header 
+        title="Projetos" 
+        subtitle="Gerencie e acompanhe o progresso de todas as obras em tempo real."
+        searchValue={searchQuery}
+        onSearch={setSearchQuery}
+        action={{ label: 'Novo Projeto', onClick: handleCreate }}
+      />
+
+      <div className="p-8 flex-1 overflow-y-auto">
+        {/* View Switcher & Filters */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="bg-white dark:bg-[#1a2430] border border-slate-200 dark:border-slate-800 rounded-xl p-1 flex items-center shadow-sm w-fit">
+            <button 
+              onClick={() => setView('kanban')}
+              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-3 ${view === 'kanban' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              <LayoutGrid size={18} />
+              <span className="text-xs font-bold">Kanban</span>
+            </button>
+            <button 
+              onClick={() => setView('list')}
+              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-3 ${view === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              <List size={18} />
+              <span className="text-xs font-bold">Lista</span>
             </button>
           </div>
-
-          {/* Kanban Board */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-start">
-            {isLoading ? (
-              <div className="col-span-full py-20 flex flex-col items-center justify-center gap-4">
-                <Loader2 size={40} className="text-blue-600 animate-spin" />
-                <p className="text-sm font-black text-slate-500 uppercase tracking-widest">Carregando projetos...</p>
-              </div>
-            ) : (
-              columns.map((col) => (
-                <div key={col.id} className="flex flex-col gap-4">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
-                      <div className={`size-2 rounded-full ${col.color}`}></div>
-                      <h3 className="font-black text-xs text-slate-700 dark:text-slate-300 uppercase tracking-widest">{col.name}</h3>
-                      <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] px-2 py-0.5 rounded-lg font-black">
-                        {projects.filter(p => p.status === col.id).length}
-                      </span>
-                    </div>
-                    <button className="text-slate-400 hover:text-slate-600"><MoreHorizontal size={16} /></button>
-                  </div>
-
-                  <div className="flex flex-col gap-4">
-                    {projects.filter(p => p.status === col.id).map((project) => (
-                      <motion.div 
-                        key={project.id}
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className={`bg-white dark:bg-slate-900 border ${project.status === 'Atrasado' ? 'border-rose-200 dark:border-rose-900/50' : 'border-slate-200 dark:border-slate-800'} rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group cursor-pointer relative`}
-                      >
-                        <div className="flex justify-between items-start mb-4">
-                          <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
-                            project.status === 'Planejamento' ? 'bg-slate-500/10 text-slate-600' :
-                            project.status === 'Em Andamento' ? 'bg-blue-500/10 text-blue-600' :
-                            project.status === 'Atrasado' ? 'bg-rose-500/10 text-rose-600' :
-                            'bg-emerald-500/10 text-emerald-600'
-                          }`}>
-                            {project.fase}
-                          </span>
-                          <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={(e) => { e.stopPropagation(); handleOpenModal(project); }} className="p-1 hover:text-blue-600 transition-colors">
-                              <Edit2 size={14} />
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }} className="p-1 hover:text-rose-600 transition-colors">
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        </div>
-
-                        <h4 className="font-black text-slate-900 dark:text-white mb-1 tracking-tight">{project.name}</h4>
-                        
-                        <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold mb-4">
-                          <MapPin size={12} />
-                          {project.location}
-                        </div>
-
-                        <div className="flex flex-col gap-2 mb-4">
-                          <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                            <span>Progresso</span>
-                            <span className={project.status === 'Atrasado' ? 'text-rose-500' : 'text-blue-600'}>
-                              {Math.round((project.spent / project.budget) * 100) || 0}%
-                            </span>
-                          </div>
-                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full ${project.status === 'Atrasado' ? 'bg-rose-500' : 'bg-blue-600'}`} 
-                              style={{ width: `${Math.min(100, (project.spent / project.budget) * 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Orçamento</span>
-                            <span className="text-xs font-black text-slate-900 dark:text-white">R${isMounted ? project.budget.toLocaleString() : '...'}</span>
-                          </div>
-                          <div className="flex flex-col text-right">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Liquidez</span>
-                            <span className={`text-xs font-black ${project.liquidity < 30 ? 'text-rose-500' : 'text-emerald-500'}`}>{project.liquidity}%</span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+          
+          <button className="bg-white dark:bg-[#1a2430] border border-slate-200 dark:border-slate-800 px-6 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm text-sm">
+            <Filter size={18} />
+            Filtros Avançados
+          </button>
         </div>
 
-        {/* Modal */}
-        <AnimatePresence>
-          {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={handleCloseModal}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-              />
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative w-full max-w-2xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
-              >
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
-                    {editingProject ? 'Editar Projeto' : 'Novo Projeto'}
-                  </h3>
-                  <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nome do Projeto</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: Torre de Escritórios Skyline"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">ID do Contrato</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.contract_id}
-                        onChange={(e) => setFormData({...formData, contract_id: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="#299-A"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Status</label>
-                      <select 
-                        value={formData.status}
-                        onChange={(e) => setFormData({...formData, status: e.target.value as Project['status']})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      >
-                        {columns.map(col => (
-                          <option key={col.id} value={col.id}>{col.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Orçamento (R$)</label>
-                      <input 
-                        required
-                        type="number" 
-                        value={formData.budget}
-                        onChange={(e) => setFormData({...formData, budget: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Gasto (R$)</label>
-                      <input 
-                        required
-                        type="number" 
-                        value={formData.spent}
-                        onChange={(e) => setFormData({...formData, spent: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Liquidez (%)</label>
-                      <input 
-                        required
-                        type="number" 
-                        min="0"
-                        max="100"
-                        value={formData.liquidity}
-                        onChange={(e) => setFormData({...formData, liquidity: Number(e.target.value)})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Fase</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.fase}
-                        onChange={(e) => setFormData({...formData, fase: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: Fase Estrutural"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Localização</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.location}
-                        onChange={(e) => setFormData({...formData, location: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: São Paulo, SP"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <button 
-                      type="button"
-                      onClick={handleCloseModal}
-                      className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="submit"
-                      className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all"
-                    >
-                      {editingProject ? 'Salvar Alterações' : 'Criar Projeto'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
+        {/* Content */}
+        {loading && projects.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 size={48} className="text-blue-600 animate-spin mb-4" />
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Carregando Projetos...</p>
+          </div>
+        ) : filteredProjects.length === 0 ? (
+          <div className="bg-white dark:bg-[#1a2430] border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
+            <div className="size-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle size={40} className="text-slate-400" />
             </div>
-          )}
-        </AnimatePresence>
-      </main>
-    </div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Nenhum projeto encontrado</h3>
+            <p className="text-slate-500 max-w-md mx-auto">Tente ajustar sua busca ou crie um novo projeto para começar a gerenciar suas obras.</p>
+          </div>
+        ) : view === 'kanban' ? (
+          <DragDropContext onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 overflow-x-auto pb-6">
+              {COLUMNS.map((status) => (
+                <div key={status} className="flex flex-col min-w-[300px]">
+                  <div className="flex items-center justify-between mb-4 px-2">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">{status}</h2>
+                      <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {projectsByStatus[status].length}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Droppable droppableId={status}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex-1 min-h-[500px] rounded-2xl p-2 transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50/50 dark:bg-blue-900/10 ring-2 ring-blue-600/20 ring-inset' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}
+                      >
+                        {projectsByStatus[status].map((project: Project, index: number) => (
+                          <ProjectCard 
+                            key={project.id} 
+                            project={project} 
+                            index={index} 
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                        {provided.placeholder}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              ))}
+            </div>
+          </DragDropContext>
+        ) : (
+          <ProjectList 
+            projects={filteredProjects} 
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
+        )}
+      </div>
+
+      {/* Modal */}
+      <ProjectModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchProjects}
+        project={selectedProject}
+      />
+    </>
   );
 }
