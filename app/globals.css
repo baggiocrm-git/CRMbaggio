@@ -23,3 +23,9 @@ body {
 .dark * {
   border-color: #1e293b;
 }
+
+@layer base {
+  input, select, textarea {
+    @apply text-black dark:text-white placeholder:text-slate-400;
+  }
+}

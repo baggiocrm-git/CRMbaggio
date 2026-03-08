@@ -391,7 +391,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Roberto Silva"
                       />
                     </div>
@@ -402,7 +402,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.emp_id}
                         onChange={(e) => setFormData({...formData, emp_id: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="E294"
                       />
                     </div>
@@ -425,7 +425,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.role}
                         onChange={(e) => setFormData({...formData, role: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Eng. Civil Sênior"
                       />
                     </div>
@@ -436,7 +436,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.department}
                         onChange={(e) => setFormData({...formData, department: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Divisão Estrutural"
                       />
                     </div>
@@ -446,7 +446,7 @@ export default function StaffPage() {
                         type="text" 
                         value={formData.img_url}
                         onChange={(e) => setFormData({...formData, img_url: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-black outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="https://picsum.photos/..."
                       />
                     </div>

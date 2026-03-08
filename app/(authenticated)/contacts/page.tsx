@@ -666,7 +666,7 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.name}
                         onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: João Silva"
                       />
                     </div>
@@ -676,7 +676,7 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.company}
                         onChange={(e) => setFormData({...formData, company: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="ex: Acme Construções"
                       />
                     </div>
@@ -698,7 +698,7 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.phone}
                         onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="(11) 99999-9999"
                       />
                     </div>
@@ -708,7 +708,7 @@ export default function ContactsPage() {
                         type="email" 
                         value={formData.email}
                         onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="contato@empresa.com.br"
                       />
                     </div>
@@ -718,7 +718,7 @@ export default function ContactsPage() {
                         type="text" 
                         value={formData.cellphone}
                         onChange={(e) => setFormData({...formData, cellphone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
                         placeholder="(11) 99999-9999"
                       />
                     </div>
@@ -727,7 +727,7 @@ export default function ContactsPage() {
                       <textarea 
                         value={formData.info}
                         onChange={(e) => setFormData({...formData, info: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
                         placeholder="Notas, observações ou detalhes adicionais..."
                       />
                     </div>

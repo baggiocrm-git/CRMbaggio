@@ -30,7 +30,7 @@ export default function Header({ title, subtitle, searchValue, onSearch, action 
             placeholder="Pesquisar..." 
             value={searchValue}
             onChange={(e) => onSearch?.(e.target.value)}
-            className="bg-transparent border-none focus:ring-0 text-sm text-black dark:text-white placeholder:text-black w-64"
+            className="bg-transparent border-none focus:ring-0 text-sm text-black dark:text-white w-64"
           />
         </div>
 

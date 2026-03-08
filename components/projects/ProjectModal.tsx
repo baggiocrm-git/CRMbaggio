@@ -105,12 +105,12 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Nome do Projeto *</label>
                 <input 
                   {...register('nome', { required: true })}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                   placeholder="Ex: Torre Skyline"
                 />
                 {errors.nome && <span className="text-red-500 text-[10px] font-bold uppercase">Obrigatório</span>}
@@ -120,7 +120,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">ID do Contrato</label>
                 <input 
                   {...register('id_contrato')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                   placeholder="Ex: #299-A"
                 />
               </div>
@@ -129,7 +129,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Status</label>
                 <select 
                   {...register('status')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all appearance-none"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all appearance-none"
                 >
                   <option value="Planejamento">Planejamento</option>
                   <option value="Em Andamento">Em Andamento</option>
@@ -142,7 +142,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Fase</label>
                 <input 
                   {...register('fase')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                   placeholder="Ex: Fundação"
                 />
               </div>
@@ -153,7 +153,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                   type="number"
                   step="0.01"
                   {...register('orcamento', { required: true })}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                 />
               </div>
 
@@ -163,7 +163,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                   type="number"
                   step="0.01"
                   {...register('gasto')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                 />
               </div>
 
@@ -174,7 +174,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                   min="0"
                   max="100"
                   {...register('liquidez')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                 />
               </div>
 
@@ -182,7 +182,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                 <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">Localização</label>
                 <input 
                   {...register('localizacao')}
-                  className="w-full bg-white dark:bg-[#101822] border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none transition-all"
                   placeholder="Ex: Centro"
                 />
               </div>
