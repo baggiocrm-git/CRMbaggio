@@ -22,12 +22,14 @@ import {
   Target,
   Layers,
   Percent,
-  ClipboardList
+  ClipboardList,
+  Calendar
 } from 'lucide-react';
 
 const navItems = [
   { group: 'PRINCIPAL', items: [
     { name: 'Painel', icon: LayoutDashboard, href: '/finances' },
+    { name: 'Agenda', icon: Calendar, href: '/calendar' },
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables', badge: '3' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
