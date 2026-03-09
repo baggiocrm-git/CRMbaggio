@@ -13,7 +13,11 @@ import {
   Camera,
   Check,
   ChevronRight,
-  Monitor
+  Monitor,
+  Database,
+  Copy,
+  ExternalLink,
+  AlertCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -106,6 +110,7 @@ export default function SettingsPage() {
     { id: 'appearance', name: 'Aparência', icon: Monitor },
     { id: 'notifications', name: 'Notificações', icon: Bell },
     { id: 'security', name: 'Segurança', icon: Shield },
+    { id: 'database', name: 'Banco de Dados', icon: Database },
   ];
 
   const userInitials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
@@ -341,6 +346,167 @@ export default function SettingsPage() {
                       <button className="px-4 py-2 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#1a1a1a] transition-all">
                         Configurar
                       </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'database' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-8"
+                >
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-2">
+                      <Database size={20} className="text-[#d4ff3f]" />
+                      Configuração do Banco de Dados
+                    </h3>
+                    <a 
+                      href="https://supabase.com/dashboard/project/_/sql" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1 hover:underline"
+                    >
+                      Abrir Editor SQL <ExternalLink size={12} />
+                    </a>
+                  </div>
+                  
+                  <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 space-y-6">
+                    <div className="space-y-2">
+                      <p className="text-sm font-black">Script SQL: Contas a Receber</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                        Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessária.
+                      </p>
+                    </div>
+                    
+                    <div className="relative group">
+                      <pre className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+{`CREATE TABLE IF NOT EXISTS public.contas_receber (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    cliente TEXT NOT NULL,
+    descricao TEXT,
+    data_vencimento DATE NOT NULL,
+    data_recebimento DATE,
+    valor DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_recebido DECIMAL(12,2) NOT NULL DEFAULT 0,
+    situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Recebido', 'Em andamento')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.contas_receber ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow all actions for authenticated users
+CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receber
+    FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);`}
+                      </pre>
+                      <button 
+                        onClick={() => {
+                          const sql = `CREATE TABLE IF NOT EXISTS public.contas_receber (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    cliente TEXT NOT NULL,
+    descricao TEXT,
+    data_vencimento DATE NOT NULL,
+    data_recebimento DATE,
+    valor DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_recebido DECIMAL(12,2) NOT NULL DEFAULT 0,
+    situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Recebido', 'Em andamento')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.contas_receber ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow all actions for authenticated users
+CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receber
+    FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);`;
+                          navigator.clipboard.writeText(sql);
+                          alert('Script SQL copiado para a área de transferência!');
+                        }}
+                        className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-black">Script SQL: Contas a Pagar</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                        Copie e execute o script abaixo para criar a tabela de Contas a Pagar.
+                      </p>
+                    </div>
+                    
+                    <div className="relative group">
+                      <pre className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+{`CREATE TABLE IF NOT EXISTS public.contas_pagar (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    fornecedor TEXT NOT NULL,
+    descricao TEXT,
+    data_vencimento DATE NOT NULL,
+    data_pagamento DATE,
+    valor DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_pago DECIMAL(12,2) NOT NULL DEFAULT 0,
+    situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Pago', 'Em andamento')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.contas_pagar ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow all actions for authenticated users
+CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
+    FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);`}
+                      </pre>
+                      <button 
+                        onClick={() => {
+                          const sql = `CREATE TABLE IF NOT EXISTS public.contas_pagar (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    fornecedor TEXT NOT NULL,
+    descricao TEXT,
+    data_vencimento DATE NOT NULL,
+    data_pagamento DATE,
+    valor DECIMAL(12,2) NOT NULL DEFAULT 0,
+    valor_pago DECIMAL(12,2) NOT NULL DEFAULT 0,
+    situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Pago', 'Em andamento')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.contas_pagar ENABLE ROW LEVEL SECURITY;
+
+-- Create policy to allow all actions for authenticated users
+CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
+    FOR ALL
+    TO authenticated
+    USING (true)
+    WITH CHECK (true);`;
+                          navigator.clipboard.writeText(sql);
+                          alert('Script SQL copiado para a área de transferência!');
+                        }}
+                        className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+
+                    <div className="p-4 bg-[#d4ff3f]/5 border border-[#d4ff3f]/20 rounded-xl flex items-start gap-4">
+                      <AlertCircle size={18} className="text-[#d4ff3f] mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">Atenção</p>
+                        <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">
+                          Após executar o script, a página de Contas a Receber estará totalmente funcional e sincronizada com seu banco de dados.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
