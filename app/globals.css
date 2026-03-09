@@ -3,11 +3,16 @@
 :root {
   --background: #f6f7f8;
   --foreground: #101822;
+  --base-font-size: 16px;
 }
 
 .dark {
-  --background: #101822;
+  --background: #0a0a0a;
   --foreground: #f6f7f8;
+}
+
+html {
+  font-size: var(--base-font-size);
 }
 
 body {
@@ -16,16 +21,23 @@ body {
   font-family: "Inter", sans-serif;
 }
 
-* {
-  border-color: #e2e8f0;
+.font-small { --base-font-size: 14px; }
+.font-medium { --base-font-size: 16px; }
+.font-large { --base-font-size: 18px; }
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
 
-.dark * {
-  border-color: #1e293b;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-@layer base {
-  input, select, textarea {
-    @apply text-black dark:text-white placeholder:text-slate-400;
-  }
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #1a1a1a;
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #2a2a2a;
 }

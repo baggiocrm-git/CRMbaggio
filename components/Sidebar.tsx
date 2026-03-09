@@ -44,6 +44,7 @@ const navItems = [
     { name: 'Projetos', icon: Briefcase, href: '/projects' },
     { name: 'Equipe', icon: Users, href: '/staff' },
     { name: 'Contatos', icon: Contact, href: '/contacts' },
+    { name: 'Configurações', icon: Settings, href: '/settings' },
   ]}
 ];
 
@@ -99,14 +100,6 @@ export default function Sidebar() {
         ))}
 
         <div className="pt-4 border-t border-slate-800/50">
-          <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mb-2">CONFIG</div>
-          <Link 
-            href="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 text-slate-400 hover:bg-[#1a1a1a] hover:text-white rounded-xl transition-all"
-          >
-            <Settings size={18} className="text-slate-500" />
-            <span className="text-xs font-bold">Configurações</span>
-          </Link>
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500/80 hover:bg-rose-500/10 hover:text-rose-500 rounded-xl transition-all mt-1 group"

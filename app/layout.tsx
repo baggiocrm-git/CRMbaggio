@@ -13,6 +13,24 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (
     <html lang="pt-BR" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              const theme = localStorage.getItem('app-theme') || 'dark';
+              const fontSize = localStorage.getItem('app-font-size') || 'medium';
+              
+              if (theme === 'dark') {
+                document.documentElement.classList.add('dark');
+              } else {
+                document.documentElement.classList.remove('dark');
+              }
+              
+              document.documentElement.classList.add('font-' + fontSize);
+            } catch (e) {}
+          })();
+        `}} />
+      </head>
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
         {children}
       </body>
