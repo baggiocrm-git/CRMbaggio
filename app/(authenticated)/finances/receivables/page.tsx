@@ -17,7 +17,10 @@ import {
   AlertCircle,
   Clock,
   Trash2,
-  Edit2
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -60,6 +63,10 @@ export default function ReceivablesPage() {
     situacao: 'Todas',
     dataInicio: '',
     dataFim: ''
+  });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Receivable | null, direction: 'asc' | 'desc' }>({
+    key: null,
+    direction: 'asc'
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -133,6 +140,14 @@ export default function ReceivablesPage() {
       ids.push(`${prefix}-${(startNumber + i).toString().padStart(4, '0')}`);
     }
     return ids;
+  };
+
+  const handleSort = (key: keyof Receivable) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
 
   const fetchReceivables = useCallback(async () => {
@@ -313,6 +328,22 @@ export default function ReceivablesPage() {
       (!filters.dataFim || r.data_vencimento <= filters.dataFim);
       
     return matchesSearch && matchesSituacao && matchesDate;
+  }).sort((a, b) => {
+    if (!sortConfig.key) return 0;
+    
+    const aValue = a[sortConfig.key];
+    const bValue = b[sortConfig.key];
+    
+    if (aValue === null || aValue === undefined) return 1;
+    if (bValue === null || bValue === undefined) return -1;
+    
+    if (aValue < bValue) {
+      return sortConfig.direction === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortConfig.direction === 'asc' ? 1 : -1;
+    }
+    return 0;
   });
 
   const totalValue = receivables.reduce((acc, curr) => acc + curr.valor, 0);
@@ -495,13 +526,62 @@ export default function ReceivablesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4">Cliente</th>
-                <th className="px-6 py-4">Descrição</th>
-                <th className="px-6 py-4">Vencimento</th>
-                <th className="px-6 py-4">Recebimento</th>
-                <th className="px-6 py-4">Valor</th>
-                <th className="px-6 py-4">Recebido</th>
-                <th className="px-6 py-4">Situação</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('cliente')}>
+                  <div className="flex items-center gap-2">
+                    Cliente
+                    {sortConfig.key === 'cliente' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                  <div className="flex items-center gap-2">
+                    Descrição
+                    {sortConfig.key === 'descricao' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('data_vencimento')}>
+                  <div className="flex items-center gap-2">
+                    Vencimento
+                    {sortConfig.key === 'data_vencimento' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('data_recebimento')}>
+                  <div className="flex items-center gap-2">
+                    Recebimento
+                    {sortConfig.key === 'data_recebimento' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('valor')}>
+                  <div className="flex items-center gap-2">
+                    Valor
+                    {sortConfig.key === 'valor' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('valor_recebido')}>
+                  <div className="flex items-center gap-2">
+                    Recebido
+                    {sortConfig.key === 'valor_recebido' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('situacao')}>
+                  <div className="flex items-center gap-2">
+                    Situação
+                    {sortConfig.key === 'situacao' ? (
+                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
+                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                  </div>
+                </th>
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>
