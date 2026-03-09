@@ -37,6 +37,7 @@ interface Receivable {
 }
 
 interface ExcelRow {
+  id?: string;
   cliente?: string;
   descricao?: string;
   data_vencimento?: string;
@@ -73,6 +74,66 @@ export default function ReceivablesPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
+
+  const generateNextId = async () => {
+    const now = new Date();
+    const prefix = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    const { data, error } = await supabase
+      .from('contas_receber')
+      .select('id')
+      .like('id', `${prefix}-%`)
+      .order('id', { ascending: false })
+      .limit(1);
+
+    if (error) {
+      console.error('Error fetching last ID:', error);
+      return `${prefix}-0001`;
+    }
+
+    if (!data || data.length === 0) {
+      return `${prefix}-0001`;
+    }
+
+    const lastId = data[0].id;
+    const parts = lastId.split('-');
+    if (parts.length < 2) return `${prefix}-0001`;
+    
+    const lastNumber = parseInt(parts[1]);
+    if (isNaN(lastNumber)) return `${prefix}-0001`;
+    
+    const nextNumber = (lastNumber + 1).toString().padStart(4, '0');
+    return `${prefix}-${nextNumber}`;
+  };
+
+  const generateImportIds = async (count: number) => {
+    const now = new Date();
+    const prefix = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    const { data } = await supabase
+      .from('contas_receber')
+      .select('id')
+      .like('id', `${prefix}-%`)
+      .order('id', { ascending: false })
+      .limit(1);
+
+    let startNumber = 1;
+    if (data && data.length > 0) {
+      const parts = data[0].id.split('-');
+      if (parts.length >= 2) {
+        const lastNumber = parseInt(parts[1]);
+        if (!isNaN(lastNumber)) {
+          startNumber = lastNumber + 1;
+        }
+      }
+    }
+
+    const ids = [];
+    for (let i = 0; i < count; i++) {
+      ids.push(`${prefix}-${(startNumber + i).toString().padStart(4, '0')}`);
+    }
+    return ids;
+  };
 
   const fetchReceivables = useCallback(async () => {
     try {
@@ -147,9 +208,10 @@ export default function ReceivablesPage() {
           .eq('id', editingItem.id);
         if (error) throw error;
       } else {
+        const nextId = await generateNextId();
         const { error } = await supabase
           .from('contas_receber')
-          .insert([payload]);
+          .insert([{ ...payload, id: nextId }]);
         if (error) throw error;
       }
 
@@ -189,21 +251,44 @@ export default function ReceivablesPage() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const bstr = evt.target?.result;
-      const wb = XLSX.read(bstr, { type: 'binary' });
+      const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json<ExcelRow>(ws);
       
+      if (data.length === 0) {
+        alert('A planilha está vazia.');
+        return;
+      }
+
+      const ids = await generateImportIds(data.length);
+      
       // Basic validation and mapping
-      const mappedData = data.map((item: ExcelRow) => ({
-        cliente: item.cliente || 'Sem Identificação',
-        descricao: item.descricao || '',
-        data_vencimento: item.data_vencimento || new Date().toISOString().split('T')[0],
-        data_recebimento: item.data_recebimento || null,
-        valor: Number(item.valor) || 0,
-        valor_recebido: Number(item.valor_recebido) || 0,
-        situacao: (item.situacao as Receivable['situacao']) || 'Aberto'
-      }));
+      const mappedData = data.map((item: ExcelRow, index: number) => {
+        const formatDate = (val: unknown) => {
+          if (!val) return null;
+          if (val instanceof Date) return val.toISOString().split('T')[0];
+          return String(val);
+        };
+
+        // Normalize situacao
+        let situacao: Receivable['situacao'] = 'Aberto';
+        const rawSituacao = String(item.situacao || '').toUpperCase();
+        if (rawSituacao === 'RECEBIDO' || rawSituacao === 'PAGO') situacao = 'Recebido';
+        else if (rawSituacao === 'EM ANDAMENTO') situacao = 'Em andamento';
+        else situacao = 'Aberto';
+
+        return {
+          id: ids[index],
+          cliente: item.cliente || 'Sem Identificação',
+          descricao: item.descricao || '',
+          data_vencimento: formatDate(item.data_vencimento) || new Date().toISOString().split('T')[0],
+          data_recebimento: formatDate(item.data_recebimento),
+          valor: Number(item.valor) || 0,
+          valor_recebido: Number(item.valor_recebido) || 0,
+          situacao
+        };
+      });
 
       try {
         const { error } = await supabase.from('contas_receber').insert(mappedData);

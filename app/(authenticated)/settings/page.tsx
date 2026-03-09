@@ -383,7 +383,7 @@ export default function SettingsPage() {
                     <div className="relative group">
                       <pre className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
 {`CREATE TABLE IF NOT EXISTS public.contas_receber (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     cliente TEXT NOT NULL,
     descricao TEXT,
     data_vencimento DATE NOT NULL,
@@ -407,7 +407,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
                       <button 
                         onClick={() => {
                           const sql = `CREATE TABLE IF NOT EXISTS public.contas_receber (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     cliente TEXT NOT NULL,
     descricao TEXT,
     data_vencimento DATE NOT NULL,
@@ -446,7 +446,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
                     <div className="relative group">
                       <pre className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
 {`CREATE TABLE IF NOT EXISTS public.contas_pagar (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     fornecedor TEXT NOT NULL,
     descricao TEXT,
     data_vencimento DATE NOT NULL,
@@ -470,7 +470,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
                       <button 
                         onClick={() => {
                           const sql = `CREATE TABLE IF NOT EXISTS public.contas_pagar (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id TEXT PRIMARY KEY,
     fornecedor TEXT NOT NULL,
     descricao TEXT,
     data_vencimento DATE NOT NULL,
