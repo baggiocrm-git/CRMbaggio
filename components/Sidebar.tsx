@@ -55,11 +55,15 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = React.useState(false);
 
   React.useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      if (user) {
+        setIsAdmin(user.email === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador');
+      }
     };
     getUser();
   }, []);
@@ -72,6 +76,21 @@ export default function Sidebar() {
   const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
+  const filteredNavItems = navItems.map(group => {
+    if (group.group === 'OUTROS') {
+      const items = [...group.items];
+      if (isAdmin) {
+        // Add Users management to OUTROS group if admin
+        const hasUsers = items.some(i => i.name === 'Usuários');
+        if (!hasUsers) {
+          items.splice(items.length - 1, 0, { name: 'Usuários', icon: Users, href: '/users' });
+        }
+      }
+      return { ...group, items };
+    }
+    return group;
+  });
+
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
       <div className="p-6 border-b border-slate-800/50 flex flex-col gap-1">
@@ -80,7 +99,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
-        {navItems.map((group) => (
+        {filteredNavItems.map((group) => (
           <div key={group.group} className="space-y-1">
             <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mb-2">{group.group}</div>
             {group.items.map((item) => {
