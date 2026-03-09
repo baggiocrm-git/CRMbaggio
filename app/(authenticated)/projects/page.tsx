@@ -122,7 +122,7 @@ export default function ProjectsPage() {
   };
 
   return (
-    <>
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
         title="Projetos" 
         subtitle="Gerencie e acompanhe o progresso de todas as obras em tempo real."
@@ -131,28 +131,28 @@ export default function ProjectsPage() {
         action={{ label: 'Novo Projeto', onClick: handleCreate }}
       />
 
-      <div className="p-8 flex-1 overflow-y-auto">
+      <div className="p-8">
         {/* View Switcher & Filters */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div className="bg-white dark:bg-[#1a2430] border border-slate-200 dark:border-slate-800 rounded-xl p-1 flex items-center shadow-sm w-fit">
+          <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-1 flex items-center shadow-sm w-fit">
             <button 
               onClick={() => setView('kanban')}
-              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-3 ${view === 'kanban' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-4 ${view === 'kanban' ? 'bg-[#2a2a2a] text-[#d4ff3f] shadow-lg' : 'text-slate-500 hover:text-white'}`}
             >
-              <LayoutGrid size={18} />
-              <span className="text-xs font-bold">Kanban</span>
+              <LayoutGrid size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Kanban</span>
             </button>
             <button 
               onClick={() => setView('list')}
-              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-3 ${view === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              className={`p-2 rounded-lg transition-all flex items-center gap-2 px-4 ${view === 'list' ? 'bg-[#2a2a2a] text-[#d4ff3f] shadow-lg' : 'text-slate-500 hover:text-white'}`}
             >
-              <List size={18} />
-              <span className="text-xs font-bold">Lista</span>
+              <List size={16} />
+              <span className="text-[10px] font-black uppercase tracking-widest">Lista</span>
             </button>
           </div>
           
-          <button className="bg-white dark:bg-[#1a2430] border border-slate-200 dark:border-slate-800 px-6 py-2.5 rounded-xl text-slate-600 dark:text-slate-400 font-bold flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all shadow-sm text-sm">
-            <Filter size={18} />
+          <button className="bg-[#1a1a1a] border border-slate-800/50 px-6 py-2.5 rounded-xl text-slate-400 font-black uppercase tracking-widest flex items-center gap-2 hover:bg-[#2a2a2a] transition-all shadow-sm text-[10px]">
+            <Filter size={16} />
             Filtros Avançados
           </button>
         </div>
@@ -160,16 +160,16 @@ export default function ProjectsPage() {
         {/* Content */}
         {loading && projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 size={48} className="text-blue-600 animate-spin mb-4" />
-            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Carregando Projetos...</p>
+            <Loader2 size={48} className="text-[#d4ff3f] animate-spin mb-4" />
+            <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Carregando Projetos...</p>
           </div>
         ) : filteredProjects.length === 0 ? (
-          <div className="bg-white dark:bg-[#1a2430] border border-dashed border-slate-300 dark:border-slate-800 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
-            <div className="size-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
-              <AlertCircle size={40} className="text-slate-400" />
+          <div className="bg-[#1a1a1a] border border-dashed border-slate-800 rounded-3xl p-20 flex flex-col items-center justify-center text-center">
+            <div className="size-20 bg-slate-800/50 rounded-full flex items-center justify-center mb-6">
+              <AlertCircle size={40} className="text-slate-500" />
             </div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">Nenhum projeto encontrado</h3>
-            <p className="text-slate-500 max-w-md mx-auto">Tente ajustar sua busca ou crie um novo projeto para começar a gerenciar suas obras.</p>
+            <h3 className="text-xl font-black mb-2">Nenhum projeto encontrado</h3>
+            <p className="text-slate-500 max-w-md mx-auto text-sm font-bold">Tente ajustar sua busca ou crie um novo projeto para começar a gerenciar suas obras.</p>
           </div>
         ) : view === 'kanban' ? (
           <DragDropContext onDragEnd={onDragEnd}>
@@ -178,8 +178,8 @@ export default function ProjectsPage() {
                 <div key={status} className="flex flex-col min-w-[300px]">
                   <div className="flex items-center justify-between mb-4 px-2">
                     <div className="flex items-center gap-2">
-                      <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">{status}</h2>
-                      <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">
+                      <h2 className="text-[10px] font-black uppercase tracking-widest text-slate-500">{status}</h2>
+                      <span className="bg-slate-800 text-slate-400 text-[10px] font-black px-2 py-0.5 rounded-full">
                         {projectsByStatus[status].length}
                       </span>
                     </div>
@@ -190,7 +190,7 @@ export default function ProjectsPage() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`flex-1 min-h-[500px] rounded-2xl p-2 transition-colors ${snapshot.isDraggingOver ? 'bg-blue-50/50 dark:bg-blue-900/10 ring-2 ring-blue-600/20 ring-inset' : 'bg-slate-50/50 dark:bg-slate-800/20'}`}
+                        className={`flex-1 min-h-[500px] rounded-3xl p-3 transition-colors ${snapshot.isDraggingOver ? 'bg-[#d4ff3f]/5 ring-2 ring-[#d4ff3f]/20 ring-inset' : 'bg-[#1a1a1a]/50 border border-slate-800/30'}`}
                       >
                         {projectsByStatus[status].map((project: Project, index: number) => (
                           <ProjectCard 
@@ -225,6 +225,6 @@ export default function ProjectsPage() {
         onSuccess={fetchProjects}
         project={selectedProject}
       />
-    </>
+    </div>
   );
 }

@@ -383,377 +383,375 @@ export default function ContactsPage() {
     }
   };
   return (
-    <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#101822]">
-      <main className="flex-1 flex flex-col overflow-hidden">
-        <Header 
-          title="Contatos e Fornecedores" 
-          subtitle="Gestão centralizada de parceiros de engenharia, fornecedores de materiais e clientes de projetos."
-          searchValue={searchQuery}
-          onSearch={setSearchQuery}
-          action={{ label: 'Adicionar Novo Contato', onClick: () => handleOpenModal() }}
-        />
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
+      <Header 
+        title="Contatos e Fornecedores" 
+        subtitle="Gestão centralizada de parceiros de engenharia, fornecedores de materiais e clientes de projetos."
+        searchValue={searchQuery}
+        onSearch={setSearchQuery}
+        action={{ label: 'Adicionar Novo Contato', onClick: () => handleOpenModal() }}
+      />
 
-        <div className="flex-1 overflow-y-auto p-8 space-y-8">
-          {/* Filters */}
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Filtrar por:</span>
-              <select 
-                value={filterType}
-                onChange={(e) => setFilterType(e.target.value as 'TODOS' | 'NOME' | 'EMPRESA' | 'TELEFONE')}
-                className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
-              >
-                <option value="TODOS">Todos os Campos</option>
-                <option value="NOME">Nome</option>
-                <option value="EMPRESA">Empresa</option>
-                <option value="TELEFONE">Telefone</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-1.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Categoria:</span>
-              <select 
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 outline-none cursor-pointer"
-              >
-                <option value="TODOS">Todas</option>
-                <option value="CLIENTE">Clientes</option>
-                <option value="FORNECEDOR">Fornecedores</option>
-                <option value="DIVERSOS">Diversos</option>
-              </select>
-            </div>
-
-            <div className="ml-auto flex items-center gap-4">
-              <button 
-                onClick={handleDownloadTemplate}
-                title="Baixar Modelo de Importação (.txt)"
-                className="p-2 text-slate-500 hover:text-blue-600 transition-colors flex items-center gap-2"
-              >
-                <FileText size={20} />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Modelo</span>
-              </button>
-              <label className="p-2 text-slate-500 hover:text-blue-600 transition-colors cursor-pointer flex items-center gap-2">
-                {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Importar</span>
-                <input type="file" accept=".txt,.csv" onChange={handleImport} className="hidden" disabled={isImporting} />
-              </label>
-              <button 
-                onClick={handleDownload}
-                className="p-2 text-slate-500 hover:text-blue-600 transition-colors"
-                title="Exportar CSV"
-              >
-                <Download size={20} />
-              </button>
-            </div>
+      <div className="p-8 space-y-8">
+        {/* Filters */}
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-3 py-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Filtrar por:</span>
+            <select 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value as 'TODOS' | 'NOME' | 'EMPRESA' | 'TELEFONE')}
+              className="bg-transparent text-[10px] font-black uppercase tracking-widest text-white outline-none cursor-pointer"
+            >
+              <option value="TODOS">Todos os Campos</option>
+              <option value="NOME">Nome</option>
+              <option value="EMPRESA">Empresa</option>
+              <option value="TELEFONE">Telefone</option>
+            </select>
           </div>
 
-          {/* Data Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-800/50">
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Empresa / Contato</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Categoria</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Detalhes de Contato</th>
-                    <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Ações Rápidas</th>
-                    <th className="px-6 py-4 text-right"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center gap-3">
-                          <Loader2 size={24} className="text-blue-600 animate-spin" />
-                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando contatos...</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredContacts.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nenhum contato encontrado</p>
-                      </td>
-                    </tr>
-                  ) : (
-                    paginatedContacts.map((contact) => (
-                      <tr key={contact.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
-                        <td className="px-6 py-5">
-                          <div className="flex items-center gap-4">
-                            <div className={`size-10 rounded-xl ${contact.color} flex items-center justify-center font-black text-sm`}>
-                              {contact.initials}
-                            </div>
-                            <div>
-                              <p className="font-black text-sm text-slate-900 dark:text-white tracking-tight">{contact.company}</p>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.name}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                            contact.category === 'Cliente' ? 'bg-blue-600/10 text-blue-600' : 
-                            contact.category === 'Fornecedor' ? 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300' :
-                            'bg-purple-600/10 text-purple-600'
-                          }`}>
-                            {contact.category === 'Parceiro' ? 'Diversos' : contact.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="text-xs font-bold">
-                            <p className="text-slate-700 dark:text-slate-300">{contact.email}</p>
-                            <p className="text-slate-400 mt-0.5">{contact.phone}{contact.cellphone ? ` / ${contact.cellphone}` : ''}</p>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5">
-                          <div className="flex gap-2">
-                            <a 
-                              href={contact.email ? `mailto:${contact.email}` : '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => {
-                                if (!contact.email) {
-                                  e.preventDefault();
-                                  alert('E-mail não cadastrado.');
-                                }
-                              }}
-                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all"
-                              title="Enviar E-mail"
-                            >
-                              <Mail size={18} />
-                            </a>
-                            <button 
-                              onClick={() => {
-                                const cleanPhone = (contact.cellphone || contact.phone).replace(/\D/g, '');
-                                if (cleanPhone) {
-                                  window.open(`https://wa.me/${cleanPhone}`, '_blank');
-                                } else {
-                                  alert('Telefone/Celular não cadastrado ou inválido.');
-                                }
-                              }}
-                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-emerald-600/10 hover:text-emerald-600 transition-all"
-                              title="WhatsApp Web"
-                            >
-                              <Phone size={18} />
-                            </button>
-                            <a 
-                              href={contact.cellphone || contact.phone ? `sms:${contact.cellphone || contact.phone}` : '#'}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => {
-                                if (!contact.cellphone && !contact.phone) {
-                                  e.preventDefault();
-                                  alert('Telefone/Celular não cadastrado.');
-                                }
-                              }}
-                              className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-blue-600/10 hover:text-blue-600 transition-all"
-                              title="Enviar SMS"
-                            >
-                              <MessageSquare size={18} />
-                            </a>
-                          </div>
-                        </td>
-                        <td className="px-6 py-5 text-right">
-                          <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => handleOpenModal(contact)}
-                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-blue-600 transition-all"
-                              title="Editar"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button 
-                              onClick={() => handleDelete(contact.id)}
-                              className="p-2 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20 text-slate-500 hover:text-rose-600 transition-all"
-                              title="Excluir"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {/* Pagination */}
-            <div className="px-6 py-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contatos
-              </p>
-              <div className="flex items-center gap-2">
-                <button 
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all disabled:opacity-50"
-                >
-                  <ChevronLeft size={16} />
-                </button>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button 
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    className={`size-8 rounded-lg text-[10px] font-black transition-all ${
-                      currentPage === page 
-                        ? 'bg-blue-600 text-white' 
-                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'
-                    }`}
-                  >
-                    {page}
-                  </button>
-                ))}
-                <button 
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-white dark:hover:bg-slate-900 transition-all disabled:opacity-50"
-                >
-                  <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
+          <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-3 py-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Categoria:</span>
+            <select 
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="bg-transparent text-[10px] font-black uppercase tracking-widest text-white outline-none cursor-pointer"
+            >
+              <option value="TODOS">Todas</option>
+              <option value="CLIENTE">Clientes</option>
+              <option value="FORNECEDOR">Fornecedores</option>
+              <option value="DIVERSOS">Diversos</option>
+            </select>
           </div>
 
-          {/* Footer Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {stats.map((stat) => (
-              <div key={stat.label} className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm flex items-center gap-5">
-                <div className={`size-14 rounded-2xl ${stat.bg} ${stat.color} flex items-center justify-center`}>
-                  <stat.icon size={28} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
-                  <p className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{stat.value}</p>
-                </div>
-              </div>
-            ))}
+          <div className="ml-auto flex items-center gap-4">
+            <button 
+              onClick={handleDownloadTemplate}
+              title="Baixar Modelo de Importação (.txt)"
+              className="p-2 text-slate-500 hover:text-[#d4ff3f] transition-colors flex items-center gap-2"
+            >
+              <FileText size={20} />
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Modelo</span>
+            </button>
+            <label className="p-2 text-slate-500 hover:text-[#d4ff3f] transition-colors cursor-pointer flex items-center gap-2">
+              {isImporting ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Importar</span>
+              <input type="file" accept=".txt,.csv" onChange={handleImport} className="hidden" disabled={isImporting} />
+            </label>
+            <button 
+              onClick={handleDownload}
+              className="p-2 text-slate-500 hover:text-[#d4ff3f] transition-colors"
+              title="Exportar CSV"
+            >
+              <Download size={20} />
+            </button>
           </div>
         </div>
 
-        {/* Modal */}
-        <AnimatePresence>
-          {isModalOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={handleCloseModal}
-                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-              />
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="relative w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+        {/* Data Table */}
+        <div className="overflow-hidden rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#0a0a0a]">
+                  <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Empresa / Contato</th>
+                  <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Categoria</th>
+                  <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Detalhes de Contato</th>
+                  <th className="px-6 py-4 text-slate-500 text-[10px] font-black uppercase tracking-widest">Ações Rápidas</th>
+                  <th className="px-6 py-4 text-right"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center gap-3">
+                        <Loader2 size={24} className="text-[#d4ff3f] animate-spin" />
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando contatos...</p>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredContacts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nenhum contato encontrado</p>
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedContacts.map((contact) => (
+                    <tr key={contact.id} className="hover:bg-[#2a2a2a]/30 transition-colors group">
+                      <td className="px-6 py-5">
+                        <div className="flex items-center gap-4">
+                          <div className={`size-10 rounded-xl bg-slate-800/50 text-[#d4ff3f] flex items-center justify-center font-black text-sm border border-slate-700`}>
+                            {contact.initials}
+                          </div>
+                          <div>
+                            <p className="font-black text-sm tracking-tight">{contact.company}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{contact.name}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
+                          contact.category === 'Cliente' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 
+                          contact.category === 'Fornecedor' ? 'bg-slate-800 text-slate-400' :
+                          'bg-purple-500/10 text-purple-500'
+                        }`}>
+                          {contact.category === 'Parceiro' ? 'Diversos' : contact.category}
+                        </span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="text-xs font-bold">
+                          <p className="text-slate-300">{contact.email}</p>
+                          <p className="text-slate-500 mt-0.5">{contact.phone}{contact.cellphone ? ` / ${contact.cellphone}` : ''}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <div className="flex gap-2">
+                          <a 
+                            href={contact.email ? `mailto:${contact.email}` : '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!contact.email) {
+                                e.preventDefault();
+                                alert('E-mail não cadastrado.');
+                              }
+                            }}
+                            className="p-2 rounded-xl bg-[#0a0a0a] text-slate-500 hover:bg-[#d4ff3f]/10 hover:text-[#d4ff3f] transition-all border border-slate-800/50"
+                            title="Enviar E-mail"
+                          >
+                            <Mail size={18} />
+                          </a>
+                          <button 
+                            onClick={() => {
+                              const cleanPhone = (contact.cellphone || contact.phone).replace(/\D/g, '');
+                              if (cleanPhone) {
+                                window.open(`https://wa.me/${cleanPhone}`, '_blank');
+                              } else {
+                                alert('Telefone/Celular não cadastrado ou inválido.');
+                              }
+                            }}
+                            className="p-2 rounded-xl bg-[#0a0a0a] text-slate-500 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all border border-slate-800/50"
+                            title="WhatsApp Web"
+                          >
+                            <Phone size={18} />
+                          </button>
+                          <a 
+                            href={contact.cellphone || contact.phone ? `sms:${contact.cellphone || contact.phone}` : '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => {
+                              if (!contact.cellphone && !contact.phone) {
+                                e.preventDefault();
+                                alert('Telefone/Celular não cadastrado.');
+                              }
+                            }}
+                            className="p-2 rounded-xl bg-[#0a0a0a] text-slate-500 hover:bg-[#d4ff3f]/10 hover:text-[#d4ff3f] transition-all border border-slate-800/50"
+                            title="Enviar SMS"
+                          >
+                            <MessageSquare size={18} />
+                          </a>
+                        </div>
+                      </td>
+                      <td className="px-6 py-5 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => handleOpenModal(contact)}
+                            className="p-2 rounded-lg hover:bg-[#2a2a2a] text-slate-500 hover:text-[#d4ff3f] transition-all"
+                            title="Editar"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDelete(contact.id)}
+                            className="p-2 rounded-lg hover:bg-rose-900/20 text-slate-500 hover:text-rose-500 transition-all"
+                            title="Excluir"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          <div className="px-6 py-4 flex items-center justify-between border-t border-slate-800/50 bg-[#0a0a0a]">
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contatos
+            </p>
+            <div className="flex items-center gap-2">
+              <button 
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
               >
-                <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                  <h3 className="text-lg font-black text-blue-600 tracking-tight">
-                    {editingContact ? 'Editar Contato' : 'Adicionar Novo Contato'}
-                  </h3>
-                  <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600 transition-colors">
-                    <X size={20} />
-                  </button>
+                <ChevronLeft size={16} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button 
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`size-8 rounded-lg text-[10px] font-black transition-all ${
+                    currentPage === page 
+                      ? 'bg-[#d4ff3f] text-[#0a0a0a]' 
+                      : 'text-slate-500 hover:bg-[#2a2a2a]'
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <button 
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {stats.map((stat) => (
+            <div key={stat.label} className="p-6 rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm flex items-center gap-5 group hover:border-[#d4ff3f]/30 transition-all">
+              <div className={`size-14 rounded-2xl bg-slate-800/50 text-slate-400 flex items-center justify-center group-hover:text-[#d4ff3f] transition-colors`}>
+                <stat.icon size={28} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{stat.label}</p>
+                <p className="text-3xl font-black tracking-tight">{stat.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseModal}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-lg bg-[#1a1a1a] rounded-3xl shadow-2xl border border-slate-800/50 overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
+                <h3 className="text-lg font-black tracking-tight">
+                  {editingContact ? 'Editar Contato' : 'Novo Contato'}
+                </h3>
+                <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nome Completo</label>
+                    <input 
+                      required
+                      type="text" 
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="ex: João Silva"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Empresa</label>
+                    <input 
+                      type="text" 
+                      value={formData.company}
+                      onChange={(e) => setFormData({...formData, company: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="ex: Acme Construções"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Categoria</label>
+                    <select 
+                      value={formData.category}
+                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                    >
+                      <option value="Cliente">Cliente</option>
+                      <option value="Fornecedor">Fornecedor</option>
+                      <option value="Diversos">Diversos</option>
+                    </select>
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Número de Telefone</label>
+                    <input 
+                      type="text" 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
+                    <input 
+                      type="email" 
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="contato@empresa.com.br"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Celular</label>
+                    <input 
+                      type="text" 
+                      value={formData.cellphone}
+                      onChange={(e) => setFormData({...formData, cellphone: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="(11) 99999-9999"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Notas</label>
+                    <textarea 
+                      value={formData.info}
+                      onChange={(e) => setFormData({...formData, info: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all h-20 resize-none"
+                      placeholder="Notas, observações ou detalhes adicionais..."
+                    />
+                  </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Nome Completo</label>
-                      <input 
-                        required
-                        type="text" 
-                        value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: João Silva"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Empresa</label>
-                      <input 
-                        type="text" 
-                        value={formData.company}
-                        onChange={(e) => setFormData({...formData, company: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="ex: Acme Construções"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Categoria</label>
-                      <select 
-                        value={formData.category}
-                        onChange={(e) => setFormData({...formData, category: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                      >
-                        <option value="Cliente">Cliente</option>
-                        <option value="Fornecedor">Fornecedor</option>
-                        <option value="Diversos">Diversos</option>
-                      </select>
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Número de Telefone</label>
-                      <input 
-                        type="text" 
-                        value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Endereço de E-mail</label>
-                      <input 
-                        type="email" 
-                        value={formData.email}
-                        onChange={(e) => setFormData({...formData, email: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="contato@empresa.com.br"
-                      />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5 text-blue-600">Celular</label>
-                      <input 
-                        type="text" 
-                        value={formData.cellphone}
-                        onChange={(e) => setFormData({...formData, cellphone: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                        placeholder="(11) 99999-9999"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5">Notas</label>
-                      <textarea 
-                        value={formData.info}
-                        onChange={(e) => setFormData({...formData, info: e.target.value})}
-                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm text-black dark:text-white outline-none focus:ring-2 focus:ring-blue-600 transition-all h-20 resize-none"
-                        placeholder="Notas, observações ou detalhes adicionais..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-4 flex gap-3">
-                    <button 
-                      type="button"
-                      onClick={handleCloseModal}
-                      className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-sm font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-                    >
-                      Cancelar
-                    </button>
-                    <button 
-                      type="submit"
-                      className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-blue-600/20 transition-all"
-                    >
-                      {editingContact ? 'Salvar Alterações' : 'Adicionar Contato'}
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-      </main>
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="flex-1 px-4 py-2.5 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#2a2a2a] transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
+                  >
+                    {editingContact ? 'Salvar Alterações' : 'Adicionar Contato'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

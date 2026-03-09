@@ -97,20 +97,20 @@ export default function DashboardPage() {
   ];
 
   return (
-    <>
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
         title="Visão Geral Operacional" 
         subtitle={`Monitorando ${stats.activeProjects} canteiros de obras ativos em tempo real.`}
         action={{ label: 'Novo Projeto', onClick: () => {} }}
       />
       
-      <div className="flex-1 overflow-y-auto p-8 space-y-8">
+      <div className="p-8 space-y-8">
         {/* KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
-              <div key={i} className="h-32 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 animate-pulse flex items-center justify-center">
-                <Loader2 size={24} className="text-blue-600/20 animate-spin" />
+              <div key={i} className="h-32 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] animate-pulse flex items-center justify-center">
+                <Loader2 size={24} className="text-[#d4ff3f]/20 animate-spin" />
               </div>
             ))
           ) : (
@@ -120,22 +120,22 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
-                className="p-6 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm"
+                className="p-6 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm group hover:border-[#d4ff3f]/30 transition-all"
               >
                 <div className="flex justify-between items-start mb-4">
-                  <span className="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest">{kpi.label}</span>
-                  <div className={`p-2 rounded-xl ${kpi.bg} ${kpi.color}`}>
+                  <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{kpi.label}</span>
+                  <div className={`p-2 rounded-xl bg-slate-800/50 text-slate-400 group-hover:text-[#d4ff3f] transition-colors`}>
                     <kpi.icon size={20} />
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{kpi.value}</span>
-                  <span className={`text-xs font-bold ${kpi.change.startsWith('+') ? 'text-emerald-500' : 'text-red-500'}`}>
+                  <span className="text-3xl font-black tracking-tight">{kpi.value}</span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${kpi.change.startsWith('+') ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-rose-500/10 text-rose-500'}`}>
                     {kpi.change}
                   </span>
                 </div>
-                <div className="mt-4 h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div className={`h-full ${kpi.color.replace('text', 'bg')} w-3/4 opacity-80`}></div>
+                <div className="mt-4 h-1 bg-[#0a0a0a] rounded-full overflow-hidden">
+                  <div className={`h-full bg-[#d4ff3f] w-3/4 opacity-80`}></div>
                 </div>
               </motion.div>
             ))
@@ -146,20 +146,26 @@ export default function DashboardPage() {
           {/* Main Content Column */}
           <div className="lg:col-span-2 space-y-8">
             {/* Performance Chart */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm">
+            <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 shadow-sm">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Desempenho do Projeto</h3>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg text-slate-500">Mensal</button>
-                  <button className="px-4 py-1.5 text-xs font-bold rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm">Semanal</button>
+                <h3 className="text-lg font-black tracking-tight">Desempenho do Projeto</h3>
+                <div className="flex bg-[#0a0a0a] p-1 rounded-xl">
+                  {['Mensal', 'Semanal'].map((t) => (
+                    <button 
+                      key={t}
+                      className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${t === 'Semanal' ? 'bg-[#2a2a2a] text-[#d4ff3f]' : 'text-slate-500 hover:text-white'}`}
+                    >
+                      {t}
+                    </button>
+                  ))}
                 </div>
               </div>
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={performanceData}>
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
                       {performanceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 3 ? '#136dec' : '#136dec40'} />
+                        <Cell key={`cell-${index}`} fill={index === 3 ? '#d4ff3f' : '#d4ff3f30'} />
                       ))}
                     </Bar>
                     <XAxis 
@@ -169,8 +175,8 @@ export default function DashboardPage() {
                       tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
                     />
                     <Tooltip 
-                      cursor={{ fill: 'transparent' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                      cursor={{ fill: '#ffffff05' }}
+                      contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -179,18 +185,18 @@ export default function DashboardPage() {
 
             {/* High Priority Tasks */}
             <div className="space-y-4">
-              <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Tarefas Ativas de Alta Prioridade</h3>
-              <div className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+              <h3 className="text-lg font-black tracking-tight">Tarefas Ativas de Alta Prioridade</h3>
+              <div className="divide-y divide-slate-800/50 bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
                 {highPriorityTasks.map((task) => (
-                  <div key={task.id} className="p-5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <div key={task.id} className="p-6 flex items-center justify-between hover:bg-[#2a2a2a]/30 transition-colors">
                     <div className="flex items-center gap-4">
                       <div className={`size-2.5 rounded-full ${task.color} shadow-lg shadow-${task.color.split('-')[1]}-500/20`}></div>
                       <div>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white">{task.title}</p>
-                        <p className="text-xs text-slate-500 font-medium">{task.site}</p>
+                        <p className="text-sm font-black tracking-tight">{task.title}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{task.site}</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-bold px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg uppercase tracking-widest">
+                    <span className="text-[10px] font-black px-3 py-1.5 bg-[#0a0a0a] text-slate-400 rounded-lg uppercase tracking-widest border border-slate-800/50">
                       {task.status}
                     </span>
                   </div>
@@ -202,46 +208,46 @@ export default function DashboardPage() {
           {/* Sidebar Column */}
           <div className="space-y-8">
             {/* Site Map Card */}
-            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-              <div className="p-5 border-b border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Mapa do Local</h3>
+            <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-800/50">
+                <h3 className="text-xs font-black uppercase tracking-widest">Mapa do Local</h3>
               </div>
-              <div className="aspect-square relative bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+              <div className="aspect-square relative bg-[#0a0a0a] flex items-center justify-center">
                 <Image 
                   src="https://picsum.photos/seed/map/400/400?grayscale&blur=2" 
                   alt="Map" 
                   fill
-                  className="object-cover opacity-30 dark:opacity-20"
+                  className="object-cover opacity-20"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="size-4 bg-blue-600 rounded-full animate-pulse border-2 border-white shadow-lg shadow-blue-600/50"></div>
-                  <div className="size-4 bg-blue-600 rounded-full absolute top-1/4 left-1/3 border-2 border-white shadow-lg shadow-blue-600/50"></div>
-                  <div className="size-4 bg-orange-500 rounded-full absolute bottom-1/3 right-1/4 border-2 border-white shadow-lg shadow-orange-500/50"></div>
+                  <div className="size-4 bg-[#d4ff3f] rounded-full animate-pulse border-2 border-[#0a0a0a] shadow-lg shadow-[#d4ff3f]/50"></div>
+                  <div className="size-4 bg-blue-500 rounded-full absolute top-1/4 left-1/3 border-2 border-[#0a0a0a] shadow-lg shadow-blue-500/50"></div>
+                  <div className="size-4 bg-orange-500 rounded-full absolute bottom-1/3 right-1/4 border-2 border-[#0a0a0a] shadow-lg shadow-orange-500/50"></div>
                 </div>
-                <div className="absolute bottom-4 left-4 right-4 bg-white/10 dark:bg-black/20 backdrop-blur-md p-4 rounded-xl border border-white/20 dark:border-white/5">
-                  <p className="text-xs font-black text-white uppercase tracking-widest">Localização dos Projetos</p>
-                  <p className="text-[10px] text-white/80 font-medium">Rastreamento ativo para 12 zonas primárias</p>
+                <div className="absolute bottom-6 left-6 right-6 bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f]">Localização dos Projetos</p>
+                  <p className="text-[10px] text-white/60 font-medium">Rastreamento ativo para 12 zonas primárias</p>
                 </div>
               </div>
             </div>
 
             {/* Recent Activity */}
             <div className="space-y-4">
-              <h3 className="text-sm font-black text-slate-900 dark:text-white uppercase tracking-widest">Atividade Recente</h3>
+              <h3 className="text-xs font-black uppercase tracking-widest">Atividade Recente</h3>
               <div className="space-y-6">
                 {recentActivity.map((activity, idx) => (
                   <div key={activity.id} className="flex gap-4 relative">
                     {idx !== recentActivity.length - 1 && (
-                      <div className="absolute left-4 top-8 bottom-0 w-px bg-slate-200 dark:border-slate-800"></div>
+                      <div className="absolute left-4 top-8 bottom-0 w-px bg-slate-800"></div>
                     )}
-                    <div className={`size-8 rounded-xl ${activity.iconBg} ${activity.iconColor} flex items-center justify-center flex-shrink-0 z-10`}>
+                    <div className={`size-8 rounded-xl bg-slate-800/50 text-slate-400 flex items-center justify-center flex-shrink-0 z-10`}>
                       <activity.icon size={16} />
                     </div>
                     <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{activity.title}</p>
-                      <p className="text-xs text-slate-500 font-medium mt-1">{activity.desc}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mt-1">{activity.time}</p>
+                      <p className="text-sm font-black tracking-tight leading-tight">{activity.title}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mt-1">{activity.desc}</p>
+                      <p className="text-[10px] text-[#d4ff3f] font-black uppercase tracking-widest mt-1">{activity.time}</p>
                     </div>
                   </div>
                 ))}
@@ -250,6 +256,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

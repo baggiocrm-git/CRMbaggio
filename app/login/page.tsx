@@ -46,94 +46,98 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#101822] p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#1a2430] border border-slate-800 rounded-2xl p-8 shadow-2xl"
+        className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden"
       >
-        <div className="flex flex-col items-center mb-8">
-          <div className="size-24 flex items-center justify-center overflow-hidden mb-4 relative">
+        {/* Decorative background element */}
+        <div className="absolute -top-24 -right-24 size-48 bg-[#d4ff3f]/5 blur-[100px] rounded-full" />
+        
+        <div className="flex flex-col items-center mb-10 relative z-10">
+          <div className="size-28 flex items-center justify-center overflow-hidden mb-6 relative group">
+            <div className="absolute inset-0 bg-[#d4ff3f]/10 blur-2xl rounded-full scale-0 group-hover:scale-100 transition-transform duration-500" />
             <Image 
               src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
               alt="Logo" 
               fill
-              className="object-contain"
+              className="object-contain relative z-10"
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-2xl font-black text-white tracking-tight">CBSL CRM</h1>
-          <p className="text-slate-400 text-sm mt-1 text-center">Sistema de Gestão de Engenharia e Construção</p>
+          <h1 className="text-3xl font-black text-white tracking-tighter">CBSL <span className="text-[#d4ff3f]">CRM</span></h1>
+          <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2 text-center">Gestão de Engenharia e Construção</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-6">
+        <form onSubmit={handleLogin} className="space-y-6 relative z-10">
           {error && (
             <motion.div 
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
-              className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-3 text-red-500 text-sm"
+              className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex items-center gap-3 text-rose-500 text-xs font-bold"
             >
               <AlertCircle size={18} />
               <p>{error}</p>
             </motion.div>
           )}
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Endereço de E-mail</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuário / E-mail</label>
+            <div className="relative group">
+              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
               <input 
                 type="text" 
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#101822] border-slate-800 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-600 transition-all outline-none"
+                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
                 placeholder="nome@empresa.com ou Admin"
                 required
               />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Senha</label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+          <div className="space-y-2">
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha de Acesso</label>
+            <div className="relative group">
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
               <input 
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#101822] border-slate-800 rounded-xl py-3 pl-10 pr-4 text-white focus:ring-2 focus:ring-blue-600 transition-all outline-none"
+                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
                 placeholder="••••••••"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center gap-2 text-slate-400 cursor-pointer">
-              <input type="checkbox" className="rounded border-slate-800 bg-[#101822] text-blue-600 focus:ring-0" />
-              Lembrar de mim
+          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest px-1">
+            <label className="flex items-center gap-2 text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">
+              <input type="checkbox" className="rounded border-slate-800 bg-[#0a0a0a] text-[#d4ff3f] focus:ring-0 focus:ring-offset-0" />
+              Lembrar
             </label>
-            <a href="#" className="text-blue-500 hover:underline font-medium">Esqueceu a senha?</a>
+            <a href="#" className="text-slate-500 hover:text-[#d4ff3f] transition-colors">Recuperar Senha</a>
           </div>
 
           <button 
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-blue-600/20 group"
+            className="w-full bg-[#d4ff3f] hover:bg-[#c4ef2f] disabled:opacity-50 disabled:cursor-not-allowed text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#d4ff3f]/10 group mt-4 active:scale-[0.98]"
           >
             {loading ? (
-              <Loader2 size={18} className="animate-spin" />
+              <Loader2 size={20} className="animate-spin" />
             ) : (
               <>
-                Entrar
-                <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                Acessar Painel
+                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
           </button>
         </form>
 
-        <div className="mt-8 pt-8 border-t border-slate-800 text-center">
-          <p className="text-slate-500 text-xs">
-            © 2024 CBSL Engineering CRM. Todos os direitos reservados.
+        <div className="mt-10 pt-8 border-t border-slate-800/50 text-center relative z-10">
+          <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em]">
+            © 2024 CBSL Engineering CRM
           </p>
         </div>
       </motion.div>
