@@ -9,18 +9,12 @@ import {
   ArrowUpRight, 
   AlertCircle, 
   ArrowDownRight,
-  Download,
   Plus,
-  MoreHorizontal,
   Calendar,
-  Bell,
   ArrowRight,
   Wallet,
-  PieChart,
-  Target,
-  Layers,
-  Percent,
-  ClipboardList
+  ClipboardList,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -34,23 +28,129 @@ import {
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
 
-const chartData = [
-  { name: 'Out', receitas: 45000, despesas: 38000 },
-  { name: 'Nov', receitas: 52000, despesas: 42000 },
-  { name: 'Dez', receitas: 48000, despesas: 55000 },
-  { name: 'Jan', receitas: 60000, despesas: 48000 },
-  { name: 'Fev', receitas: 65000, despesas: 52000 },
-  { name: 'Mar', receitas: 84320, despesas: 61150 },
-];
+interface Receivable {
+  id: string;
+  cliente: string;
+  descricao: string;
+  data_vencimento: string;
+  data_recebimento: string | null;
+  valor: number;
+  valor_recebido: number;
+  situacao: 'Aberto' | 'Recebido' | 'Em andamento';
+}
+
+interface Payable {
+  id: string;
+  fornecedor: string;
+  descricao: string;
+  data_vencimento: string;
+  data_pagamento: string | null;
+  valor: number;
+  valor_pago: number;
+  situacao: 'Aberto' | 'Pago' | 'Em andamento';
+}
 
 export default function FinanceDashboard() {
   const [isMounted, setIsMounted] = useState(false);
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [payables, setPayables] = useState<Payable[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
+    fetchData();
   }, []);
 
+  const fetchData = async () => {
+    try {
+      const [recRes, payRes] = await Promise.all([
+        supabase.from('contas_receber').select('*'),
+        supabase.from('contas_pagar').select('*')
+      ]);
+
+      if (recRes.data) setReceivables(recRes.data);
+      if (payRes.data) setPayables(payRes.data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    }
+  };
+
   if (!isMounted) return null;
+
+  // Data processing
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const currentMonthReceivables = receivables.filter(r => {
+    const date = new Date(r.data_vencimento);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const currentMonthPayables = payables.filter(p => {
+    const date = new Date(p.data_vencimento);
+    return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+  });
+
+  const monthlyRevenue = currentMonthReceivables.reduce((acc, curr) => acc + curr.valor, 0);
+  const monthlyExpenses = currentMonthPayables.reduce((acc, curr) => acc + curr.valor, 0);
+  const netProfit = monthlyRevenue - monthlyExpenses;
+  
+  const totalReceived = receivables.reduce((acc, curr) => acc + curr.valor_recebido, 0);
+  const totalPaid = payables.reduce((acc, curr) => acc + curr.valor_pago, 0);
+  const cashBalance = totalReceived - totalPaid;
+
+  // Chart data processing (last 6 months)
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const last6Months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date();
+    d.setMonth(d.getMonth() - i);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    
+    const monthRec = receivables.filter(r => {
+      const rd = new Date(r.data_vencimento);
+      return rd.getMonth() === m && rd.getFullYear() === y;
+    }).reduce((acc, curr) => acc + curr.valor, 0);
+
+    const monthPay = payables.filter(p => {
+      const pd = new Date(p.data_vencimento);
+      return pd.getMonth() === m && pd.getFullYear() === y;
+    }).reduce((acc, curr) => acc + curr.valor, 0);
+
+    last6Months.push({
+      name: months[m],
+      receitas: monthRec,
+      despesas: monthPay
+    });
+  }
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
+  const overdueReceivables = receivables.filter(r => 
+    r.situacao !== 'Recebido' && new Date(r.data_vencimento) < new Date()
+  ).sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime());
+
+  const latestTransactions = [
+    ...receivables.filter(r => r.data_recebimento).map(r => ({
+      name: `Recebimento — ${r.cliente}`,
+      desc: `Vendas · ${new Date(r.data_recebimento!).toLocaleDateString('pt-BR')}`,
+      amount: `+ ${formatCurrency(r.valor_recebido)}`,
+      color: 'text-[#d4ff3f]',
+      icon: Wallet,
+      date: new Date(r.data_recebimento!).getTime()
+    })),
+    ...payables.filter(p => p.data_pagamento).map(p => ({
+      name: `Pagamento — ${p.fornecedor}`,
+      desc: `Despesa · ${new Date(p.data_pagamento!).toLocaleDateString('pt-BR')}`,
+      amount: `- ${formatCurrency(p.valor_pago)}`,
+      color: 'text-rose-500',
+      icon: ClipboardList,
+      date: new Date(p.data_pagamento!).getTime()
+    }))
+  ].sort((a, b) => b.date - a.date).slice(0, 5);
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
@@ -60,24 +160,22 @@ export default function FinanceDashboard() {
           <h1 className="text-4xl font-black tracking-tight italic">
             Painel <span className="text-[#d4ff3f]">Financeiro</span>
           </h1>
-          <p className="text-slate-500 text-xs font-bold mt-1">Março 2026 · Atualizado há 12 minutos</p>
+          <p className="text-slate-500 text-xs font-bold mt-1">
+            {months[currentMonth]} {currentYear} · Atualizado agora
+          </p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="flex bg-[#1a1a1a] p-1 rounded-lg">
-            {['Sem', 'Mês', 'Tri', 'Ano'].map((t) => (
-              <button 
-                key={t} 
-                className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-md transition-all ${t === 'Mês' ? 'bg-[#2a2a2a] text-[#d4ff3f]' : 'text-slate-500 hover:text-white'}`}
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] border border-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all">
-            <Download size={14} /> Exportar
+          <button 
+            onClick={fetchData}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] border border-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all"
+          >
+            <Calendar size={14} /> Sincronizar
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all">
-            <Plus size={14} /> Lançamento
+          <button 
+            onClick={() => window.location.href = '/finances/receivables'}
+            className="flex items-center gap-2 px-4 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
+          >
+            <Plus size={14} /> Novo Lançamento
           </button>
         </div>
       </header>
@@ -86,10 +184,10 @@ export default function FinanceDashboard() {
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
-            { label: 'RECEITA DO MÊS', value: 'R$ 84.320', change: '12,4%', trend: 'up', icon: TrendingUp, color: '#d4ff3f' },
-            { label: 'DESPESAS DO MÊS', value: 'R$ 61.150', change: '4,1%', trend: 'up', icon: TrendingDown, color: '#ff4d4d' },
-            { label: 'LUCRO LÍQUIDO', value: 'R$ 23.170', change: '27,8%', trend: 'up', icon: DollarSign, color: '#d4ff3f' },
-            { label: 'SALDO EM CAIXA', value: 'R$ 142.800', change: '9,2%', trend: 'up', icon: Wallet, color: '#d4ff3f' },
+            { label: 'RECEITA DO MÊS', value: formatCurrency(monthlyRevenue), change: 'Real', trend: 'up', icon: TrendingUp, color: '#d4ff3f' },
+            { label: 'DESPESAS DO MÊS', value: formatCurrency(monthlyExpenses), change: 'Real', trend: 'down', icon: TrendingDown, color: '#ff4d4d' },
+            { label: 'LUCRO LÍQUIDO', value: formatCurrency(netProfit), change: 'Real', trend: 'up', icon: DollarSign, color: '#d4ff3f' },
+            { label: 'SALDO EM CAIXA', value: formatCurrency(cashBalance), change: 'Total', trend: 'up', icon: Wallet, color: '#d4ff3f' },
           ].map((card, idx) => (
             <motion.div 
               key={card.label}
@@ -102,10 +200,10 @@ export default function FinanceDashboard() {
                 <card.icon size={20} />
               </div>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">{card.label}</p>
-              <p className="text-3xl font-black tracking-tight mb-4">{card.value}</p>
-              <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg w-fit ${card.color === '#d4ff3f' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-[#ff4d4d]/10 text-[#ff4d4d]'}`}>
+              <p className="text-2xl font-black tracking-tight mb-4">{card.value}</p>
+              <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg w-fit ${card.trend === 'up' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-[#ff4d4d]/10 text-[#ff4d4d]'}`}>
                 {card.trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                {card.change} vs mês anterior
+                {card.change}
               </div>
             </motion.div>
           ))}
@@ -116,13 +214,10 @@ export default function FinanceDashboard() {
           <div className="lg:col-span-2 bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
             <div className="flex justify-between items-center mb-8">
               <h3 className="text-lg font-black tracking-tight">Receitas vs Despesas</h3>
-              <button className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1">
-                Ver relatório <ArrowRight size={12} />
-              </button>
             </div>
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                <BarChart data={last6Months} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
                   <XAxis 
                     dataKey="name" 
@@ -138,15 +233,16 @@ export default function FinanceDashboard() {
                   <Tooltip 
                     cursor={{ fill: '#ffffff05' }}
                     contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
+                    formatter={(value: number) => formatCurrency(value)}
                   />
                   <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={40}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-rec-${index}`} fill={index === chartData.length - 1 ? '#d4ff3f' : '#88ab00'} />
+                    {last6Months.map((entry, index) => (
+                      <Cell key={`cell-rec-${index}`} fill={index === last6Months.length - 1 ? '#d4ff3f' : '#88ab00'} />
                     ))}
                   </Bar>
                   <Bar dataKey="despesas" radius={[4, 4, 0, 0]} barSize={40}>
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-des-${index}`} fill={index === chartData.length - 1 ? '#ff4d4d' : '#993333'} />
+                    {last6Months.map((entry, index) => (
+                      <Cell key={`cell-des-${index}`} fill={index === last6Months.length - 1 ? '#ff4d4d' : '#993333'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -169,61 +265,46 @@ export default function FinanceDashboard() {
             <h3 className="text-lg font-black tracking-tight mb-8">Indicadores</h3>
             <div className="grid grid-cols-2 gap-4 flex-1">
               {[
-                { label: 'MARGEM BRUTA', value: '38,4%', color: 'text-[#d4ff3f]' },
-                { label: 'MARGEM LÍQUIDA', value: '27,5%', color: 'text-[#d4ff3f]' },
-                { label: 'LIQUIDEZ CORR.', value: '2,34', color: 'text-blue-400' },
-                { label: 'INADIMPLÊNCIA', value: '4,2%', color: 'text-orange-400' },
+                { label: 'MARGEM BRUTA', value: monthlyRevenue > 0 ? `${((netProfit / monthlyRevenue) * 100).toFixed(1)}%` : '0%', color: 'text-[#d4ff3f]' },
+                { label: 'RECEBIDO/TOTAL', value: monthlyRevenue > 0 ? `${((currentMonthReceivables.reduce((a, c) => a + c.valor_recebido, 0) / monthlyRevenue) * 100).toFixed(1)}%` : '0%', color: 'text-[#d4ff3f]' },
+                { label: 'PAGO/TOTAL', value: monthlyExpenses > 0 ? `${((currentMonthPayables.reduce((a, c) => a + c.valor_pago, 0) / monthlyExpenses) * 100).toFixed(1)}%` : '0%', color: 'text-blue-400' },
+                { label: 'INADIMPLÊNCIA', value: overdueReceivables.length > 0 ? `${overdueReceivables.length}` : '0', color: 'text-orange-400' },
               ].map((ind) => (
                 <div key={ind.label} className="bg-[#0a0a0a] p-4 rounded-2xl border border-slate-800/30">
                   <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest mb-2">{ind.label}</p>
-                  <p className={`text-2xl font-black ${ind.color}`}>{ind.value}</p>
+                  <p className={`text-xl font-black ${ind.color}`}>{ind.value}</p>
                 </div>
               ))}
-            </div>
-            <div className="mt-8 pt-8 border-t border-slate-800/50">
-              <div className="flex justify-between items-end mb-2">
-                <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">EBITDA MARGIN</p>
-                <p className="text-xl font-black text-[#d4ff3f]">31%</p>
-              </div>
-              <div className="h-2 bg-[#0a0a0a] rounded-full overflow-hidden relative">
-                <div className="h-full bg-[#d4ff3f] rounded-full" style={{ width: '31%' }}></div>
-                <div className="absolute top-0 left-[35%] h-full w-0.5 bg-slate-700"></div>
-              </div>
-              <div className="flex justify-between mt-2">
-                <p className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Meta: 35% · Faltam 4 p.p.</p>
-              </div>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Contas a Receber */}
+          {/* Contas a Receber Próximas */}
           <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black tracking-tight">Contas a Receber</h3>
-              <button className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1">
+              <h3 className="text-lg font-black tracking-tight">Próximos Recebimentos</h3>
+              <button 
+                onClick={() => window.location.href = '/finances/receivables'}
+                className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1"
+              >
                 Ver todas <ArrowRight size={12} />
               </button>
             </div>
             <div className="space-y-3">
-              {[
-                { name: 'Tech Solutions Ltda.', desc: 'Venceu em 28/02 · 8 dias em atraso', amount: 'R$ 12.400', status: 'VENCIDA', color: 'bg-rose-500/10 text-rose-500' },
-                { name: 'Grupo Ômega S.A.', desc: 'Vence em 10/03 · 2 dias', amount: 'R$ 8.750', status: 'PENDENTE', color: 'bg-orange-500/10 text-orange-500' },
-                { name: 'Distribuidora Norte', desc: 'Vence em 15/03 · 7 dias', amount: 'R$ 5.200', status: 'PENDENTE', color: 'bg-orange-500/10 text-orange-500' },
-                { name: 'Alfa Comércio ME', desc: 'Recebido em 05/03', amount: 'R$ 3.100', status: 'PAGO', color: 'bg-emerald-500/10 text-emerald-500' },
-              ].map((item) => (
-                <div key={item.name} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 hover:border-slate-700 transition-all">
+              {receivables.filter(r => r.situacao !== 'Recebido').slice(0, 4).map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 hover:border-slate-700 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className={`size-2 rounded-full ${item.status === 'VENCIDA' ? 'bg-rose-500' : item.status === 'PAGO' ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
+                    <div className={`size-2 rounded-full ${new Date(item.data_vencimento) < new Date() ? 'bg-rose-500' : 'bg-orange-500'}`}></div>
                     <div>
-                      <p className="text-sm font-black tracking-tight">{item.name}</p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{item.desc}</p>
+                      <p className="text-sm font-black tracking-tight">{item.cliente}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Vence em {new Date(item.data_vencimento).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <p className={`text-sm font-black ${item.status === 'VENCIDA' ? 'text-rose-500' : 'text-white'}`}>{item.amount}</p>
-                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${item.color}`}>
-                      {item.status}
+                    <p className="text-sm font-black">{formatCurrency(item.valor)}</p>
+                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${item.situacao === 'Aberto' ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                      {item.situacao}
                     </span>
                   </div>
                 </div>
@@ -231,33 +312,31 @@ export default function FinanceDashboard() {
             </div>
           </div>
 
-          {/* Contas a Pagar */}
+          {/* Contas a Pagar Próximas */}
           <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-black tracking-tight">Contas a Pagar</h3>
-              <button className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1">
+              <h3 className="text-lg font-black tracking-tight">Próximos Pagamentos</h3>
+              <button 
+                onClick={() => window.location.href = '/finances/payables'}
+                className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1"
+              >
                 Ver todas <ArrowRight size={12} />
               </button>
             </div>
             <div className="space-y-3">
-              {[
-                { name: 'Aluguel Comercial', desc: 'Vence em 10/03 · 2 dias', amount: 'R$ 7.500', status: 'PENDENTE', color: 'bg-orange-500/10 text-orange-500' },
-                { name: 'Folha de Pagamento', desc: 'Vence em 05/03 — hoje', amount: 'R$ 28.600', status: 'PENDENTE', color: 'bg-orange-500/10 text-orange-500' },
-                { name: 'Fornecedor Principal', desc: 'Pago em 03/03', amount: 'R$ 14.200', status: 'PAGO', color: 'bg-emerald-500/10 text-emerald-500' },
-                { name: 'DARF / Impostos', desc: 'Vence em 20/03 · 12 dias', amount: 'R$ 4.830', status: 'PENDENTE', color: 'bg-orange-500/10 text-orange-500' },
-              ].map((item) => (
-                <div key={item.name} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 hover:border-slate-700 transition-all">
+              {payables.filter(p => p.situacao !== 'Pago').slice(0, 4).map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 hover:border-slate-700 transition-all">
                   <div className="flex items-center gap-4">
-                    <div className={`size-2 rounded-full ${item.status === 'PAGO' ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
+                    <div className={`size-2 rounded-full ${new Date(item.data_vencimento) < new Date() ? 'bg-rose-500' : 'bg-orange-500'}`}></div>
                     <div>
-                      <p className="text-sm font-black tracking-tight">{item.name}</p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{item.desc}</p>
+                      <p className="text-sm font-black tracking-tight">{item.fornecedor}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Vence em {new Date(item.data_vencimento).toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    <p className="text-sm font-black">{item.amount}</p>
-                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${item.color}`}>
-                      {item.status}
+                    <p className="text-sm font-black">{formatCurrency(item.valor)}</p>
+                    <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${item.situacao === 'Aberto' ? 'bg-orange-500/10 text-orange-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                      {item.situacao}
                     </span>
                   </div>
                 </div>
@@ -270,20 +349,16 @@ export default function FinanceDashboard() {
           {/* DRE Resumido */}
           <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
             <div className="flex justify-between items-center mb-8">
-              <h3 className="text-lg font-black tracking-tight">DRE Resumido — Março 2026</h3>
-              <button className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1">
-                Completo <ArrowRight size={12} />
-              </button>
+              <h3 className="text-lg font-black tracking-tight">DRE Resumido — {months[currentMonth]} {currentYear}</h3>
             </div>
             <div className="space-y-4">
               {[
-                { label: '(+) Receita Bruta', value: 'R$ 84.320', color: 'text-[#d4ff3f]' },
-                { label: '(-) Deduções e Impostos s/ Venda', value: '- R$ 11.800', color: 'text-rose-500' },
-                { label: '(=) Receita Líquida', value: 'R$ 72.520', color: 'text-white', bold: true },
-                { label: '(-) Custo dos Produtos/Serviços', value: '- R$ 31.700', color: 'text-rose-500' },
-                { label: '(=) Lucro Bruto', value: 'R$ 40.820', color: 'text-[#d4ff3f]', bold: true },
-                { label: '(-) Despesas Operacionais', value: '- R$ 17.650', color: 'text-rose-500' },
-                { label: '(=) Lucro Líquido', value: 'R$ 23.170', color: 'text-[#d4ff3f]', bold: true },
+                { label: '(+) Receita Bruta', value: formatCurrency(monthlyRevenue), color: 'text-[#d4ff3f]' },
+                { label: '(-) Despesas do Mês', value: `- ${formatCurrency(monthlyExpenses)}`, color: 'text-rose-500' },
+                { label: '(=) Resultado Operacional', value: formatCurrency(netProfit), color: 'text-white', bold: true },
+                { label: '(+) Saldo Acumulado (Recebido)', value: formatCurrency(totalReceived), color: 'text-[#d4ff3f]' },
+                { label: '(-) Saldo Acumulado (Pago)', value: `- ${formatCurrency(totalPaid)}`, color: 'text-rose-500' },
+                { label: '(=) Saldo em Caixa', value: formatCurrency(cashBalance), color: 'text-[#d4ff3f]', bold: true },
               ].map((item) => (
                 <div key={item.label} className={`flex justify-between items-center py-2 border-b border-slate-800/30 ${item.bold ? 'pt-4' : ''}`}>
                   <p className={`text-xs ${item.bold ? 'font-black text-white' : 'font-bold text-slate-400'}`}>{item.label}</p>
@@ -294,37 +369,42 @@ export default function FinanceDashboard() {
           </div>
 
           <div className="space-y-8">
-            {/* Alertas */}
+            {/* Alertas Reais */}
             <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
               <h3 className="text-lg font-black tracking-tight mb-6">Alertas</h3>
               <div className="space-y-4">
-                {[
-                  { icon: AlertCircle, color: 'text-rose-500', bg: 'bg-rose-500/5', border: 'border-rose-500/20', text: 'Tech Solutions com R$ 12.400 em atraso há 8 dias. Acionar régua de cobrança.' },
-                  { icon: Calendar, color: 'text-orange-500', bg: 'bg-orange-500/5', border: 'border-orange-500/20', text: 'Folha de pagamento de R$ 28.600 vence hoje. Confirme o saldo disponível.' },
-                  { icon: Bell, color: 'text-blue-500', bg: 'bg-blue-500/5', border: 'border-blue-500/20', text: 'DARF de março vence em 20/03. Valor estimado: R$ 4.830.' },
-                ].map((alert, idx) => (
-                  <div key={idx} className={`p-4 rounded-2xl border ${alert.bg} ${alert.border} flex items-start gap-4`}>
-                    <alert.icon size={18} className={`${alert.color} mt-0.5 flex-shrink-0`} />
-                    <p className="text-xs font-bold text-slate-300 leading-relaxed">{alert.text}</p>
+                {overdueReceivables.length > 0 ? (
+                  <div className="p-4 rounded-2xl border bg-rose-500/5 border-rose-500/20 flex items-start gap-4">
+                    <AlertCircle size={18} className="text-rose-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed">
+                      Existem {overdueReceivables.length} contas a receber em atraso. A maior é de {overdueReceivables[0].cliente} ({formatCurrency(overdueReceivables[0].valor)}).
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-2xl border bg-emerald-500/5 border-emerald-500/20 flex items-start gap-4">
+                    <CheckCircle2 size={18} className="text-emerald-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed">Não há contas a receber em atraso no momento.</p>
+                  </div>
+                )}
+                
+                {payables.filter(p => p.situacao !== 'Pago' && p.data_vencimento === now.toISOString().split('T')[0]).map((p, idx) => (
+                  <div key={idx} className="p-4 rounded-2xl border bg-orange-500/5 border-orange-500/20 flex items-start gap-4">
+                    <Calendar size={18} className="text-orange-500 mt-0.5 flex-shrink-0" />
+                    <p className="text-xs font-bold text-slate-300 leading-relaxed">
+                      Atenção: A conta &quot;{p.descricao}&quot; de {formatCurrency(p.valor)} vence hoje.
+                    </p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Últimas Transações */}
+            {/* Últimas Transações Reais */}
             <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-lg font-black tracking-tight">Últimas Transações</h3>
-                <button className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-1">
-                  Ver extrato <ArrowRight size={12} />
-                </button>
               </div>
               <div className="space-y-4">
-                {[
-                  { name: 'Recebimento — Alfa ME', desc: 'Vendas · 05/03', amount: '+ R$ 3.100', color: 'text-[#d4ff3f]', icon: Wallet },
-                  { name: 'Fornecedor Principal', desc: 'Compras · 03/03', amount: '- R$ 14.200', color: 'text-rose-500', icon: ClipboardList },
-                  { name: 'Transferência — Caixa Geral', desc: 'Interno · 01/03', amount: 'R$ 20.000', color: 'text-slate-400', icon: Layers },
-                ].map((tx, idx) => (
+                {latestTransactions.length > 0 ? latestTransactions.map((tx, idx) => (
                   <div key={idx} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30">
                     <div className="flex items-center gap-4">
                       <div className="size-10 bg-slate-800/50 rounded-xl flex items-center justify-center text-slate-400">
@@ -337,7 +417,9 @@ export default function FinanceDashboard() {
                     </div>
                     <p className={`text-sm font-black ${tx.color}`}>{tx.amount}</p>
                   </div>
-                ))}
+                )) : (
+                  <p className="text-xs text-slate-500 font-bold uppercase text-center py-4">Nenhuma transação recente.</p>
+                )}
               </div>
             </div>
           </div>
