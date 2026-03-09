@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { 
   LayoutDashboard, 
   Briefcase, 
@@ -53,11 +54,23 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [user, setUser] = React.useState<User | null>(null);
+
+  React.useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
   };
+
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
+  const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
@@ -115,11 +128,11 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-800/50">
         <div className="flex items-center gap-3 p-3 bg-[#1a1a1a] rounded-2xl border border-slate-800/50">
           <div className="size-8 rounded-full bg-[#d4ff3f] flex items-center justify-center text-[#0a0a0a] font-black text-xs">
-            MF
+            {userInitials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-white truncate">Maria Fonseca</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">Financeiro</p>
+            <p className="text-xs font-bold text-white truncate">{userName}</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{user?.email || 'Conectado'}</p>
           </div>
         </div>
       </div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
-  User, 
+  User as UserIcon, 
   Moon, 
   Sun, 
   Type, 
@@ -16,6 +16,8 @@ import {
   Monitor
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
@@ -23,8 +25,15 @@ export default function SettingsPage() {
   const [fontSize, setFontSize] = useState('medium');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState({
+    fullName: '',
+    email: '',
+    role: 'Usuário',
+    phone: ''
+  });
 
-  // Load settings from localStorage
+  // Load settings and user from Supabase
   useEffect(() => {
     const savedTheme = localStorage.getItem('app-theme') || 'dark';
     const savedFontSize = localStorage.getItem('app-font-size') || 'medium';
@@ -41,38 +50,65 @@ export default function SettingsPage() {
     // Apply font size
     document.documentElement.classList.remove('font-small', 'font-medium', 'font-large');
     document.documentElement.classList.add(`font-${savedFontSize}`);
+
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUser(user);
+        setProfile({
+          fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          role: user.user_metadata?.role || 'Usuário',
+          phone: user.user_metadata?.phone || ''
+        });
+      }
+    };
+    getUser();
   }, []);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.setItem('app-theme', theme);
-      localStorage.setItem('app-font-size', fontSize);
-      
-      // Apply theme
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
+    
+    // Update user metadata in Supabase
+    const { error } = await supabase.auth.updateUser({
+      data: {
+        full_name: profile.fullName,
+        role: profile.role,
+        phone: profile.phone
       }
+    });
 
-      // Apply font size
-      document.documentElement.classList.remove('font-small', 'font-medium', 'font-large');
-      document.documentElement.classList.add(`font-${fontSize}`);
-      
-      setIsSaving(false);
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
-    }, 800);
+    if (error) {
+      console.error('Error updating profile:', error);
+    }
+
+    localStorage.setItem('app-theme', theme);
+    localStorage.setItem('app-font-size', fontSize);
+    
+    // Apply theme
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    // Apply font size
+    document.documentElement.classList.remove('font-small', 'font-medium', 'font-large');
+    document.documentElement.classList.add(`font-${fontSize}`);
+    
+    setIsSaving(false);
+    setShowSuccess(true);
+    setTimeout(() => setShowSuccess(false), 3000);
   };
 
   const tabs = [
-    { id: 'profile', name: 'Perfil', icon: User },
+    { id: 'profile', name: 'Perfil', icon: UserIcon },
     { id: 'appearance', name: 'Aparência', icon: Monitor },
     { id: 'notifications', name: 'Notificações', icon: Bell },
     { id: 'security', name: 'Segurança', icon: Shield },
   ];
+
+  const userInitials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
@@ -117,15 +153,15 @@ export default function SettingsPage() {
                   <div className="flex items-center gap-6">
                     <div className="relative group">
                       <div className="size-24 rounded-full bg-[#d4ff3f] flex items-center justify-center text-[#0a0a0a] font-black text-3xl shadow-xl shadow-[#d4ff3f]/10">
-                        MF
+                        {userInitials}
                       </div>
                       <button className="absolute bottom-0 right-0 p-2 bg-[#0a0a0a] border border-slate-800 rounded-full text-[#d4ff3f] hover:scale-110 transition-transform">
                         <Camera size={14} />
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-xl font-black">Maria Fonseca</h3>
-                      <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">Diretora Financeira</p>
+                      <h3 className="text-xl font-black">{profile.fullName || 'Usuário'}</h3>
+                      <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{profile.role}</p>
                     </div>
                   </div>
 
@@ -134,7 +170,8 @@ export default function SettingsPage() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome Completo</label>
                       <input 
                         type="text"
-                        defaultValue="Maria Fonseca"
+                        value={profile.fullName}
+                        onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
                       />
                     </div>
@@ -142,15 +179,17 @@ export default function SettingsPage() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail</label>
                       <input 
                         type="email"
-                        defaultValue="maria.fonseca@cbsl.com.br"
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        value={profile.email}
+                        disabled
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-slate-500 font-bold outline-none cursor-not-allowed"
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cargo</label>
                       <input 
                         type="text"
-                        defaultValue="Diretora Financeira"
+                        value={profile.role}
+                        onChange={(e) => setProfile({ ...profile, role: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
                       />
                     </div>
@@ -158,7 +197,8 @@ export default function SettingsPage() {
                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
                       <input 
                         type="text"
-                        defaultValue="+55 (11) 98877-6655"
+                        value={profile.phone}
+                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
                       />
                     </div>
