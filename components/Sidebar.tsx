@@ -107,9 +107,20 @@ export default function Sidebar() {
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
-      <div className="p-6 border-b border-slate-800/50 flex flex-col gap-1">
-        <h1 className="font-black text-xl tracking-tight text-[#d4ff3f]">FinancePME</h1>
-        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Gestão Financeira</span>
+      <div className="p-6 border-b border-slate-800/50 flex flex-col items-center gap-3">
+        <div className="size-16 relative">
+          <Image 
+            src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
+            alt="Logo" 
+            fill
+            className="object-contain"
+            referrerPolicy="no-referrer"
+          />
+        </div>
+        <div className="text-center">
+          <h1 className="font-medium text-[10px] tracking-tight text-white uppercase whitespace-nowrap">Construtora Baggio Silveira Ltda.</h1>
+          <span className="text-[8px] font-bold text-[#d4ff3f] uppercase tracking-widest">Gestão de Engenharia</span>
+        </div>
       </div>
 
       <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
