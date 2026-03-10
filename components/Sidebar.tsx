@@ -44,6 +44,7 @@ const navItems: NavGroup[] = [
   { group: 'PRINCIPAL', items: [
     { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
+    { name: 'Gestão de Documentos', icon: FileText, href: '/documents' },
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
