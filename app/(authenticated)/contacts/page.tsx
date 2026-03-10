@@ -48,13 +48,13 @@ export default function ContactsPage() {
   const itemsPerPage = 10;
 
   const [formData, setFormData] = useState({
-    company: '',
-    name: '',
-    category: 'Cliente',
+    empresa: '',
+    nome: '',
+    categoria: 'Cliente',
     email: '',
-    phone: '',
-    cellphone: '',
-    info: '',
+    telefone: '',
+    celular: '',
+    notas: '',
   });
 
   const fetchContacts = useCallback(async () => {
@@ -121,24 +121,24 @@ export default function ContactsPage() {
     if (contact) {
       setEditingContact(contact);
       setFormData({
-        company: contact.company,
-        name: contact.name,
-        category: contact.category,
+        empresa: contact.company,
+        nome: contact.name,
+        categoria: contact.category,
         email: contact.email,
-        phone: contact.phone,
-        cellphone: contact.cellphone,
-        info: contact.info,
+        telefone: contact.phone,
+        celular: contact.cellphone,
+        notas: contact.info,
       });
     } else {
       setEditingContact(null);
       setFormData({
-        company: '',
-        name: '',
-        category: 'Cliente',
+        empresa: '',
+        nome: '',
+        categoria: 'Cliente',
         email: '',
-        phone: '',
-        cellphone: '',
-        info: '',
+        telefone: '',
+        celular: '',
+        notas: '',
       });
     }
     setIsModalOpen(true);
@@ -322,27 +322,17 @@ export default function ContactsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
-        nome: formData.name,
-        empresa: formData.company,
-        telefone: formData.phone,
-        celular: formData.cellphone,
-        email: formData.email,
-        categoria: formData.category,
-        notas: formData.info
-      };
-
       if (editingContact) {
         const { error } = await supabase
           .from('contatos')
-          .update(payload)
+          .update(formData)
           .eq('id', editingContact.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('contatos')
-          .insert([payload]);
+          .insert([formData]);
 
         if (error) throw error;
       }
@@ -663,8 +653,8 @@ export default function ContactsPage() {
                     <input 
                       required
                       type="text" 
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      value={formData.nome}
+                      onChange={(e) => setFormData({...formData, nome: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="ex: João Silva"
                     />
@@ -673,8 +663,8 @@ export default function ContactsPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Empresa</label>
                     <input 
                       type="text" 
-                      value={formData.company}
-                      onChange={(e) => setFormData({...formData, company: e.target.value})}
+                      value={formData.empresa}
+                      onChange={(e) => setFormData({...formData, empresa: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="ex: Acme Construções"
                     />
@@ -682,8 +672,8 @@ export default function ContactsPage() {
                   <div className="col-span-1">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Categoria</label>
                     <select 
-                      value={formData.category}
-                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                      value={formData.categoria}
+                      onChange={(e) => setFormData({...formData, categoria: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                     >
                       <option value="Cliente">Cliente</option>
@@ -695,8 +685,8 @@ export default function ContactsPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Número de Telefone</label>
                     <input 
                       type="text" 
-                      value={formData.phone}
-                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                      value={formData.telefone}
+                      onChange={(e) => setFormData({...formData, telefone: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="(11) 99999-9999"
                     />
@@ -715,8 +705,8 @@ export default function ContactsPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Celular</label>
                     <input 
                       type="text" 
-                      value={formData.cellphone}
-                      onChange={(e) => setFormData({...formData, cellphone: e.target.value})}
+                      value={formData.celular}
+                      onChange={(e) => setFormData({...formData, celular: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="(11) 99999-9999"
                     />
@@ -724,8 +714,8 @@ export default function ContactsPage() {
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Notas</label>
                     <textarea 
-                      value={formData.info}
-                      onChange={(e) => setFormData({...formData, info: e.target.value})}
+                      value={formData.notas}
+                      onChange={(e) => setFormData({...formData, notas: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all h-20 resize-none"
                       placeholder="Notas, observações ou detalhes adicionais..."
                     />

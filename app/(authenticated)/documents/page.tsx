@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { 
   FileText, 
   Search, 
-  Filter, 
   Plus, 
   Download, 
   Eye, 
@@ -15,10 +14,14 @@ import {
   CheckCircle2,
   AlertCircle,
   Archive,
-  FolderOpen
+  LayoutGrid,
+  List as ListIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { FileTree, FileSystemItem } from '@/components/documents/FileTree';
+import { supabase } from '@/lib/supabase';
+import { useEffect } from 'react';
 
 // Types
 type DocumentCategory = 
@@ -33,26 +36,78 @@ type DocumentStatus = 'Vigente' | 'Vencido' | 'Arquivado';
 
 interface Document {
   id: string;
-  name: string;
-  category: DocumentCategory;
-  area: string;
-  type: string;
+  nome: string;
+  Categoria: DocumentCategory;
+  area?: string;
+  tipo_arquivo: string;
   status: DocumentStatus;
-  year: number;
-  date: string;
-  size: string;
+  Ano: string;
+  data: string;
+  tamanho_arquivo: string;
 }
 
-// Mock Data
-const MOCK_DOCUMENTS: Document[] = [
-  { id: '1', name: 'Contrato Social - Alteração 2024', category: 'Administrativos', area: 'Administrativo', type: 'Contrato', status: 'Vigente', year: 2024, date: '2024-03-15', size: '2.4 MB' },
-  { id: '2', name: 'Alvará de Funcionamento 2025', category: 'Jurídicos e Legais', area: 'Jurídico', type: 'Licença', status: 'Vigente', year: 2025, date: '2025-01-10', size: '1.1 MB' },
-  { id: '3', name: 'DRE - Q4 2024', category: 'Financeiros e Contábeis', area: 'Financeiro', type: 'Relatório', status: 'Arquivado', year: 2024, date: '2024-12-31', size: '850 KB' },
-  { id: '4', name: 'Folha de Pagamento - Fev 2025', category: 'Recursos Humanos', area: 'RH', type: 'Holerite', status: 'Vigente', year: 2025, date: '2025-02-28', size: '4.2 MB' },
-  { id: '5', name: 'Proposta Comercial - Cliente X', category: 'Comerciais e Marketing', area: 'Comercial', type: 'Proposta', status: 'Vigente', year: 2025, date: '2025-03-01', size: '1.5 MB' },
-  { id: '6', name: 'Projeto Executivo - Obra Alpha', category: 'Operacionais e Técnicos', area: 'Operacional', type: 'Projeto', status: 'Vigente', year: 2025, date: '2025-02-15', size: '15.8 MB' },
-  { id: '7', name: 'Certidão Negativa Municipal', category: 'Jurídicos e Legais', area: 'Jurídico', type: 'Certidão', status: 'Vencido', year: 2024, date: '2024-11-20', size: '450 KB' },
-  { id: '8', name: 'Ata de Reunião de Sócios', category: 'Administrativos', area: 'Administrativo', type: 'Ata', status: 'Vigente', year: 2025, date: '2025-02-10', size: '320 KB' },
+// Mock Tree Data
+const INITIAL_TREE_DATA: FileSystemItem[] = [
+  {
+    id: 'folder-admin',
+    nome: 'Administrativos',
+    type: 'folder',
+    isOpen: true,
+    children: [
+      { id: '1', nome: 'Contrato Social - Alteração 2024', type: 'file' },
+      { id: '8', nome: 'Ata de Reunião de Sócios', type: 'file' },
+      {
+        id: 'folder-contracts',
+        nome: 'Contratos Antigos',
+        type: 'folder',
+        children: [
+          { id: 'sub-1', nome: 'Contrato 2022.pdf', type: 'file' },
+          { id: 'sub-2', nome: 'Contrato 2021.pdf', type: 'file' },
+        ]
+      }
+    ]
+  },
+  {
+    id: 'folder-legal',
+    nome: 'Jurídicos e Legais',
+    type: 'folder',
+    children: [
+      { id: '2', nome: 'Alvará de Funcionamento 2025', type: 'file' },
+      { id: '7', nome: 'Certidão Negativa Municipal', type: 'file' },
+    ]
+  },
+  {
+    id: 'folder-finance',
+    nome: 'Financeiros e Contábeis',
+    type: 'folder',
+    children: [
+      { id: '3', nome: 'DRE - Q4 2024', type: 'file' },
+    ]
+  },
+  {
+    id: 'folder-rh',
+    nome: 'Recursos Humanos',
+    type: 'folder',
+    children: [
+      { id: '4', nome: 'Folha de Pagamento - Fev 2025', type: 'file' },
+    ]
+  },
+  {
+    id: 'folder-marketing',
+    nome: 'Comerciais e Marketing',
+    type: 'folder',
+    children: [
+      { id: '5', nome: 'Proposta Comercial - Cliente X', type: 'file' },
+    ]
+  },
+  {
+    id: 'folder-ops',
+    nome: 'Operacionais e Técnicos',
+    type: 'folder',
+    children: [
+      { id: '6', nome: 'Projeto Executivo - Obra Alpha', type: 'file' },
+    ]
+  }
 ];
 
 const CATEGORIES: DocumentCategory[] = [
@@ -69,6 +124,9 @@ const STATUSES = ['Todos', 'Vigente', 'Vencido', 'Arquivado'];
 const YEARS = [2026, 2025, 2024, 2023];
 
 export default function DocumentManagementPage() {
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | 'Todos'>('Todos');
   const [selectedArea, setSelectedArea] = useState('Todas');
@@ -88,17 +146,38 @@ export default function DocumentManagementPage() {
     file: null as File | null
   });
 
+  const fetchDocuments = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('documentos')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setDocuments(data || []);
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
+
   const filteredDocuments = useMemo(() => {
-    return MOCK_DOCUMENTS.filter(doc => {
-      const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'Todos' || doc.category === selectedCategory;
+    return documents.filter(doc => {
+      const matchesSearch = doc.nome.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'Todos' || doc.Categoria === selectedCategory;
       const matchesArea = selectedArea === 'Todas' || doc.area === selectedArea;
       const matchesStatus = selectedStatus === 'Todos' || doc.status === selectedStatus;
-      const matchesYear = selectedYear === 'Todos' || doc.year === selectedYear;
+      const matchesYear = selectedYear === 'Todos' || Number(doc.Ano) === selectedYear;
       
       return matchesSearch && matchesCategory && matchesArea && matchesStatus && matchesYear;
     });
-  }, [searchQuery, selectedCategory, selectedArea, selectedStatus, selectedYear]);
+  }, [documents, searchQuery, selectedCategory, selectedArea, selectedStatus, selectedYear]);
 
   const getStatusColor = (status: DocumentStatus) => {
     switch (status) {
@@ -139,14 +218,27 @@ export default function DocumentManagementPage() {
 
       setUploadProgress(80);
 
+      const contentType = response.headers.get('content-type');
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Erro ao fazer upload');
+        if (contentType && contentType.includes('application/json')) {
+          const error = await response.json();
+          throw new Error(error.error || `Erro ${response.status}: ${response.statusText}`);
+        } else {
+          const text = await response.text();
+          console.error('Non-JSON error response:', text);
+          throw new Error(`Erro do servidor (${response.status}): ${response.statusText}. O servidor retornou HTML em vez de JSON.`);
+        }
       }
 
-      const result = await response.json();
-      console.log('Upload success:', result);
-      setUploadProgress(100);
+      if (contentType && contentType.includes('application/json')) {
+        const result = await response.json();
+        console.log('Upload success:', result);
+        setUploadProgress(100);
+      } else {
+        const text = await response.text();
+        console.error('Unexpected non-JSON success response:', text);
+        throw new Error('O servidor retornou uma resposta inesperada (não-JSON).');
+      }
 
       setTimeout(() => {
         setIsModalOpen(false);
@@ -158,8 +250,8 @@ export default function DocumentManagementPage() {
           date: new Date().toISOString().split('T')[0],
           file: null
         });
-        // In a real app, you'd refresh the list here
-        window.location.reload();
+        // Refresh the list
+        fetchDocuments();
       }, 500);
     } catch (error) {
       const err = error as Error;
@@ -317,31 +409,16 @@ export default function DocumentManagementPage() {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-6 space-y-6">
             <div>
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Categorias</h3>
-              <div className="space-y-1">
-                <button 
-                  onClick={() => setSelectedCategory('Todos')}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all",
-                    selectedCategory === 'Todos' ? "bg-[#d4ff3f] text-[#0a0a0a]" : "text-slate-400 hover:bg-white/5 hover:text-white"
-                  )}
-                >
-                  <FolderOpen size={16} />
-                  Todos os Documentos
-                </button>
-                {CATEGORIES.map(cat => (
-                  <button 
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={cn(
-                      "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-bold transition-all text-left",
-                      selectedCategory === cat ? "bg-[#d4ff3f] text-[#0a0a0a]" : "text-slate-400 hover:bg-white/5 hover:text-white"
-                    )}
-                  >
-                    <div className={cn("size-1.5 rounded-full", selectedCategory === cat ? "bg-[#0a0a0a]" : "bg-slate-700")} />
-                    {cat}
-                  </button>
-                ))}
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Explorador de Arquivos</h3>
+              <div className="bg-[#0a0a0a] rounded-2xl p-2 border border-slate-800/30">
+                <FileTree 
+                  initialData={INITIAL_TREE_DATA} 
+                  onItemClick={(item) => {
+                    if (item.type === 'file') {
+                      setSearchQuery(item.nome);
+                    }
+                  }}
+                />
               </div>
             </div>
 
@@ -425,132 +502,213 @@ export default function DocumentManagementPage() {
               />
             </div>
             <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-1">
-              <button className="p-2 rounded-xl bg-[#0a0a0a] text-[#d4ff3f] shadow-inner">
-                <FileText size={18} />
+              <button 
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  viewMode === 'list' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
+                )}
+                title="Visualização em Lista"
+              >
+                <ListIcon size={18} />
               </button>
-              <button className="p-2 rounded-xl text-slate-500 hover:text-white transition-colors">
-                <Filter size={18} />
+              <button 
+                onClick={() => setViewMode('grid')}
+                className={cn(
+                  "p-2 rounded-xl transition-all",
+                  viewMode === 'grid' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
+                )}
+                title="Visualização em Grade"
+              >
+                <LayoutGrid size={18} />
               </button>
             </div>
           </div>
 
-          {/* Documents Table */}
-          <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800/50">
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Documento</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Área / Tipo</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Data / Ano</th>
-                    <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/30">
-                  <AnimatePresence mode='popLayout'>
-                    {filteredDocuments.length > 0 ? (
-                      filteredDocuments.map((doc) => (
-                        <motion.tr 
-                          layout
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          key={doc.id} 
-                          className="group hover:bg-white/[0.02] transition-colors"
-                        >
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className="size-10 rounded-xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors">
-                                <FileText size={20} />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-white line-clamp-1">{doc.name}</p>
-                                <p className="text-[10px] text-slate-500 font-medium">{doc.size}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <Tag size={10} className="text-slate-500" />
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{doc.area}</span>
-                              </div>
-                              <p className="text-xs font-bold text-slate-300">{doc.type}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className={cn(
-                              "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                              getStatusColor(doc.status)
-                            )}>
-                              {getStatusIcon(doc.status)}
-                              {doc.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-1.5 text-slate-500">
-                                <CalendarIcon size={10} />
-                                <span className="text-[10px] font-bold">{new Date(doc.date).toLocaleDateString('pt-BR')}</span>
-                              </div>
-                              <p className="text-xs font-black text-white">{doc.year}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" title="Visualizar">
-                                <Eye size={16} />
-                              </button>
-                              <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" title="Download">
-                                <Download size={16} />
-                              </button>
-                              <button className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-all" title="Excluir">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </motion.tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-20 text-center">
-                          <div className="flex flex-col items-center gap-3 text-slate-600">
-                            <Search size={40} strokeWidth={1} />
-                            <p className="text-sm font-bold">Nenhum documento encontrado com estes filtros.</p>
-                            <button 
-                              onClick={() => {
-                                setSearchQuery('');
-                                setSelectedCategory('Todos');
-                                setSelectedArea('Todas');
-                                setSelectedStatus('Todos');
-                                setSelectedYear('Todos');
-                              }}
-                              className="text-[#d4ff3f] text-xs font-black uppercase tracking-widest hover:underline"
-                            >
-                              Limpar Filtros
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </AnimatePresence>
-                </tbody>
-              </table>
+          {/* Documents View */}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-[#1a1a1a] border border-slate-800/50 rounded-3xl">
+              <div className="size-12 border-4 border-[#d4ff3f]/20 border-t-[#d4ff3f] rounded-full animate-spin mb-4" />
+              <p className="text-slate-500 text-xs font-black uppercase tracking-widest">Carregando Documentos...</p>
             </div>
-            
-            {/* Footer / Pagination Info */}
-            <div className="px-6 py-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              <p>Mostrando {filteredDocuments.length} de {MOCK_DOCUMENTS.length} documentos</p>
-              <div className="flex items-center gap-4">
-                <button className="hover:text-white transition-colors disabled:opacity-30" disabled>Anterior</button>
-                <div className="flex items-center gap-2">
-                  <span className="text-white bg-white/5 px-2 py-1 rounded">1</span>
+          ) : viewMode === 'list' ? (
+            <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-800/50">
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Documento</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Área / Tipo</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Data / Ano</th>
+                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/30">
+                    <AnimatePresence mode='popLayout'>
+                      {filteredDocuments.length > 0 ? (
+                        filteredDocuments.map((doc) => (
+                          <motion.tr 
+                            layout
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            key={doc.id} 
+                            className="group hover:bg-white/[0.02] transition-colors"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="size-10 rounded-xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors">
+                                  <FileText size={20} />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-white line-clamp-1">{doc.nome}</p>
+                                  <p className="text-[10px] text-slate-500 font-medium">{doc.tamanho_arquivo}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5">
+                                  <Tag size={10} className="text-slate-500" />
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{doc.area || 'N/A'}</span>
+                                </div>
+                                <p className="text-xs font-bold text-slate-300">{doc.tipo_arquivo}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={cn(
+                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                                getStatusColor(doc.status)
+                              )}>
+                                {getStatusIcon(doc.status)}
+                                {doc.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-slate-500">
+                                  <CalendarIcon size={10} />
+                                  <span className="text-[10px] font-bold">{new Date(doc.data).toLocaleDateString('pt-BR')}</span>
+                                </div>
+                                <p className="text-xs font-black text-white">{doc.Ano}</p>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" title="Visualizar">
+                                  <Eye size={16} />
+                                </button>
+                                <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" title="Download">
+                                  <Download size={16} />
+                                </button>
+                                <button className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-all" title="Excluir">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-20 text-center">
+                            <div className="flex flex-col items-center gap-3 text-slate-600">
+                              <Search size={40} strokeWidth={1} />
+                              <p className="text-sm font-bold">Nenhum documento encontrado com estes filtros.</p>
+                              <button 
+                                onClick={() => {
+                                  setSearchQuery('');
+                                  setSelectedCategory('Todos');
+                                  setSelectedArea('Todas');
+                                  setSelectedStatus('Todos');
+                                  setSelectedYear('Todos');
+                                }}
+                                className="text-[#d4ff3f] text-xs font-black uppercase tracking-widest hover:underline"
+                              >
+                                Limpar Filtros
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </AnimatePresence>
+                  </tbody>
+                </table>
+              </div>
+              
+              {/* Footer / Pagination Info */}
+              <div className="px-6 py-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                <p>Mostrando {filteredDocuments.length} de {documents.length} documentos</p>
+                <div className="flex items-center gap-4">
+                  <button className="hover:text-white transition-colors disabled:opacity-30" disabled>Anterior</button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-white bg-white/5 px-2 py-1 rounded">1</span>
+                  </div>
+                  <button className="hover:text-white transition-colors disabled:opacity-30" disabled>Próximo</button>
                 </div>
-                <button className="hover:text-white transition-colors disabled:opacity-30" disabled>Próximo</button>
               </div>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+              <AnimatePresence mode='popLayout'>
+                {filteredDocuments.length > 0 ? (
+                  filteredDocuments.map((doc) => (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      key={doc.id}
+                      className="group bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-6 hover:border-[#d4ff3f]/30 transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="size-12 rounded-2xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors">
+                          <FileText size={24} />
+                        </div>
+                        <div className={cn(
+                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
+                          getStatusColor(doc.status)
+                        )}>
+                          {doc.status}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1 mb-6">
+                        <h3 className="text-sm font-bold text-white line-clamp-1">{doc.nome}</h3>
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                          <span>{doc.tamanho_arquivo}</span>
+                          <span className="size-1 rounded-full bg-slate-800" />
+                          <span>{doc.tipo_arquivo}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-800/30">
+                        <div className="flex items-center gap-1.5 text-slate-400">
+                          <CalendarIcon size={12} />
+                          <span className="text-[10px] font-bold">{new Date(doc.data).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                            <Eye size={16} />
+                          </button>
+                          <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all">
+                            <Download size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))
+                ) : (
+                  <div className="col-span-full py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 text-slate-600">
+                      <Search size={40} strokeWidth={1} />
+                      <p className="text-sm font-bold">Nenhum documento encontrado.</p>
+                    </div>
+                  </div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
       </div>
     </div>

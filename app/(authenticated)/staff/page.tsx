@@ -22,23 +22,23 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface StaffMember {
   id: string;
-  name: string;
-  emp_id: string;
-  role: string;
-  department: string;
+  nome: string;
+  id_funcionario: string;
+  cargo: string;
+  departamento: string;
   status: 'Ativo' | 'Em Licença' | 'Inativo';
-  img_url: string;
+  url_imagem: string;
   created_at: string;
 }
 
 interface Document {
   id: string;
-  name: string;
-  file_type: string;
-  file_size: string;
-  icon_name: string;
-  color_class: string;
-  bg_class: string;
+  nome: string;
+  tipo_arquivo: string;
+  tamanho_arquivo: string;
+  nome_icone: string;
+  classe_cor: string;
+  classe_fundo: string;
   created_at: string;
 }
 
@@ -56,12 +56,12 @@ export default function StaffPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    emp_id: '',
-    role: '',
-    department: '',
+    nome: '',
+    id_funcionario: '',
+    cargo: '',
+    departamento: '',
     status: 'Ativo' as StaffMember['status'],
-    img_url: '',
+    url_imagem: '',
   });
 
   const fetchData = useCallback(async () => {
@@ -99,22 +99,22 @@ export default function StaffPage() {
     if (member) {
       setEditingMember(member);
       setFormData({
-        name: member.name,
-        emp_id: member.emp_id,
-        role: member.role,
-        department: member.department,
+        nome: member.nome,
+        id_funcionario: member.id_funcionario,
+        cargo: member.cargo,
+        departamento: member.departamento,
         status: member.status,
-        img_url: member.img_url || '',
+        url_imagem: member.url_imagem || '',
       });
     } else {
       setEditingMember(null);
       setFormData({
-        name: '',
-        emp_id: '',
-        role: '',
-        department: '',
+        nome: '',
+        id_funcionario: '',
+        cargo: '',
+        departamento: '',
         status: 'Ativo',
-        img_url: '',
+        url_imagem: '',
       });
     }
     setIsModalOpen(true);
@@ -131,27 +131,13 @@ export default function StaffPage() {
       if (editingMember) {
         const { error } = await supabase
           .from('equipe')
-          .update({
-            nome: formData.name,
-            id_funcionario: formData.emp_id,
-            cargo: formData.role,
-            departamento: formData.department,
-            status: formData.status,
-            url_imagem: formData.img_url
-          })
+          .update(formData)
           .eq('id', editingMember.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('equipe')
-          .insert([{
-            nome: formData.name,
-            id_funcionario: formData.emp_id,
-            cargo: formData.role,
-            departamento: formData.department,
-            status: formData.status,
-            url_imagem: formData.img_url
-          }]);
+          .insert([formData]);
         if (error) throw error;
       }
       await fetchData();
@@ -248,17 +234,17 @@ export default function StaffPage() {
                           <td className="px-6 py-5">
                             <div className="flex items-center gap-4">
                               <div className="size-10 rounded-full bg-slate-800 overflow-hidden border-2 border-slate-700 shadow-sm relative">
-                                <Image src={person.img_url || `https://picsum.photos/seed/${person.id}/100/100`} alt={person.name} fill className="object-cover" referrerPolicy="no-referrer" />
+                                <Image src={person.url_imagem || `https://picsum.photos/seed/${person.id}/100/100`} alt={person.nome} fill className="object-cover" referrerPolicy="no-referrer" />
                               </div>
                               <div>
-                                <p className="font-black text-sm">{person.name}</p>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Func #{person.emp_id}</p>
+                                <p className="font-black text-sm">{person.nome}</p>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Func #{person.id_funcionario}</p>
                               </div>
                             </div>
                           </td>
                           <td className="px-6 py-5">
-                            <p className="text-sm font-black tracking-tight">{person.role}</p>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{person.department}</p>
+                            <p className="text-sm font-black tracking-tight">{person.cargo}</p>
+                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{person.departamento}</p>
                           </td>
                           <td className="px-6 py-5">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
@@ -315,16 +301,16 @@ export default function StaffPage() {
                   </div>
                 ) : (
                   documents.map((doc) => {
-                    const Icon = iconMap[doc.icon_name] || FileText;
+                    const Icon = iconMap[doc.nome_icone] || FileText;
                     return (
                       <div key={doc.id} className="p-4 border border-slate-800/30 rounded-2xl flex items-center gap-4 hover:border-[#d4ff3f]/30 transition-all cursor-pointer group bg-[#0a0a0a]">
                         <div className={`size-10 bg-slate-800/50 text-slate-400 rounded-xl flex items-center justify-center group-hover:text-[#d4ff3f] transition-colors`}>
                           <Icon size={20} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black tracking-tight truncate">{doc.name}</p>
+                          <p className="text-sm font-black tracking-tight truncate">{doc.nome}</p>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                            {doc.file_type} • {doc.file_size}
+                            {doc.tipo_arquivo} • {doc.tamanho_arquivo}
                           </p>
                         </div>
                         <Download size={16} className="text-slate-500 group-hover:text-[#d4ff3f] transition-colors" />
@@ -388,8 +374,8 @@ export default function StaffPage() {
                     <input 
                       required
                       type="text" 
-                      value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      value={formData.nome}
+                      onChange={(e) => setFormData({...formData, nome: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="ex: Roberto Silva"
                     />
@@ -399,8 +385,8 @@ export default function StaffPage() {
                     <input 
                       required
                       type="text" 
-                      value={formData.emp_id}
-                      onChange={(e) => setFormData({...formData, emp_id: e.target.value})}
+                      value={formData.id_funcionario}
+                      onChange={(e) => setFormData({...formData, id_funcionario: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="E294"
                     />
@@ -422,8 +408,8 @@ export default function StaffPage() {
                     <input 
                       required
                       type="text" 
-                      value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
+                      value={formData.cargo}
+                      onChange={(e) => setFormData({...formData, cargo: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="ex: Eng. Civil Sênior"
                     />
@@ -433,8 +419,8 @@ export default function StaffPage() {
                     <input 
                       required
                       type="text" 
-                      value={formData.department}
-                      onChange={(e) => setFormData({...formData, department: e.target.value})}
+                      value={formData.departamento}
+                      onChange={(e) => setFormData({...formData, departamento: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="ex: Divisão Estrutural"
                     />
@@ -443,8 +429,8 @@ export default function StaffPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">URL da Imagem</label>
                     <input 
                       type="text" 
-                      value={formData.img_url}
-                      onChange={(e) => setFormData({...formData, img_url: e.target.value})}
+                      value={formData.url_imagem}
+                      onChange={(e) => setFormData({...formData, url_imagem: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                       placeholder="https://picsum.photos/..."
                     />

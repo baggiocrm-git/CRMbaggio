@@ -9,6 +9,8 @@ export const metadata: Metadata = {
   description: 'CRM profissional para gestão de projetos de construção, finanças e pessoal.',
 };
 
+export const dynamic = 'force-dynamic';
+
 // Root layout for the CBSL CRM application
 export default function RootLayout({children}: {children: React.ReactNode}) {
   return (

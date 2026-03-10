@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { google } from 'googleapis';
+import { drive as googleDrive } from '@googleapis/drive';
+import { OAuth2Client } from 'google-auth-library';
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,11 +20,28 @@ export async function POST(req: NextRequest) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // 1. Upload to Supabase Storage
+    // 1. Ensure bucket exists
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) {
+      console.error('Error listing buckets:', listError);
+    } else {
+      const bucketExists = buckets?.some(b => b.name === 'documentos');
+      if (!bucketExists) {
+        const { error: createError } = await supabase.storage.createBucket('documentos', {
+          public: true,
+        });
+        if (createError) {
+          console.error('Error creating bucket:', createError);
+          throw new Error(`O bucket 'documentos' não existe e não pôde ser criado automaticamente. Por favor, crie-o no painel do Supabase.`);
+        }
+      }
+    }
+
+    // 2. Upload to Supabase Storage
     const fileBuffer = await file.arrayBuffer();
     const fileName = `${Date.now()}-${file.name}`;
     const { data: storageData, error: storageError } = await supabase.storage
-      .from('documents')
+      .from('documentos')
       .upload(fileName, fileBuffer, {
         contentType: file.type,
         upsert: true
@@ -31,34 +49,39 @@ export async function POST(req: NextRequest) {
 
     if (storageError) throw storageError;
 
-    // 2. Save to Supabase DB
+    // 3. Save to Supabase DB
     const { data: dbData, error: dbError } = await supabase
-      .from('documents')
+      .from('documentos')
       .insert({
-        name,
-        category,
-        date,
+        nome: name,
+        Categoria: category,
+        data: date,
         file_path: storageData.path,
-        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        tamanho_arquivo: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        tipo_arquivo: file.type,
         status: 'Vigente',
-        year: new Date(date).getFullYear()
+        Ano: new Date(date).getFullYear().toString(),
+        nome_icone: 'FileText',
+        classe_cor: 'text-slate-400',
+        classe_fundo: 'bg-[#0a0a0a]'
       })
       .select()
       .single();
 
     if (dbError) throw dbError;
 
-    // 3. Sync to Google Drive
+    // 4. Sync to Google Drive
     try {
-      // Get tokens
+      // Get tokens - using the most recent token
       const { data: tokenData } = await supabase
         .from('google_tokens')
         .select('*')
-        .eq('id', 'default_user')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .single();
 
       if (tokenData) {
-        const oauth2Client = new google.auth.OAuth2(
+        const oauth2Client = new OAuth2Client(
           process.env.GOOGLE_CLIENT_ID,
           process.env.GOOGLE_CLIENT_SECRET,
           `${process.env.APP_URL}/api/auth/google/callback`
@@ -67,10 +90,10 @@ export async function POST(req: NextRequest) {
         oauth2Client.setCredentials({
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
-          expiry_date: tokenData.expiry_date
+          expiry_date: tokenData.expiry_date ? new Date(tokenData.expiry_date).getTime() : undefined
         });
 
-        const drive = google.drive({ version: 'v3', auth: oauth2Client });
+        const drive = googleDrive({ version: 'v3', auth: oauth2Client });
 
         // Find or create root folder
         let rootFolderId = '';
@@ -127,8 +150,8 @@ export async function POST(req: NextRequest) {
 
         // Update DB with Drive ID
         await supabase
-          .from('documents')
-          .update({ google_drive_id: driveFile.data.id })
+          .from('documentos')
+          .update({ Google_Drive_id: driveFile.data.id })
           .eq('id', dbData.id);
       }
     } catch (driveErr) {

@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=400' next build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "clean": "next clean"
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
+    "@googleapis/drive": "^20.1.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@hookform/resolvers": "^5.2.1",
     "@supabase/supabase-js": "^2.98.0",
@@ -18,7 +19,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
-    "googleapis": "^171.4.0",
+    "google-auth-library": "^10.6.1",
     "lucide-react": "^0.577.0",
     "motion": "^12.35.1",
     "next": "^16.1.6",

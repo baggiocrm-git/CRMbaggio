@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
-import * as XLSX from 'xlsx';
+// import * as XLSX from 'xlsx';
 import CurrencyInput from 'react-currency-input-field';
 import { COST_CATEGORIES, CONSTRUCTION_STAGES } from '@/lib/constants';
 
@@ -280,7 +280,8 @@ export default function PayablesPage() {
     }
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(payables);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Contas a Pagar");
@@ -294,6 +295,7 @@ export default function PayablesPage() {
     const reader = new FileReader();
     reader.onload = async (evt) => {
       const bstr = evt.target?.result;
+      const XLSX = await import('xlsx');
       const wb = XLSX.read(bstr, { type: 'binary', cellDates: true });
       const wsname = wb.SheetNames[0];
       const ws = wb.Sheets[wsname];

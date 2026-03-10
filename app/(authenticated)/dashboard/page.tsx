@@ -36,19 +36,18 @@ export default function DashboardPage() {
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [projectsRes, staffRes, financesRes] = await Promise.all([
+      const [projectsRes, staffRes, receivablesRes, payablesRes] = await Promise.all([
         supabase.from('projetos').select('id', { count: 'exact' }).neq('status', 'Concluído'),
         supabase.from('equipe').select('id', { count: 'exact' }).eq('status', 'Ativo'),
-        supabase.from('financas').select('valor, tipo, status')
+        supabase.from('contas_receber').select('valor').neq('situacao', 'Recebido'),
+        supabase.from('contas_pagar').select('valor').neq('situacao', 'Pago')
       ]);
 
-      const receivable = financesRes.data
-        ?.filter(f => f.tipo === 'Receita' && f.status !== 'Concluído')
-        .reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const receivable = (receivablesRes.data || [])
+        .reduce((acc, curr) => acc + Number(curr.valor), 0);
       
-      const payable = financesRes.data
-        ?.filter(f => f.tipo === 'Despesa' && f.status !== 'Concluído')
-        .reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const payable = (payablesRes.data || [])
+        .reduce((acc, curr) => acc + Number(curr.valor), 0);
 
       setStats({
         activeProjects: projectsRes.count || 0,

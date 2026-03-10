@@ -51,13 +51,12 @@ export async function GET(req: NextRequest) {
     );
 
     await supabase.from('google_tokens').upsert({
-      id: 'default_user', // Placeholder for user ID
+      id: 1, // Using numeric ID for int8 column
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
-      expiry_date: Date.now() + (tokens.expires_in * 1000),
+      expiry_date: new Date(Date.now() + (tokens.expires_in * 1000)).toISOString().split('T')[0],
       scope: tokens.scope,
       token_type: tokens.token_type,
-      updated_at: new Date().toISOString()
     });
 
     return new NextResponse(`
