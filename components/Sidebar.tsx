@@ -28,11 +28,23 @@ import {
   BarChart3
 } from 'lucide-react';
 
-const navItems = [
+interface NavItem {
+  name: string;
+  icon: React.ElementType;
+  href: string;
+  badge?: string;
+}
+
+interface NavGroup {
+  group: string;
+  items: NavItem[];
+}
+
+const navItems: NavGroup[] = [
   { group: 'PRINCIPAL', items: [
     { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
-    { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables', badge: '3' },
+    { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
   { group: 'FINANCEIRO', items: [

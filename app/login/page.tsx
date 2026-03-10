@@ -66,7 +66,7 @@ export default function LoginPage() {
               referrerPolicy="no-referrer"
             />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tighter">CBSL <span className="text-[#d4ff3f]">CRM</span></h1>
+          <h1 className="text-3xl font-black text-white tracking-tighter">CBSL <span className="text-[#d4ff3f]">ERP</span></h1>
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2 text-center">Gestão de Engenharia e Construção</p>
         </div>
 
@@ -128,7 +128,7 @@ export default function LoginPage() {
               <Loader2 size={20} className="animate-spin" />
             ) : (
               <>
-                Acessar Dashboard
+                ACESSAR SISTEMA
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -137,7 +137,7 @@ export default function LoginPage() {
 
         <div className="mt-10 pt-8 border-t border-slate-800/50 text-center relative z-10">
           <p className="text-slate-600 text-[9px] font-black uppercase tracking-[0.2em]">
-            © 2024 CBSL Engineering CRM
+            © 2026 Baggio Silveira
           </p>
         </div>
       </motion.div>
