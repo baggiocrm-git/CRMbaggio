@@ -158,7 +158,7 @@ export default function FinanceDashboard() {
       <header className="p-8 flex justify-between items-start">
         <div>
           <h1 className="text-4xl font-black tracking-tight italic">
-            Painel <span className="text-[#d4ff3f]">Financeiro</span>
+            Dashboard <span className="text-[#d4ff3f]">Financeiro</span>
           </h1>
           <p className="text-slate-500 text-xs font-bold mt-1">
             {months[currentMonth]} {currentYear} · Atualizado agora

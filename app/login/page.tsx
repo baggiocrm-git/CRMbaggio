@@ -128,7 +128,7 @@ export default function LoginPage() {
               <Loader2 size={20} className="animate-spin" />
             ) : (
               <>
-                Acessar Painel
+                Acessar Dashboard
                 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </>
             )}
