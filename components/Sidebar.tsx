@@ -24,17 +24,19 @@ import {
   Layers,
   Percent,
   ClipboardList,
-  Calendar
+  Calendar,
+  BarChart3
 } from 'lucide-react';
 
 const navItems = [
   { group: 'PRINCIPAL', items: [
+    { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables', badge: '3' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
   { group: 'FINANCEIRO', items: [
-    { name: 'Dashboard', icon: LayoutDashboard, href: '/finances' },
+    { name: 'Dashboard', icon: BarChart3, href: '/finances' },
     { name: 'DRE', icon: PieChart, href: '/finances/dre' },
     { name: 'Orçamento', icon: Target, href: '/finances/budget' },
     { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
