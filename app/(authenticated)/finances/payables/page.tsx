@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import CurrencyInput from 'react-currency-input-field';
+import { COST_CATEGORIES, CONSTRUCTION_STAGES } from '@/lib/constants';
 
 interface Payable {
   id: string;
@@ -36,7 +37,15 @@ interface Payable {
   valor: number;
   valor_pago: number;
   situacao: 'Aberto' | 'Pago' | 'Em andamento';
+  projeto_id?: string;
+  categoria_custo?: string;
+  etapa_obra?: string;
   created_at?: string;
+}
+
+interface Project {
+  id: string;
+  nome: string;
 }
 
 interface ExcelRow {
@@ -77,10 +86,23 @@ export default function PayablesPage() {
     data_pagamento: '',
     valor: 0,
     valor_pago: 0,
-    situacao: 'Aberto' as Payable['situacao']
+    situacao: 'Aberto' as Payable['situacao'],
+    projeto_id: '',
+    categoria_custo: '',
+    etapa_obra: ''
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  const fetchProjects = async () => {
+    const { data } = await supabase.from('projetos').select('id, nome');
+    if (data) setProjects(data);
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const generateNextId = async () => {
     const now = new Date();
@@ -191,7 +213,10 @@ export default function PayablesPage() {
         data_pagamento: item.data_pagamento || '',
         valor: item.valor,
         valor_pago: item.valor_pago,
-        situacao: item.situacao
+        situacao: item.situacao,
+        projeto_id: item.projeto_id || '',
+        categoria_custo: item.categoria_custo || '',
+        etapa_obra: item.etapa_obra || ''
       });
     } else {
       setEditingItem(null);
@@ -202,7 +227,10 @@ export default function PayablesPage() {
         data_pagamento: '',
         valor: 0,
         valor_pago: 0,
-        situacao: 'Aberto'
+        situacao: 'Aberto',
+        projeto_id: '',
+        categoria_custo: '',
+        etapa_obra: ''
       });
     }
     setIsModalOpen(true);
@@ -792,6 +820,45 @@ export default function PayablesPage() {
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Obra / Projeto</label>
+                    <select 
+                      value={formData.projeto_id}
+                      onChange={(e) => setFormData({...formData, projeto_id: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                    >
+                      <option value="">Nenhum</option>
+                      {projects.map(p => (
+                        <option key={p.id} value={p.id}>{p.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Categoria de Custo</label>
+                    <select 
+                      value={formData.categoria_custo}
+                      onChange={(e) => setFormData({...formData, categoria_custo: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                    >
+                      <option value="">Nenhuma</option>
+                      {COST_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Etapa da Obra</label>
+                    <select 
+                      value={formData.etapa_obra}
+                      onChange={(e) => setFormData({...formData, etapa_obra: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                    >
+                      <option value="">Nenhuma</option>
+                      {CONSTRUCTION_STAGES.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Situação</label>
