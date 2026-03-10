@@ -233,7 +233,7 @@ export default function FinanceDashboard() {
                   <Tooltip 
                     cursor={{ fill: '#ffffff05' }}
                     contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
-                    formatter={(value: number) => formatCurrency(value)}
+                    formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
                   />
                   <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={40}>
                     {last6Months.map((entry, index) => (

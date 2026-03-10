@@ -254,7 +254,7 @@ export default function CostCentersPage() {
                                 </Pie>
                                 <Tooltip 
                                   contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px', color: '#fff' }}
-                                  formatter={(value: number) => formatCurrency(value)}
+                                  formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
                                 />
                               </PieChart>
                             </ResponsiveContainer>
@@ -290,7 +290,7 @@ export default function CostCentersPage() {
                                 <Tooltip 
                                   cursor={{ fill: '#1a1a1a' }}
                                   contentStyle={{ backgroundColor: '#1a1a1a', border: 'none', borderRadius: '12px', color: '#fff' }}
-                                  formatter={(value: number) => formatCurrency(value)}
+                                  formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
                                 />
                                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                                   {project.stageBreakdown.map((entry, index) => (
