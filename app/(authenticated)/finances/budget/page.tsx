@@ -19,7 +19,7 @@ interface Budget {
   id: string;
   projeto_id: string;
   nome: string;
-  valor_total: number;
+  total_geral: number;
   created_at: string;
   projeto?: {
     nome: string;
@@ -176,7 +176,7 @@ export default function BudgetPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(budget.valor_total)}</p>
+                      <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(budget.total_geral)}</p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm text-slate-500">{new Date(budget.created_at).toLocaleDateString('pt-BR')}</p>

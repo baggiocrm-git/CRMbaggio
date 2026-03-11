@@ -1,77 +1,73 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { 
-  ChevronLeft, 
+  ArrowLeft, 
   Printer, 
   Download, 
-  Loader2
+  Loader2, 
+  Building2, 
+  Calendar,
+  FileText,
+  PieChart
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+import { Budget } from '@/lib/types';
 
-interface Budget {
+interface AnalyticalItem {
   id: string;
-  projeto_id: string;
-  nome: string;
-  valor_total: number;
-  created_at: string;
-  projeto?: {
-    nome: string;
-    localizacao?: string;
-  };
-}
-
-interface BudgetItem {
-  id: string;
-  etapa: string;
+  tcpo_id: string;
   descricao: string;
-  unidade: string;
   quantidade: number;
-  preco_unitario: number;
-  total: number;
+  unidade: string;
+  custo_unit_mo: number;
+  custo_unit_mat: number;
+  custo_unit_eq: number;
+  custo_unit_total: number;
+  bdi: number;
+  preco_unit_com_bdi: number;
+  subtotal_custo: number;
+  subtotal_preco: number;
+  ordem: number;
 }
 
 export default function ViewBudgetPage() {
-  const params = useParams();
-  const id = params.id as string;
+  const { id } = useParams();
   const [budget, setBudget] = useState<Budget | null>(null);
-  const [items, setItems] = useState<BudgetItem[]>([]);
+  const [items, setItems] = useState<AnalyticalItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const { data: budgetData, error: bError } = await supabase
+        // Fetch Budget Info
+        const { data: budgetData } = await supabase
           .from('orcamentos')
-          .select(`
-            *,
-            projeto:projetos(nome, localizacao)
-          `)
+          .select('*, projeto:projetos(nome)')
           .eq('id', id)
           .single();
         
-        if (bError) throw bError;
         setBudget(budgetData);
 
-        const { data: itemsData, error: iError } = await supabase
-          .from('orcamento_itens')
+        // Fetch Items from the Analytical View
+        const { data: itemsData } = await supabase
+          .from('vw_orcamento_analitico')
           .select('*')
           .eq('orcamento_id', id)
-          .order('created_at', { ascending: true });
+          .order('ordem');
         
-        if (iError) throw iError;
         setItems(itemsData || []);
       } catch (error) {
-        console.error('Error fetching budget:', error);
+        console.error('Error fetching budget details:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
+    if (id) fetchData();
   }, [id]);
 
   const formatCurrency = (value: number) => {
@@ -80,140 +76,179 @@ export default function ViewBudgetPage() {
 
   if (loading) {
     return (
-      <div className="flex-1 bg-[#0a0a0a] flex flex-col items-center justify-center py-20">
+      <div className="flex-1 bg-[#0a0a0a] flex flex-col items-center justify-center">
         <Loader2 size={48} className="text-[#d4ff3f] animate-spin mb-4" />
-        <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Carregando Orçamento...</p>
+        <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">Carregando Detalhes do Orçamento...</p>
       </div>
     );
   }
 
   if (!budget) {
     return (
-      <div className="flex-1 bg-[#0a0a0a] p-8">
-        <p className="text-white">Orçamento não encontrado.</p>
+      <div className="flex-1 bg-[#0a0a0a] flex flex-col items-center justify-center p-8">
+        <h2 className="text-2xl font-black text-white mb-4">Orçamento não encontrado</h2>
+        <Link href="/finances/budget" className="text-[#d4ff3f] font-bold underline">Voltar para a lista</Link>
       </div>
     );
   }
 
-  const stages = Array.from(new Set(items.map(item => item.etapa)));
-
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8 print:p-0 print:bg-white print:text-black">
+      {/* Header - Hidden on Print */}
+      <div className="flex items-center justify-between mb-8 print:hidden">
         <div className="flex items-center gap-4">
-          <Link 
-            href="/finances/budget"
-            className="p-2 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-slate-500 hover:text-white transition-all"
-          >
-            <ChevronLeft size={20} />
+          <Link href="/finances/budget" className="p-2 rounded-xl bg-slate-800/50 text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-4xl font-black tracking-tight italic">
-              Visualizar <span className="text-[#d4ff3f]">Orçamento</span>
-            </h1>
-            <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">{budget.nome}</p>
+            <h1 className="text-2xl font-black tracking-tight italic">Visualizar <span className="text-[#d4ff3f]">Orçamento</span></h1>
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Relatório Analítico TCPO</p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => window.print()}
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
           >
-            <Printer size={16} /> IMPRIMIR
-          </button>
-          <button 
-            className="flex items-center gap-2 px-6 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
-          >
-            <Download size={16} /> EXPORTAR PDF
+            <Printer size={18} /> Imprimir / PDF
           </button>
         </div>
       </div>
 
-      <div className="bg-white text-black p-12 rounded-3xl shadow-2xl print:p-0 print:shadow-none print:rounded-none">
-        {/* Header PINI Style */}
-        <div className="flex justify-between items-start border-b-4 border-black pb-8 mb-8">
+      {/* Report Header */}
+      <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 mb-8 shadow-sm print:border-none print:shadow-none print:bg-transparent">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Orçamento</p>
+            <p className="text-lg font-black text-white print:text-black">{budget.nome}</p>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Obra / Projeto</p>
+            <div className="flex items-center gap-2 text-white print:text-black">
+              <Building2 size={16} className="text-[#d4ff3f] print:text-black" />
+              <p className="font-bold">{(budget as Budget & { projeto?: { nome: string } }).projeto?.nome || 'N/A'}</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Data de Emissão</p>
+            <div className="flex items-center gap-2 text-white print:text-black">
+              <Calendar size={16} className="text-[#d4ff3f] print:text-black" />
+              <p className="font-bold">{new Date(budget.created_at).toLocaleDateString('pt-BR')}</p>
+            </div>
+          </div>
+          <div className="space-y-1">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Geral</p>
+            <p className="text-2xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
+          </div>
+        </div>
+        
+        {budget.descricao && (
+          <div className="mt-8 pt-6 border-t border-slate-800/50 print:border-black/10">
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Descrição / Escopo</p>
+            <p className="text-sm text-slate-400 print:text-black leading-relaxed">{budget.descricao}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Summary Cards - Hidden on Print */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print:hidden">
+        <div className="bg-[#1a1a1a] border border-slate-800/50 p-6 rounded-3xl flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-500">
+            <PieChart size={24} />
+          </div>
           <div>
-            <h2 className="text-3xl font-black uppercase tracking-tighter mb-2">Orçamento Analítico</h2>
-            <p className="text-sm font-bold text-gray-600 uppercase tracking-widest">Base TCPO / PINI</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-1">Data de Emissão</p>
-            <p className="text-lg font-black">{new Date().toLocaleDateString('pt-BR')}</p>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Mão de Obra</p>
+            <p className="text-xl font-black">{formatCurrency(budget.total_mo)}</p>
           </div>
         </div>
-
-        {/* Project Info */}
-        <div className="grid grid-cols-2 gap-12 mb-12">
-          <div className="space-y-4">
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Obra / Projeto</p>
-              <p className="text-xl font-black uppercase">{budget.projeto?.nome || 'Não especificado'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Localização</p>
-              <p className="text-sm font-bold text-gray-600">{budget.projeto?.localizacao || 'Não especificada'}</p>
-            </div>
+        <div className="bg-[#1a1a1a] border border-slate-800/50 p-6 rounded-3xl flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-orange-500/10 text-orange-500">
+            <FileText size={24} />
           </div>
-          <div className="bg-gray-50 p-8 rounded-2xl border border-gray-200 flex flex-col justify-center items-center text-center">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Valor Total Estimado</p>
-            <p className="text-4xl font-black text-black">{formatCurrency(budget.valor_total)}</p>
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Materiais</p>
+            <p className="text-xl font-black">{formatCurrency(budget.total_mat)}</p>
           </div>
         </div>
-
-        {/* Stages and Items */}
-        <div className="space-y-12">
-          {stages.map((stage, stageIdx) => {
-            const stageItems = items.filter(item => item.etapa === stage);
-            const stageTotal = stageItems.reduce((acc, curr) => acc + curr.total, 0);
-
-            return (
-              <div key={stage} className="space-y-4">
-                <div className="flex items-center justify-between border-b-2 border-gray-200 pb-2">
-                  <div className="flex items-center gap-4">
-                    <span className="text-xl font-black text-gray-300">{(stageIdx + 1).toString().padStart(2, '0')}</span>
-                    <h3 className="text-lg font-black uppercase tracking-widest">{stage}</h3>
-                  </div>
-                  <p className="text-sm font-black uppercase tracking-widest">Subtotal: {formatCurrency(stageTotal)}</p>
-                </div>
-
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-[10px] font-black uppercase tracking-widest text-gray-400 border-b border-gray-100">
-                      <th className="py-3 w-1/2">Descrição do Serviço / Material</th>
-                      <th className="py-3 text-center">Unid.</th>
-                      <th className="py-3 text-center">Quant.</th>
-                      <th className="py-3 text-right">Unitário</th>
-                      <th className="py-3 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {stageItems.map((item) => (
-                      <tr key={item.id} className="text-sm">
-                        <td className="py-4 font-bold text-gray-800">{item.descricao}</td>
-                        <td className="py-4 text-center font-bold text-gray-500">{item.unidade}</td>
-                        <td className="py-4 text-center font-black">{item.quantidade}</td>
-                        <td className="py-4 text-right font-bold text-gray-600">{formatCurrency(item.preco_unitario)}</td>
-                        <td className="py-4 text-right font-black">{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Footer Summary */}
-        <div className="mt-20 pt-8 border-t-4 border-black flex justify-between items-end">
-          <div className="space-y-4">
-            <div className="w-64 h-px bg-gray-300 mb-8" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Assinatura do Responsável Técnico</p>
+        <div className="bg-[#1a1a1a] border border-slate-800/50 p-6 rounded-3xl flex items-center gap-4">
+          <div className="p-3 rounded-2xl bg-purple-500/10 text-purple-500">
+            <Download size={24} />
           </div>
-          <div className="text-right">
-            <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Valor Total do Orçamento</p>
-            <p className="text-5xl font-black tracking-tighter">{formatCurrency(budget.valor_total)}</p>
+          <div>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Equipamentos</p>
+            <p className="text-xl font-black">{formatCurrency(budget.total_eq)}</p>
           </div>
         </div>
+      </div>
+
+      {/* Analytical Table */}
+      <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm print:border-none print:shadow-none print:bg-transparent">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50 print:bg-gray-100 print:text-black print:border-black">
+                <th className="px-6 py-4">Código / Descrição</th>
+                <th className="px-6 py-4 w-20">Un</th>
+                <th className="px-6 py-4 w-24">Qtd</th>
+                <th className="px-6 py-4 w-32">Custo Unit.</th>
+                <th className="px-6 py-4 w-20">BDI %</th>
+                <th className="px-6 py-4 w-32">Preço Unit.</th>
+                <th className="px-6 py-4 w-32 text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50 print:divide-black/10">
+              {items.map((item) => (
+                <tr key={item.id} className="hover:bg-[#0a0a0a] transition-colors print:text-black">
+                  <td className="px-6 py-4">
+                    <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black">{item.tcpo_id}</p>
+                    <p className="text-sm font-bold text-white print:text-black mt-1">{item.descricao}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-xs font-bold text-slate-500 uppercase print:text-black">{item.unidade}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold print:text-black">{item.quantidade}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-slate-400 print:text-black">{formatCurrency(item.custo_unit_total)}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-xs text-slate-400 print:text-black">{item.bdi}%</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-bold print:text-black">{formatCurrency(item.preco_unit_com_bdi)}</p>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <p className="text-sm font-black text-[#d4ff3f] print:text-black">{formatCurrency(item.subtotal_preco)}</p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="bg-[#0a0a0a] print:bg-gray-50">
+                <td colSpan={6} className="px-6 py-6 text-right">
+                  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Valor Total do Orçamento</p>
+                </td>
+                <td className="px-6 py-6 text-right">
+                  <p className="text-2xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Footer - Only on Print */}
+      <div className="hidden print:block mt-20 pt-10 border-t border-black/20 text-center">
+        <div className="flex justify-around">
+          <div className="w-64 border-t border-black pt-2">
+            <p className="text-xs font-bold uppercase">Responsável Técnico</p>
+          </div>
+          <div className="w-64 border-t border-black pt-2">
+            <p className="text-xs font-bold uppercase">Cliente / Aprovação</p>
+          </div>
+        </div>
+        <p className="text-[8px] text-gray-500 mt-10 italic">Gerado por CBSL Gestão de Engenharia em {new Date().toLocaleString('pt-BR')}</p>
       </div>
     </div>
   );
