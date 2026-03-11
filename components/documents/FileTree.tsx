@@ -3,10 +3,12 @@
 import React, { useState } from 'react';
 import { 
   Folder, 
-  File, 
   ChevronRight, 
   ChevronDown, 
-  MoreVertical
+  MoreVertical,
+  Edit2,
+  Plus,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -15,195 +17,138 @@ export interface FileSystemItem {
   id: string;
   nome: string;
   type: 'file' | 'folder';
+  parent_id?: string | null;
   children?: FileSystemItem[];
   isOpen?: boolean;
 }
 
 interface FileTreeProps {
-  initialData: FileSystemItem[];
+  data: FileSystemItem[];
+  selectedId?: string | null;
   onItemClick?: (item: FileSystemItem) => void;
-  onMoveItem?: (sourceId: string, targetId: string | null) => void;
+  onRename?: (item: FileSystemItem) => void;
+  onNewFolder?: (parentId: string | null) => void;
+  onDelete?: (item: FileSystemItem) => void;
 }
 
-export function FileTree({ initialData, onItemClick, onMoveItem }: FileTreeProps) {
-  const [data, setData] = useState<FileSystemItem[]>(initialData);
-  const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
+export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder, onDelete }: FileTreeProps) {
+  const [openFolders, setOpenFolders] = useState<Record<string, boolean>>({});
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
-  const toggleFolder = (id: string) => {
-    const updateItems = (items: FileSystemItem[]): FileSystemItem[] => {
-      return items.map(item => {
-        if (item.id === id) {
-          return { ...item, isOpen: !item.isOpen };
-        }
-        if (item.children) {
-          return { ...item, children: updateItems(item.children) };
-        }
-        return item;
-      });
-    };
-    setData(updateItems(data));
-  };
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
+  const toggleFolder = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setDraggedItemId(id);
-    e.dataTransfer.setData('text/plain', id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent, item: FileSystemItem) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (item.type === 'folder' && item.id !== draggedItemId) {
-      e.dataTransfer.dropEffect = 'move';
-    } else {
-      e.dataTransfer.dropEffect = 'none';
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: string | null) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const sourceId = e.dataTransfer.getData('text/plain');
-    
-    if (sourceId === targetId) return;
-    
-    // Check if target is not a descendant of source
-    const isDescendant = (parent: FileSystemItem, targetId: string): boolean => {
-      if (!parent.children) return false;
-      return parent.children.some(child => child.id === targetId || isDescendant(child, targetId));
-    };
-
-    const findItem = (items: FileSystemItem[], id: string): FileSystemItem | null => {
-      for (const item of items) {
-        if (item.id === id) return item;
-        if (item.children) {
-          const found = findItem(item.children, id);
-          if (found) return found;
-        }
-      }
-      return null;
-    };
-
-    const sourceItem = findItem(data, sourceId);
-    if (sourceItem && targetId && isDescendant(sourceItem, targetId)) {
-      console.warn('Cannot move a folder into its own descendant');
-      return;
-    }
-
-    if (onMoveItem) {
-      onMoveItem(sourceId, targetId);
-    }
-
-    // Local update for immediate feedback
-    const moveItem = (items: FileSystemItem[], sId: string, tId: string | null): FileSystemItem[] => {
-      let itemToMove: FileSystemItem | null = null;
-
-      // Remove item from its current position
-      const removeItem = (list: FileSystemItem[]): FileSystemItem[] => {
-        return list.filter(item => {
-          if (item.id === sId) {
-            itemToMove = item;
-            return false;
-          }
-          if (item.children) {
-            item.children = removeItem(item.children);
-          }
-          return true;
-        });
-      };
-
-      const newList = removeItem([...items]);
-
-      if (!itemToMove) return newList;
-
-      // Add item to its new position
-      if (tId === null) {
-        return [...newList, itemToMove];
-      }
-
-      const addItem = (list: FileSystemItem[]): FileSystemItem[] => {
-        return list.map(item => {
-          if (item.id === tId && item.type === 'folder') {
-            return {
-              ...item,
-              children: [...(item.children || []), itemToMove!],
-              isOpen: true
-            };
-          }
-          if (item.children) {
-            return { ...item, children: addItem(item.children) };
-          }
-          return item;
-        });
-      };
-
-      return addItem(newList);
-    };
-
-    setData(moveItem(data, sourceId, targetId));
-    setDraggedItemId(null);
+    setOpenFolders(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
   const renderItem = (item: FileSystemItem, depth: number = 0) => {
     const isFolder = item.type === 'folder';
-    const isDragged = draggedItemId === item.id;
+    if (!isFolder) return null; // Show only folders in the tree
+
+    const isOpen = openFolders[item.id];
+    const isSelected = selectedId === item.id;
 
     return (
-      <div key={item.id} className="select-none">
+      <div key={item.id || `folder-${item.nome}-${depth}`} className="select-none">
         <div
-          draggable
-          onDragStart={(e) => handleDragStart(e, item.id)}
-          onDragOver={(e) => handleDragOver(e, item)}
-          onDrop={(e) => handleDrop(e, isFolder ? item.id : null)}
-          onClick={() => {
-            if (isFolder) toggleFolder(item.id);
-            if (onItemClick) onItemClick(item);
-          }}
+          onClick={() => onItemClick?.(item)}
           className={cn(
-            "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all border border-transparent",
-            isDragged ? "opacity-40 bg-white/5 border-dashed border-slate-700" : "hover:bg-white/5",
+            "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all border border-transparent relative",
+            isSelected ? "bg-[#d4ff3f]/10 border-[#d4ff3f]/20 text-[#d4ff3f]" : "hover:bg-white/5 text-slate-400 hover:text-slate-200",
             "active:scale-[0.98]"
           )}
           style={{ paddingLeft: `${depth * 16 + 8}px` }}
         >
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            {isFolder ? (
-              <>
-                <div className="text-slate-500 group-hover:text-slate-300 transition-colors">
-                  {item.isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                </div>
-                <Folder 
-                  size={18} 
-                  className={cn(
-                    "transition-colors",
-                    item.isOpen ? "text-[#d4ff3f] fill-[#d4ff3f]/10" : "text-slate-400"
-                  )} 
-                />
-              </>
-            ) : (
-              <>
-                <div className="w-[14px]" /> {/* Spacer for alignment */}
-                <File size={18} className="text-slate-500 group-hover:text-slate-300 transition-colors" />
-              </>
-            )}
-            <span className={cn(
-              "text-xs font-medium truncate",
-              isFolder ? "text-slate-200" : "text-slate-400 group-hover:text-slate-200"
-            )}>
+            <div 
+              onClick={(e) => toggleFolder(item.id, e)}
+              className="p-0.5 hover:bg-white/10 rounded transition-colors"
+            >
+              {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            </div>
+            <Folder 
+              size={18} 
+              className={cn(
+                "transition-colors",
+                isOpen ? "text-[#d4ff3f] fill-[#d4ff3f]/10" : "text-slate-500"
+              )} 
+            />
+            <span className="text-xs font-medium truncate">
               {item.nome}
             </span>
           </div>
 
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-slate-300 transition-colors">
-              <MoreVertical size={14} />
-            </button>
+            <div className="relative">
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveMenu(activeMenu === item.id ? null : item.id);
+                }}
+                className="p-1 rounded hover:bg-white/10 text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <MoreVertical size={14} />
+              </button>
+              
+              <AnimatePresence>
+                {activeMenu === item.id && (
+                  <>
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenu(null);
+                      }} 
+                    />
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                      className="absolute right-0 top-full mt-1 z-20 w-40 bg-[#1a1a1a] border border-slate-800 rounded-xl shadow-2xl overflow-hidden p-1"
+                    >
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenu(null);
+                          onNewFolder?.(item.id);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-[#d4ff3f] hover:bg-white/5 rounded-lg transition-all"
+                      >
+                        <Plus size={12} />
+                        Nova Pasta
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenu(null);
+                          onRename?.(item);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                      >
+                        <Edit2 size={12} />
+                        Renomear
+                      </button>
+                      <div className="h-px bg-slate-800 my-1" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenu(null);
+                          onDelete?.(item);
+                        }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                      >
+                        <Trash2 size={12} />
+                        Excluir
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
 
         <AnimatePresence initial={false}>
-          {isFolder && item.isOpen && item.children && (
+          {isOpen && item.children && item.children.length > 0 && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -219,15 +164,18 @@ export function FileTree({ initialData, onItemClick, onMoveItem }: FileTreeProps
   };
 
   return (
-    <div 
-      className="space-y-0.5"
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-      }}
-      onDrop={(e) => handleDrop(e, null)}
-    >
-      {data.map(item => renderItem(item))}
+    <div className="space-y-0.5">
+      <div
+        onClick={() => onItemClick?.({ id: 'root', nome: 'Todos os Documentos', type: 'folder' })}
+        className={cn(
+          "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all border border-transparent",
+          selectedId === 'root' ? "bg-[#d4ff3f]/10 border-[#d4ff3f]/20 text-[#d4ff3f]" : "hover:bg-white/5 text-slate-400 hover:text-slate-200"
+        )}
+      >
+        <Folder size={18} className={selectedId === 'root' ? "text-[#d4ff3f]" : "text-slate-500"} />
+        <span className="text-xs font-medium">Todos os Documentos</span>
+      </div>
+      {data.map((item) => renderItem(item, 0))}
     </div>
   );
 }

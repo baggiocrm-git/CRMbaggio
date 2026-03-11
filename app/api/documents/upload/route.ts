@@ -19,9 +19,10 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
     const category = formData.get('category') as string;
-    const date = formData.get('date') as string;
+    const pastaId = formData.get('pasta_id') as string;
+    const date = new Date().toISOString().split('T')[0]; // Automatic date
 
-    console.log('Upload details:', { name, category, date, fileSize: file?.size, fileType: file?.type });
+    console.log('Upload details:', { name, category, date, pastaId, fileSize: file?.size, fileType: file?.type });
 
     if (!file || !name || !category) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
@@ -57,7 +58,15 @@ export async function POST(req: NextRequest) {
     // 2. Upload to Supabase Storage
     console.log('Uploading to Supabase Storage...');
     const fileBuffer = await file.arrayBuffer();
-    const fileName = `${Date.now()}-${file.name}`;
+    
+    // Sanitize filename for Supabase Storage
+    const sanitizedOriginalName = file.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .replace(/[^a-zA-Z0-9.-]/g, '_'); // Replace special chars with underscore
+      
+    const fileName = `${Date.now()}-${sanitizedOriginalName}`;
+    
     const { data: storageData, error: storageError } = await supabase.storage
       .from('documentos')
       .upload(fileName, fileBuffer, {
@@ -89,6 +98,7 @@ export async function POST(req: NextRequest) {
         Categoria: category,
         area: categoryToArea[category] || 'Administrativo',
         data: date,
+        pasta_id: pastaId || null,
         file_path: storageData.path,
         tamanho_arquivo: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         tipo_arquivo: file.type,
