@@ -1,24 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { drive as googleDrive } from '@googleapis/drive';
-import { OAuth2Client } from 'google-auth-library';
 
 export async function POST(req: NextRequest) {
+  console.log('POST /api/documents/upload - Request received');
   try {
-    const formData = await req.formData();
+    // Dynamic imports for heavy libraries
+    const { drive: googleDrive } = await import('@googleapis/drive');
+    const { OAuth2Client } = await import('google-auth-library');
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch (formErr) {
+      console.error('Error parsing form data:', formErr);
+      return NextResponse.json({ error: 'Falha ao processar os dados do formulário. O arquivo pode ser muito grande ou o formato é inválido.' }, { status: 400 });
+    }
+    
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
     const category = formData.get('category') as string;
     const date = formData.get('date') as string;
 
+    console.log('Upload details:', { name, category, date, fileSize: file?.size, fileType: file?.type });
+
     if (!file || !name || !category) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('Supabase credentials missing');
+      return NextResponse.json({ error: 'Configuração do Supabase ausente no servidor' }, { status: 500 });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // 1. Ensure bucket exists
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
@@ -38,6 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Upload to Supabase Storage
+    console.log('Uploading to Supabase Storage...');
     const fileBuffer = await file.arrayBuffer();
     const fileName = `${Date.now()}-${file.name}`;
     const { data: storageData, error: storageError } = await supabase.storage
@@ -47,14 +65,29 @@ export async function POST(req: NextRequest) {
         upsert: true
       });
 
-    if (storageError) throw storageError;
+    if (storageError) {
+      console.error('Storage error:', storageError);
+      throw storageError;
+    }
+    console.log('Storage upload success:', storageData.path);
+
+    const categoryToArea: Record<string, string> = {
+      'Administrativos': 'Administrativo',
+      'Jurídicos e Legais': 'Jurídico',
+      'Financeiros e Contábeis': 'Financeiro',
+      'Recursos Humanos': 'RH',
+      'Comerciais e Marketing': 'Comercial',
+      'Operacionais e Técnicos': 'Operacional'
+    };
 
     // 3. Save to Supabase DB
+    console.log('Saving to Supabase DB...');
     const { data: dbData, error: dbError } = await supabase
       .from('documentos')
       .insert({
         nome: name,
         Categoria: category,
+        area: categoryToArea[category] || 'Administrativo',
         data: date,
         file_path: storageData.path,
         tamanho_arquivo: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
@@ -68,19 +101,27 @@ export async function POST(req: NextRequest) {
       .select()
       .single();
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('Database error:', dbError);
+      throw dbError;
+    }
+    console.log('Database save success:', dbData.id);
 
     // 4. Sync to Google Drive
     try {
+      console.log('Checking for Google Drive tokens...');
       // Get tokens - using the most recent token
-      const { data: tokenData } = await supabase
+      const { data: tokenData, error: tokenError } = await supabase
         .from('google_tokens')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (tokenData) {
+      if (tokenError) {
+        console.warn('Error fetching google_tokens (table might not exist yet):', tokenError);
+      } else if (tokenData && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+        console.log('Found Google tokens, starting Drive sync...');
         const oauth2Client = new OAuth2Client(
           process.env.GOOGLE_CLIENT_ID,
           process.env.GOOGLE_CLIENT_SECRET,

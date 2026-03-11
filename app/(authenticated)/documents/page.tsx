@@ -220,25 +220,23 @@ export default function DocumentManagementPage() {
 
       const contentType = response.headers.get('content-type');
       if (!response.ok) {
+        let errorMessage = 'Erro ao fazer upload';
         if (contentType && contentType.includes('application/json')) {
-          const error = await response.json();
-          throw new Error(error.error || `Erro ${response.status}: ${response.statusText}`);
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
         } else {
           const text = await response.text();
-          console.error('Non-JSON error response:', text);
-          throw new Error(`Erro do servidor (${response.status}): ${response.statusText}. O servidor retornou HTML em vez de JSON.`);
+          console.error('Server returned non-JSON error:', text);
+          errorMessage = `Erro do servidor (${response.status}). Verifique o console para detalhes.`;
         }
+        throw new Error(errorMessage);
       }
 
-      if (contentType && contentType.includes('application/json')) {
-        const result = await response.json();
-        console.log('Upload success:', result);
-        setUploadProgress(100);
-      } else {
-        const text = await response.text();
-        console.error('Unexpected non-JSON success response:', text);
-        throw new Error('O servidor retornou uma resposta inesperada (não-JSON).');
-      }
+      const result = contentType && contentType.includes('application/json') 
+        ? await response.json() 
+        : { success: true };
+      console.log('Upload success:', result);
+      setUploadProgress(100);
 
       setTimeout(() => {
         setIsModalOpen(false);
@@ -415,7 +413,7 @@ export default function DocumentManagementPage() {
                   initialData={INITIAL_TREE_DATA} 
                   onItemClick={(item) => {
                     if (item.type === 'file') {
-                      setSearchQuery(item.nome);
+                      setSearchQuery(item.name);
                     }
                   }}
                 />
