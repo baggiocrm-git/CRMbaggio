@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -11,7 +10,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('123456');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  // const router = useRouter(); // Removido pois window.location.href é usado para garantir navegação
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();

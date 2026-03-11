@@ -13,8 +13,6 @@ import {
   Users, 
   Contact, 
   Settings, 
-  HelpCircle,
-  ChevronRight,
   LogOut,
   TrendingUp,
   TrendingDown,
@@ -120,6 +118,7 @@ export default function Sidebar() {
             src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
             alt="Logo" 
             fill
+            priority
             className="object-contain"
             referrerPolicy="no-referrer"
           />

@@ -74,7 +74,7 @@ export default function DashboardPage() {
     { label: 'A Pagar', value: `R$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
 
-  const performanceData = [
+  const performanceData = React.useMemo(() => [
     { name: 'Seg', value: 40 },
     { name: 'Ter', value: 60 },
     { name: 'Qua', value: 80 },
@@ -82,19 +82,19 @@ export default function DashboardPage() {
     { name: 'Sex', value: 70 },
     { name: 'Sáb', value: 50 },
     { name: 'Dom', value: 45 },
-  ];
+  ], []);
 
-  const highPriorityTasks = [
+  const highPriorityTasks = React.useMemo(() => [
     { id: 1, title: 'Concretagem - Fase 4', site: 'Complexo Torre Norte', status: 'Vence Hoje', color: 'bg-red-500' },
     { id: 2, title: 'Auditoria de Inspeção de Segurança', site: 'Ponte Riverside', status: 'Vence Amanhã', color: 'bg-orange-500' },
     { id: 3, title: 'Realocação de Equipamentos', site: 'Múltiplos Locais', status: 'Em Andamento', color: 'bg-blue-500' },
-  ];
+  ], []);
 
-  const recentActivity = [
+  const recentActivity = React.useMemo(() => [
     { id: 1, type: 'upload', title: 'Novo Relatório de Inspeção', desc: "Sarah Jenkins enviou 'Site-B_Struct_Final.pdf'", time: '12 minutos atrás', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
     { id: 2, type: 'milestone', title: 'Marco Concluído', desc: 'Fase de escavação concluída na Metro Tower', time: '2 horas atrás', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
     { id: 3, type: 'alert', title: 'Alerta de Atraso Climático', desc: 'Operações de guindaste suspensas devido a ventos fortes', time: '5 horas atrás', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
-  ];
+  ], []);
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">

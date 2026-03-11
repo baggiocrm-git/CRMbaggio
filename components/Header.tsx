@@ -14,7 +14,7 @@ interface HeaderProps {
   };
 }
 
-export default function Header({ title, subtitle, searchValue, onSearch, action }: HeaderProps) {
+const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, action }: HeaderProps) {
   return (
     <header className="h-20 border-b border-slate-800/50 bg-[#0a0a0a] px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
       <div className="flex flex-col">
@@ -53,4 +53,6 @@ export default function Header({ title, subtitle, searchValue, onSearch, action 
       </div>
     </header>
   );
-}
+});
+
+export default Header;
