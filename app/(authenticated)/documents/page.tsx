@@ -15,7 +15,13 @@ import {
   AlertCircle,
   Archive,
   LayoutGrid,
-  List as ListIcon
+  List as ListIcon,
+  MoreVertical,
+  Move,
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -77,6 +83,10 @@ export default function DocumentManagementPage() {
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>('Todos');
   const [selectedFolderId, setSelectedFolderId] = useState<string | 'root'>('root');
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Document | 'folder';
+    direction: 'asc' | 'desc';
+  }>({ key: 'created_at', direction: 'desc' });
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,6 +97,10 @@ export default function DocumentManagementPage() {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [docRenameForm, setDocRenameForm] = useState({ id: '', nome: '' });
+  const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
+  const [docToMove, setDocToMove] = useState<Document | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<string | 'root'>('root');
+  const [activeDocMenu, setActiveDocMenu] = useState<string | null>(null);
   
   // Confirmation Modal State
   const [confirmModal, setConfirmModal] = useState<{
@@ -192,7 +206,7 @@ export default function DocumentManagementPage() {
   }, [folders]);
 
   const filteredDocuments = useMemo(() => {
-    return documents.filter(doc => {
+    const filtered = documents.filter(doc => {
       const matchesSearch = doc.nome.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === 'Todos' || doc.Categoria === selectedCategory;
       const matchesArea = selectedArea === 'Todas' || doc.area === selectedArea;
@@ -201,7 +215,38 @@ export default function DocumentManagementPage() {
       
       return matchesSearch && matchesCategory && matchesArea && matchesStatus && matchesYear;
     });
-  }, [documents, searchQuery, selectedCategory, selectedArea, selectedStatus, selectedYear]);
+
+    return [...filtered].sort((a, b) => {
+      let aValue: string | number | null;
+      let bValue: string | number | null;
+
+      if (sortConfig.key === 'folder') {
+        aValue = folders.find(f => f.id === a.pasta_id)?.nome || 'Raiz';
+        bValue = folders.find(f => f.id === b.pasta_id)?.nome || 'Raiz';
+      } else {
+        aValue = a[sortConfig.key as keyof Document];
+        bValue = b[sortConfig.key as keyof Document];
+      }
+
+      if (aValue === null) return 1;
+      if (bValue === null) return -1;
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [documents, searchQuery, selectedCategory, selectedArea, selectedStatus, selectedYear, sortConfig, folders]);
+
+  const toggleSort = (key: keyof Document | 'folder') => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const getSortIcon = (key: keyof Document | 'folder') => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />;
+  };
 
   const getStatusColor = (status: DocumentStatus) => {
     switch (status) {
@@ -358,6 +403,31 @@ export default function DocumentManagementPage() {
         setConfirmModal(prev => ({ ...prev, isOpen: false }));
       }
     });
+  };
+
+  const handleMoveDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!docToMove || !targetFolderId) return;
+
+    try {
+      const response = await fetch('/api/documents', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          id: docToMove.id, 
+          pasta_id: targetFolderId === 'root' ? null : targetFolderId 
+        }),
+      });
+
+      if (!response.ok) throw new Error('Falha ao mover documento');
+
+      setIsMoveModalOpen(false);
+      showNotification('Documento movido com sucesso');
+      fetchDocuments();
+    } catch (error) {
+      console.error('Error moving document:', error);
+      showNotification('Erro ao mover documento', 'error');
+    }
   };
 
   const handleViewDocument = (doc: Document) => {
@@ -560,6 +630,64 @@ export default function DocumentManagementPage() {
                     className="flex-1 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-[#d4ff3f]/10"
                   >
                     Salvar
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Move Document Modal */}
+        {isMoveModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsMoveModalOpen(false)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[32px] p-8 shadow-2xl"
+            >
+              <h2 className="text-xl font-black text-white uppercase tracking-tight mb-2">
+                Mover Documento
+              </h2>
+              <p className="text-xs text-slate-500 mb-6">Selecione a pasta de destino para o documento <strong>{docToMove?.nome}</strong></p>
+              
+              <form onSubmit={handleMoveDocument} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Pasta de Destino</label>
+                  <select 
+                    value={targetFolderId}
+                    onChange={e => setTargetFolderId(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  >
+                    <option value="root">Todos os Documentos (Raiz)</option>
+                    {folders.map(folder => (
+                      <option key={folder.id} value={folder.id}>
+                        {folder.nome}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsMoveModalOpen(false)}
+                    className="flex-1 px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl shadow-[#d4ff3f]/10"
+                  >
+                    Mover
                   </button>
                 </div>
               </form>
@@ -845,6 +973,20 @@ export default function DocumentManagementPage() {
                 </div>
 
                 <div className="space-y-2">
+                  <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Pasta</label>
+                  <select 
+                    value={selectedFolderId}
+                    onChange={(e) => setSelectedFolderId(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/50"
+                  >
+                    <option value="root">Todos os Documentos</option>
+                    {folders.map(folder => (
+                      <option key={folder.id} value={folder.id}>{folder.nome}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Ano</label>
                   <select 
                     value={selectedYear}
@@ -874,27 +1016,50 @@ export default function DocumentManagementPage() {
                 className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-2xl py-3 pl-12 pr-4 text-white font-bold text-sm focus:ring-2 focus:ring-[#d4ff3f]/20 outline-none transition-all"
               />
             </div>
-            <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-1">
-              <button 
-                onClick={() => setViewMode('list')}
-                className={cn(
-                  "p-2 rounded-xl transition-all",
-                  viewMode === 'list' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
-                )}
-                title="Visualização em Lista"
-              >
-                <ListIcon size={18} />
-              </button>
-              <button 
-                onClick={() => setViewMode('grid')}
-                className={cn(
-                  "p-2 rounded-xl transition-all",
-                  viewMode === 'grid' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
-                )}
-                title="Visualização em Grade"
-              >
-                <LayoutGrid size={18} />
-              </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-1">
+                <select 
+                  value={`${sortConfig.key}-${sortConfig.direction}`}
+                  onChange={(e) => {
+                    const [key, direction] = e.target.value.split('-');
+                    setSortConfig({ 
+                      key: key as keyof Document | 'folder', 
+                      direction: direction as 'asc' | 'desc' 
+                    });
+                  }}
+                  className="bg-transparent text-[10px] font-black uppercase tracking-widest text-slate-400 px-2 outline-none cursor-pointer hover:text-white transition-colors"
+                >
+                  <option value="nome-asc">Nome (A-Z)</option>
+                  <option value="nome-desc">Nome (Z-A)</option>
+                  <option value="created_at-desc">Data (Mais Recente)</option>
+                  <option value="created_at-asc">Data (Mais Antigo)</option>
+                  <option value="Categoria-asc">Categoria</option>
+                  {selectedFolderId === 'root' && <option value="folder-asc">Pasta</option>}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-1">
+                <button 
+                  onClick={() => setViewMode('list')}
+                  className={cn(
+                    "p-2 rounded-xl transition-all",
+                    viewMode === 'list' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
+                  )}
+                  title="Visualização em Lista"
+                >
+                  <ListIcon size={18} />
+                </button>
+                <button 
+                  onClick={() => setViewMode('grid')}
+                  className={cn(
+                    "p-2 rounded-xl transition-all",
+                    viewMode === 'grid' ? "bg-[#0a0a0a] text-[#d4ff3f] shadow-inner" : "text-slate-500 hover:text-white"
+                  )}
+                  title="Visualização em Grade"
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
             </div>
           </div>
 
@@ -910,10 +1075,53 @@ export default function DocumentManagementPage() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-800/50">
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Documento</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Área / Tipo</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Data / Ano</th>
+                      <th 
+                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        onClick={() => toggleSort('nome')}
+                      >
+                        <div className="flex items-center">
+                          Documento
+                          {getSortIcon('nome')}
+                        </div>
+                      </th>
+                      {selectedFolderId === 'root' && (
+                        <th 
+                          className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                          onClick={() => toggleSort('folder')}
+                        >
+                          <div className="flex items-center">
+                            Pasta
+                            {getSortIcon('folder')}
+                          </div>
+                        </th>
+                      )}
+                      <th 
+                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        onClick={() => toggleSort('Categoria')}
+                      >
+                        <div className="flex items-center">
+                          Área / Tipo
+                          {getSortIcon('Categoria')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        onClick={() => toggleSort('status')}
+                      >
+                        <div className="flex items-center">
+                          Status
+                          {getSortIcon('status')}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        onClick={() => toggleSort('created_at')}
+                      >
+                        <div className="flex items-center">
+                          Data / Ano
+                          {getSortIcon('created_at')}
+                        </div>
+                      </th>
                       <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
                     </tr>
                   </thead>
@@ -940,6 +1148,16 @@ export default function DocumentManagementPage() {
                                 </div>
                               </div>
                             </td>
+                            {selectedFolderId === 'root' && (
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-1.5">
+                                  <FolderOpen size={10} className="text-slate-500" />
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                    {folders.find(f => f.id === doc.pasta_id)?.nome || 'Raiz'}
+                                  </span>
+                                </div>
+                              </td>
+                            )}
                             <td className="px-6 py-4">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
@@ -970,16 +1188,6 @@ export default function DocumentManagementPage() {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
-                                  onClick={() => {
-                                    setDocRenameForm({ id: doc.id, nome: doc.nome });
-                                    setIsDocRenameModalOpen(true);
-                                  }}
-                                  className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
-                                  title="Renomear"
-                                >
-                                  <Plus size={16} className="rotate-45" />
-                                </button>
-                                <button 
                                   onClick={() => handleViewDocument(doc)}
                                   className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
                                   title="Visualizar"
@@ -994,20 +1202,84 @@ export default function DocumentManagementPage() {
                                 >
                                   <Download size={16} />
                                 </a>
-                                <button 
-                                  onClick={() => handleDeleteDocument(doc)}
-                                  className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-all" 
-                                  title="Excluir"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                                
+                                <div className="relative">
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDocMenu(activeDocMenu === doc.id ? null : doc.id);
+                                    }}
+                                    className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
+                                    title="Mais opções"
+                                  >
+                                    <MoreVertical size={16} />
+                                  </button>
+
+                                  <AnimatePresence>
+                                    {activeDocMenu === doc.id && (
+                                      <>
+                                        <div 
+                                          className="fixed inset-0 z-10" 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setActiveDocMenu(null);
+                                          }} 
+                                        />
+                                        <motion.div
+                                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                          className="absolute right-0 top-full mt-1 z-20 w-40 bg-[#1a1a1a] border border-slate-800 rounded-xl shadow-2xl overflow-hidden p-1"
+                                        >
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveDocMenu(null);
+                                              setDocRenameForm({ id: doc.id, nome: doc.nome });
+                                              setIsDocRenameModalOpen(true);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                                          >
+                                            <Edit2 size={12} />
+                                            Renomear
+                                          </button>
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveDocMenu(null);
+                                              setDocToMove(doc);
+                                              setTargetFolderId(doc.pasta_id || 'root');
+                                              setIsMoveModalOpen(true);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                                          >
+                                            <Move size={12} />
+                                            Mover
+                                          </button>
+                                          <div className="h-px bg-slate-800 my-1" />
+                                          <button
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveDocMenu(null);
+                                              handleDeleteDocument(doc);
+                                            }}
+                                            className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                          >
+                                            <Trash2 size={12} />
+                                            Excluir
+                                          </button>
+                                        </motion.div>
+                                      </>
+                                    )}
+                                  </AnimatePresence>
+                                </div>
                               </div>
                             </td>
                           </motion.tr>
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-6 py-20 text-center">
+                          <td colSpan={selectedFolderId === 'root' ? 6 : 5} className="px-6 py-20 text-center">
                             <div className="flex flex-col items-center gap-3 text-slate-600">
                               <Search size={40} strokeWidth={1} />
                               <p className="text-sm font-bold">Nenhum documento encontrado com estes filtros.</p>
@@ -1018,6 +1290,7 @@ export default function DocumentManagementPage() {
                                   setSelectedArea('Todas');
                                   setSelectedStatus('Todos');
                                   setSelectedYear('Todos');
+                                  setSelectedFolderId('root');
                                 }}
                                 className="text-[#d4ff3f] text-xs font-black uppercase tracking-widest hover:underline"
                               >
@@ -1076,6 +1349,14 @@ export default function DocumentManagementPage() {
                           <span className="size-1 rounded-full bg-slate-800" />
                           <span>{doc.tipo_arquivo}</span>
                         </div>
+                        {selectedFolderId === 'root' && (
+                          <div className="flex items-center gap-1.5 mt-2">
+                            <FolderOpen size={10} className="text-slate-500" />
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                              {folders.find(f => f.id === doc.pasta_id)?.nome || 'Raiz'}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between pt-4 border-t border-slate-800/30">
@@ -1085,18 +1366,9 @@ export default function DocumentManagementPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button 
-                            onClick={() => {
-                              setDocRenameForm({ id: doc.id, nome: doc.nome });
-                              setIsDocRenameModalOpen(true);
-                            }}
-                            className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
-                            title="Renomear"
-                          >
-                            <Plus size={16} className="rotate-45" />
-                          </button>
-                          <button 
                             onClick={() => handleViewDocument(doc)}
                             className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
+                            title="Visualizar"
                           >
                             <Eye size={16} />
                           </button>
@@ -1104,16 +1376,81 @@ export default function DocumentManagementPage() {
                             href={getFileUrl(doc.file_path)}
                             download={doc.nome}
                             className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
+                            title="Download"
                           >
                             <Download size={16} />
                           </a>
-                          <button 
-                            onClick={() => handleDeleteDocument(doc)}
-                            className="p-2 rounded-lg hover:bg-rose-500/10 text-slate-400 hover:text-rose-500 transition-all" 
-                            title="Excluir"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+
+                          <div className="relative">
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveDocMenu(activeDocMenu === doc.id ? null : doc.id);
+                              }}
+                              className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
+                              title="Mais opções"
+                            >
+                              <MoreVertical size={16} />
+                            </button>
+
+                            <AnimatePresence>
+                              {activeDocMenu === doc.id && (
+                                <>
+                                  <div 
+                                    className="fixed inset-0 z-10" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveDocMenu(null);
+                                    }} 
+                                  />
+                                  <motion.div
+                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                    className="absolute right-0 bottom-full mb-1 z-20 w-40 bg-[#1a1a1a] border border-slate-800 rounded-xl shadow-2xl overflow-hidden p-1"
+                                  >
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDocMenu(null);
+                                        setDocRenameForm({ id: doc.id, nome: doc.nome });
+                                        setIsDocRenameModalOpen(true);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                                    >
+                                      <Edit2 size={12} />
+                                      Renomear
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDocMenu(null);
+                                        setDocToMove(doc);
+                                        setTargetFolderId(doc.pasta_id || 'root');
+                                        setIsMoveModalOpen(true);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
+                                    >
+                                      <Move size={12} />
+                                      Mover
+                                    </button>
+                                    <div className="h-px bg-slate-800 my-1" />
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveDocMenu(null);
+                                        handleDeleteDocument(doc);
+                                      }}
+                                      className="w-full flex items-center gap-2 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-500/10 rounded-lg transition-all"
+                                    >
+                                      <Trash2 size={12} />
+                                      Excluir
+                                    </button>
+                                  </motion.div>
+                                </>
+                              )}
+                            </AnimatePresence>
+                          </div>
                         </div>
                       </div>
                     </motion.div>

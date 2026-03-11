@@ -12,12 +12,8 @@ export async function GET(req: NextRequest) {
   try {
     let query = supabase.from('documentos').select('*');
     
-    if (pastaId) {
-      if (pastaId === 'root') {
-        query = query.is('pasta_id', null);
-      } else {
-        query = query.eq('pasta_id', pastaId);
-      }
+    if (pastaId && pastaId !== 'root') {
+      query = query.eq('pasta_id', pastaId);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
