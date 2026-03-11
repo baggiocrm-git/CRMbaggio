@@ -76,7 +76,7 @@ const MOCK_EVENTS: Event[] = [
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
+  const [events] = useState<Event[]>(MOCK_EVENTS);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
 
   const next = () => {

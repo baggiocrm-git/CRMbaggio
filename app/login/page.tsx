@@ -4,7 +4,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -20,23 +19,29 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      console.log('Tentativa de login iniciada:', { email });
+      
       // 1. Check for hardcoded Admin
       if ((email === 'Admin' || email === 'admin@buildflow.com') && password === '123456') {
-        router.push('/dashboard');
+        console.log('Login Admin detectado, redirecionando para /dashboard');
+        window.location.href = '/dashboard';
         return;
       }
 
+      console.log('Tentando login via Supabase...');
       // 2. Try Supabase login
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (authError) {
+        console.error('Erro na autenticação Supabase:', authError);
         throw new Error(authError.message);
       }
 
-      router.push('/dashboard');
+      console.log('Login Supabase bem-sucedido:', data.user?.id);
+      window.location.href = '/dashboard';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Credenciais inválidas';
       setError(message);
@@ -47,11 +52,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden"
-      >
+      <div className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
         {/* Decorative background element */}
         <div className="absolute -top-24 -right-24 size-48 bg-[#d4ff3f]/5 blur-[100px] rounded-full" />
         
@@ -72,14 +73,10 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-6 relative z-10">
           {error && (
-            <motion.div 
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex items-center gap-3 text-rose-500 text-xs font-bold"
-            >
+            <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex items-center gap-3 text-rose-500 text-xs font-bold animate-in fade-in slide-in-from-top-1">
               <AlertCircle size={18} />
               <p>{error}</p>
-            </motion.div>
+            </div>
           )}
 
           <div className="space-y-2">
@@ -140,7 +137,7 @@ export default function LoginPage() {
             © 2026 Baggio Silveira
           </p>
         </div>
-      </motion.div>
+      </div>
     </div>
   );
 }

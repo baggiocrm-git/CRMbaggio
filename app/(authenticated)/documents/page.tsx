@@ -1,5 +1,7 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import { 
@@ -246,6 +248,27 @@ export default function DocumentManagementPage() {
   const getSortIcon = (key: keyof Document | 'folder') => {
     if (sortConfig.key !== key) return null;
     return sortConfig.direction === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />;
+  };
+
+  const getFileExtension = (doc: Document) => {
+    const nameParts = doc.nome.split('.');
+    if (nameParts.length > 1) {
+      return `.${nameParts.pop()?.toLowerCase()}`;
+    }
+    
+    const pathParts = doc.file_path.split('.');
+    if (pathParts.length > 1) {
+      return `.${pathParts.pop()?.toLowerCase()}`;
+    }
+
+    if (doc.tipo_arquivo.includes('pdf')) return '.pdf';
+    if (doc.tipo_arquivo.includes('word') || doc.tipo_arquivo.includes('officedocument.wordprocessingml')) return '.docx';
+    if (doc.tipo_arquivo.includes('excel') || doc.tipo_arquivo.includes('officedocument.spreadsheetml')) return '.xlsx';
+    if (doc.tipo_arquivo.includes('image/jpeg')) return '.jpg';
+    if (doc.tipo_arquivo.includes('image/png')) return '.png';
+    if (doc.tipo_arquivo.includes('text/plain')) return '.txt';
+    
+    return '';
   };
 
   const getStatusColor = (status: DocumentStatus) => {
@@ -1071,12 +1094,12 @@ export default function DocumentManagementPage() {
             </div>
           ) : viewMode === 'list' ? (
             <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="overflow-x-hidden overflow-y-auto max-h-[800px] min-h-[280px]">
+                <table className="w-full text-left border-collapse table-auto">
                   <thead>
                     <tr className="border-b border-slate-800/50">
                       <th 
-                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                         onClick={() => toggleSort('nome')}
                       >
                         <div className="flex items-center">
@@ -1086,7 +1109,7 @@ export default function DocumentManagementPage() {
                       </th>
                       {selectedFolderId === 'root' && (
                         <th 
-                          className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                          className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                           onClick={() => toggleSort('folder')}
                         >
                           <div className="flex items-center">
@@ -1096,7 +1119,7 @@ export default function DocumentManagementPage() {
                         </th>
                       )}
                       <th 
-                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                         onClick={() => toggleSort('Categoria')}
                       >
                         <div className="flex items-center">
@@ -1105,7 +1128,7 @@ export default function DocumentManagementPage() {
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                         onClick={() => toggleSort('status')}
                       >
                         <div className="flex items-center">
@@ -1114,15 +1137,15 @@ export default function DocumentManagementPage() {
                         </div>
                       </th>
                       <th 
-                        className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                         onClick={() => toggleSort('created_at')}
                       >
                         <div className="flex items-center">
-                          Data / Ano
+                          Ano
                           {getSortIcon('created_at')}
                         </div>
                       </th>
-                      <th className="px-6 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
+                      <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/30">
@@ -1137,7 +1160,7 @@ export default function DocumentManagementPage() {
                             key={doc.id || `doc-list-${index}`} 
                             className="group hover:bg-white/[0.02] transition-colors"
                           >
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="size-10 rounded-xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors">
                                   <FileText size={20} />
@@ -1149,25 +1172,25 @@ export default function DocumentManagementPage() {
                               </div>
                             </td>
                             {selectedFolderId === 'root' && (
-                              <td className="px-6 py-4">
+                              <td className="px-4 py-4">
                                 <div className="flex items-center gap-1.5">
                                   <FolderOpen size={10} className="text-slate-500" />
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider line-clamp-1">
                                     {folders.find(f => f.id === doc.pasta_id)?.nome || 'Raiz'}
                                   </span>
                                 </div>
                               </td>
                             )}
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1.5">
                                   <Tag size={10} className="text-slate-500" />
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{doc.area || 'N/A'}</span>
+                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider line-clamp-1">{doc.area || 'N/A'}</span>
                                 </div>
-                                <p className="text-xs font-bold text-slate-300">{doc.tipo_arquivo}</p>
+                                <p className="text-xs font-bold text-slate-300 uppercase">{getFileExtension(doc)}</p>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <span className={cn(
                                 "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
                                 getStatusColor(doc.status)
@@ -1176,16 +1199,13 @@ export default function DocumentManagementPage() {
                                 {doc.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-slate-500">
-                                  <CalendarIcon size={10} />
-                                  <span className="text-[10px] font-bold">{new Date(doc.data).toLocaleDateString('pt-BR')}</span>
-                                </div>
-                                <p className="text-xs font-black text-white">{doc.Ano}</p>
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-1.5 text-white">
+                                <CalendarIcon size={10} className="text-slate-500" />
+                                <span className="text-xs font-black">{doc.Ano}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-4">
                               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => handleViewDocument(doc)}
@@ -1229,7 +1249,7 @@ export default function DocumentManagementPage() {
                                           initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                           animate={{ opacity: 1, scale: 1, y: 0 }}
                                           exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                          className="absolute right-0 top-full mt-1 z-20 w-40 bg-[#1a1a1a] border border-slate-800 rounded-xl shadow-2xl overflow-hidden p-1"
+                                          className="absolute right-0 top-full mt-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
                                         >
                                           <button
                                             onClick={(e) => {
@@ -1306,7 +1326,7 @@ export default function DocumentManagementPage() {
               </div>
               
               {/* Footer / Pagination Info */}
-              <div className="px-6 py-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest">
+              <div className="px-6 py-4 border-t border-slate-800/50 flex items-center justify-between text-[10px] font-black text-slate-500 uppercase tracking-widest bg-[#1a1a1a] sticky bottom-0 z-10">
                 <p>Mostrando {filteredDocuments.length} de {documents.length} documentos</p>
                 <div className="flex items-center gap-4">
                   <button className="hover:text-white transition-colors disabled:opacity-30" disabled>Anterior</button>
@@ -1318,7 +1338,8 @@ export default function DocumentManagementPage() {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="overflow-y-auto max-h-[800px] pr-2 custom-scrollbar">
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               <AnimatePresence mode='popLayout'>
                 {filteredDocuments.length > 0 ? (
                   filteredDocuments.map((doc, index) => (
@@ -1347,7 +1368,7 @@ export default function DocumentManagementPage() {
                         <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
                           <span>{doc.tamanho_arquivo}</span>
                           <span className="size-1 rounded-full bg-slate-800" />
-                          <span>{doc.tipo_arquivo}</span>
+                          <span className="uppercase">{getFileExtension(doc)}</span>
                         </div>
                         {selectedFolderId === 'root' && (
                           <div className="flex items-center gap-1.5 mt-2">
@@ -1360,9 +1381,9 @@ export default function DocumentManagementPage() {
                       </div>
 
                       <div className="flex items-center justify-between pt-4 border-t border-slate-800/30">
-                        <div className="flex items-center gap-1.5 text-slate-400">
-                          <CalendarIcon size={12} />
-                          <span className="text-[10px] font-bold">{new Date(doc.data).toLocaleDateString('pt-BR')}</span>
+                        <div className="flex items-center gap-1.5 text-white">
+                          <CalendarIcon size={12} className="text-slate-500" />
+                          <span className="text-xs font-black">{doc.Ano}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <button 
@@ -1407,7 +1428,7 @@ export default function DocumentManagementPage() {
                                     initial={{ opacity: 0, scale: 0.95, y: -10 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    className="absolute right-0 bottom-full mb-1 z-20 w-40 bg-[#1a1a1a] border border-slate-800 rounded-xl shadow-2xl overflow-hidden p-1"
+                                    className="absolute right-0 bottom-full mb-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
                                   >
                                     <button
                                       onClick={(e) => {
@@ -1465,9 +1486,10 @@ export default function DocumentManagementPage() {
                 )}
               </AnimatePresence>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
-  );
+  </div>
+);
 }

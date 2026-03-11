@@ -74,10 +74,16 @@ export default function Sidebar() {
 
   React.useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        setIsAdmin(user.email === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador');
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        setUser(user);
+        if (user) {
+          setIsAdmin(user.email === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador');
+        }
+      } catch (err) {
+        console.error('Erro ao buscar usuário no Sidebar:', err);
+        setUser(null);
       }
     };
     getUser();

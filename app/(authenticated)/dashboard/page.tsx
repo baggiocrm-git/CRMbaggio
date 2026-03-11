@@ -25,6 +25,7 @@ import {
 import { motion } from 'motion/react';
 
 export default function DashboardPage() {
+  console.log('DashboardPage inicializado');
   const [stats, setStats] = useState({
     activeProjects: 0,
     staffOnSite: 0,

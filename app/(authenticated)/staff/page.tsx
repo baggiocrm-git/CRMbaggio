@@ -52,7 +52,6 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState({

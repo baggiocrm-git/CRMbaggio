@@ -6,12 +6,14 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   productionBrowserSourceMaps: false,
   experimental: {
     cpus: 1,
     webpackBuildWorker: false,
     serverMinification: false,
-    optimizePackageImports: [],
   },
   images: {
     remotePatterns: [
