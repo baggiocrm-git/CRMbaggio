@@ -9,7 +9,14 @@ export interface TCPOItem {
   custo_mat: number;
   custo_eq: number;
   bdi_padrao: number;
-  composicao?: unknown[];
+  composicao?: {
+    insumo: string;
+    un: string;
+    coef: number;
+    p_unit: number;
+    p_total: number;
+    tipo: 'mo' | 'mat' | 'eq';
+  }[];
 }
 
 export interface Budget {
@@ -22,6 +29,24 @@ export interface Budget {
   total_eq: number;
   total_geral: number;
   created_at: string;
+}
+
+export interface Insumo {
+  id: string;
+  descricao: string;
+  unidade: string;
+  preco_unitario: number;
+  tipo: 'mo' | 'mat' | 'eq';
+}
+
+export interface CompositionItem {
+  codigo?: string;
+  insumo: string;
+  un: string;
+  coef: number;
+  p_unit: number;
+  p_total: number;
+  tipo: 'mo' | 'mat' | 'eq';
 }
 
 export interface BudgetItem {
@@ -37,6 +62,7 @@ export interface BudgetItem {
   bdi: number;
   observacao?: string;
   ordem: number;
+  composicao?: CompositionItem[];
 }
 
 export interface Project {

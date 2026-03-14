@@ -67,6 +67,9 @@ BEGIN
     ALTER TABLE orcamento_itens ADD COLUMN custo_unit_mat NUMERIC DEFAULT 0;
     ALTER TABLE orcamento_itens ADD COLUMN custo_unit_eq NUMERIC DEFAULT 0;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orcamento_itens' AND column_name='composicao') THEN
+    ALTER TABLE orcamento_itens ADD COLUMN composicao JSONB;
+  END IF;
 END $$;
 
 -- 5. Performance Indexes
@@ -74,13 +77,29 @@ CREATE INDEX IF NOT EXISTS idx_tcpo_descricao_trgm ON tcpo_itens USING gin (desc
 CREATE INDEX IF NOT EXISTS idx_tcpo_categoria ON tcpo_itens (categoria);
 
 -- 6. Updated At Trigger
+DO $$ 
+BEGIN 
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tcpo_itens' AND column_name='updated_at') THEN
+    ALTER TABLE tcpo_itens ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='orcamentos' AND column_name='updated_at') THEN
+    ALTER TABLE orcamentos ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+END $$;
+
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
+    -- Check if the column exists in the record to be safe
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
 $$ language 'plpgsql';
+
+-- Drop triggers if they exist to recreate them safely
+DROP TRIGGER IF EXISTS update_tcpo_itens_updated_at ON tcpo_itens;
+DROP TRIGGER IF EXISTS update_orcamentos_updated_at ON orcamentos;
 
 CREATE TRIGGER update_tcpo_itens_updated_at BEFORE UPDATE ON tcpo_itens FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_orcamentos_updated_at BEFORE UPDATE ON orcamentos FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
@@ -115,7 +134,34 @@ ON CONFLICT (id) DO UPDATE SET
   custo_eq = EXCLUDED.custo_eq,
   bdi_padrao = EXCLUDED.bdi_padrao;
 
--- 8. View for Analytical Budget
+-- 9. Tabela de Insumos Base (Preços de referência)
+CREATE TABLE IF NOT EXISTS tcpo_insumos (
+  id TEXT PRIMARY KEY,
+  descricao TEXT NOT NULL,
+  unidade TEXT NOT NULL,
+  preco_unitario NUMERIC DEFAULT 0,
+  tipo TEXT CHECK (tipo IN ('mo', 'mat', 'eq')), -- mo: mão de obra, mat: material, eq: equipamento
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Índices para busca rápida de insumos
+CREATE INDEX IF NOT EXISTS idx_tcpo_insumos_busca ON tcpo_insumos USING gin (to_tsvector('portuguese', descricao));
+
+-- Inserindo alguns insumos base conforme solicitado
+INSERT INTO tcpo_insumos (id, descricao, unidade, preco_unitario, tipo) VALUES
+('MO-001', 'Servente', 'h', 15.50, 'mo'),
+('MO-002', 'Pedreiro', 'h', 22.00, 'mo'),
+('MO-003', 'Carpinteiro', 'h', 22.00, 'mo'),
+('MAT-001', 'Cimento Portland CP II-32', 'kg', 0.85, 'mat'),
+('MAT-002', 'Areia média lavada', 'm3', 120.00, 'mat'),
+('MAT-003', 'Prego 15x15 com cabeça', 'kg', 18.50, 'mat'),
+('MAT-004', 'Madeira 1x3 (Sarrafo)', 'm', 4.50, 'mat'),
+('MAT-005', 'Madeira 1x6 (Tábua)', 'm', 8.20, 'mat'),
+('MAT-006', 'Madeira 1x12 (Tábua)', 'm', 15.40, 'mat')
+ON CONFLICT (id) DO NOTHING;
+
+-- 10. View for Analytical Budget
+DROP VIEW IF EXISTS vw_orcamento_analitico;
 CREATE OR REPLACE VIEW vw_orcamento_analitico AS
 SELECT 
   oi.id,
@@ -132,6 +178,7 @@ SELECT
   ((oi.custo_unit_mo + oi.custo_unit_mat + oi.custo_unit_eq) * (1 + oi.bdi/100)) as preco_unit_com_bdi,
   (oi.quantidade * (oi.custo_unit_mo + oi.custo_unit_mat + oi.custo_unit_eq)) as subtotal_custo,
   (oi.quantidade * (oi.custo_unit_mo + oi.custo_unit_mat + oi.custo_unit_eq) * (1 + oi.bdi/100)) as subtotal_preco,
-  oi.ordem
+  oi.ordem,
+  COALESCE(oi.composicao, t.composicao) as composicao
 FROM orcamento_itens oi
 LEFT JOIN tcpo_itens t ON oi.tcpo_id = t.id;

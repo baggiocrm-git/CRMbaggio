@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
-import { TCPOItem, BudgetItem } from '@/lib/types';
+import { TCPOItem, BudgetItem, CompositionItem } from '@/lib/types';
 
 interface SearchOptions {
   categoria?: string;
@@ -20,10 +20,22 @@ export function useTCPOSearch(options: SearchOptions = {}) {
 
     setLoading(true);
     try {
-      let q = supabase
-        .from('tcpo_itens')
-        .select('*')
-        .ilike('descricao', `%${searchQuery}%`);
+      // Se a busca parecer um código (começa com número) ou for muito curta, usamos ilike
+      // Caso contrário, usamos o textSearch que é mais potente para descrições longas
+      const isCode = /^\d/.test(searchQuery);
+      
+      let q = supabase.from('tcpo_itens').select('*');
+
+      if (isCode || searchQuery.length < 4) {
+        // Busca por ID (código) ou parte da descrição
+        q = q.or(`id.ilike.%${searchQuery}%,descricao.ilike.%${searchQuery}%`);
+      } else {
+        // Busca textual avançada
+        q = q.textSearch('descricao', searchQuery, { 
+          config: 'portuguese', 
+          type: 'websearch' 
+        });
+      }
 
       if (options.categoria) {
         q = q.eq('categoria', options.categoria);
@@ -69,8 +81,10 @@ export function useOrcamento() {
       custo_unit_mo: tcpoItem.custo_mo,
       custo_unit_mat: tcpoItem.custo_mat,
       custo_unit_eq: tcpoItem.custo_eq,
-      bdi: tcpoItem.bdi_padrao,
-      ordem: items.length
+      // Converte 0.30 para 30 para exibição na UI
+      bdi: (tcpoItem.bdi_padrao || 0) * 100,
+      ordem: items.length,
+      composicao: tcpoItem.composicao || []
     };
     setItems([...items, newItem]);
   };
@@ -85,11 +99,66 @@ export function useOrcamento() {
     setItems(newItems);
   };
 
+  const updateItemComposition = (index: number, composition: CompositionItem[], totals: { mo: number; mat: number; eq: number }) => {
+    const newItems = [...items];
+    newItems[index] = { 
+      ...newItems[index], 
+      composicao: composition,
+      custo_unit_mo: totals.mo,
+      custo_unit_mat: totals.mat,
+      custo_unit_eq: totals.eq
+    };
+    setItems(newItems);
+  };
+
+  const updateCompositionItem = async (itemIndex: number, compIndex: number, updates: Partial<CompositionItem>) => {
+    const newItems = [...items];
+    const item = newItems[itemIndex];
+    if (!item.composicao) return;
+
+    const newComposition = [...item.composicao];
+    newComposition[compIndex] = { ...newComposition[compIndex], ...updates };
+    
+    // Recalcula p_total do item da composição
+    newComposition[compIndex].p_total = (newComposition[compIndex].coef || 0) * (newComposition[compIndex].p_unit || 0);
+
+    // Recalcula totais da composição (mo, mat, eq)
+    const newTotals = newComposition.reduce((acc, comp) => {
+      if (comp.tipo === 'mo') acc.mo += comp.p_total;
+      else if (comp.tipo === 'mat') acc.mat += comp.p_total;
+      else if (comp.tipo === 'eq') acc.eq += comp.p_total;
+      return acc;
+    }, { mo: 0, mat: 0, eq: 0 });
+
+    newItems[itemIndex] = {
+      ...item,
+      composicao: newComposition,
+      custo_unit_mo: newTotals.mo,
+      custo_unit_mat: newTotals.mat,
+      custo_unit_eq: newTotals.eq
+    };
+
+    setItems(newItems);
+
+    // Sincroniza com tcpo_insumos se p_unit foi alterado
+    if (updates.p_unit !== undefined && newComposition[compIndex].codigo) {
+      try {
+        await supabase
+          .from('tcpo_insumos')
+          .update({ preco_unitario: updates.p_unit })
+          .eq('id', newComposition[compIndex].codigo);
+      } catch (error) {
+        console.error('Error updating insumo price:', error);
+      }
+    }
+  };
+
   const totals = items.reduce((acc, item) => {
     const mo = (item.custo_unit_mo || 0) * (item.quantidade || 0);
     const mat = (item.custo_unit_mat || 0) * (item.quantidade || 0);
     const eq = (item.custo_unit_eq || 0) * (item.quantidade || 0);
     const subtotal = mo + mat + eq;
+    // BDI é tratado como porcentagem (ex: 30)
     const total = subtotal * (1 + (item.bdi || 0) / 100);
 
     return {
@@ -107,6 +176,9 @@ export function useOrcamento() {
     addItem,
     removeItem,
     updateItem,
+    updateItemComposition,
+    updateCompositionItem,
+    setItems,
     totals
   };
 }

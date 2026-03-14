@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { useTCPOSearch, useOrcamento } from '@/hooks/useTCPOSearch';
 import { Project } from '@/lib/types';
 import { GoogleGenAI } from "@google/genai";
+import CompositionModal from '@/components/CompositionModal';
 
 export default function NewBudgetPage() {
   const router = useRouter();
@@ -26,9 +27,26 @@ export default function NewBudgetPage() {
   const [budgetDesc, setBudgetDesc] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  
+  // Composition Modal State (Legacy, keeping for now but user wants inline)
+  const [isCompModalOpen, setIsCompModalOpen] = useState(false);
+  const [activeItemIndex, setActiveItemIndex] = useState<number | null>(null);
+  
+  // Inline Expansion State
+  const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
   const { query, setQuery, suggestions, loading: searchLoading, clearSuggestions } = useTCPOSearch({ limit: 8 });
-  const { items, addItem, removeItem, updateItem, totals } = useOrcamento();
+  const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, totals } = useOrcamento();
+
+  const toggleExpand = (index: number) => {
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedItems(newExpanded);
+  };
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -74,7 +92,8 @@ export default function NewBudgetPage() {
         custo_unit_mat: item.custo_unit_mat,
         custo_unit_eq: item.custo_unit_eq,
         bdi: item.bdi,
-        ordem: index
+        ordem: index,
+        composicao: item.composicao
       }));
 
       const { error: itemsError } = await supabase
@@ -82,6 +101,21 @@ export default function NewBudgetPage() {
         .insert(budgetItems);
 
       if (itemsError) throw itemsError;
+
+      // 3. Update Project Budget Value (Sum of all budgets for this project)
+      const { data: allBudgets } = await supabase
+        .from('orcamentos')
+        .select('total_geral')
+        .eq('projeto_id', selectedProjectId);
+      
+      const newTotal = (allBudgets || []).reduce((acc, curr) => acc + (curr.total_geral || 0), 0);
+
+      const { error: projectUpdateError } = await supabase
+        .from('projetos')
+        .update({ orcamento: newTotal })
+        .eq('id', selectedProjectId);
+
+      if (projectUpdateError) throw projectUpdateError;
 
       router.push('/finances/budget');
     } catch (error) {
@@ -146,102 +180,72 @@ export default function NewBudgetPage() {
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
-      <div className="flex items-center gap-4 mb-8">
-        <Link href="/finances/budget" className="p-2 rounded-xl bg-slate-800/50 text-slate-400 hover:text-white transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-black tracking-tight italic">Novo <span className="text-[#d4ff3f]">Orçamento Detalhado</span></h1>
-          <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Utilizando base de dados TCPO/PINI</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="flex items-center gap-4">
+          <Link href="/finances/budget" className="p-2 rounded-xl bg-slate-800/50 text-slate-400 hover:text-white transition-colors">
+            <ArrowLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-black tracking-tight italic">Novo <span className="text-[#d4ff3f]">Orçamento Detalhado</span></h1>
+            <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">Utilizando base de dados TCPO/PINI</p>
+          </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Config */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-slate-800/50 space-y-4 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-[#d4ff3f] flex items-center gap-2">
-              <Calculator size={14} /> Informações Gerais
-            </h3>
-            
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Obra / Projeto</label>
-              <select 
-                value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30"
-              >
-                <option value="">Selecione uma obra...</option>
-                {projects.map(p => (
-                  <option key={p.id} value={p.id}>{p.nome}</option>
-                ))}
-              </select>
-            </div>
+        {/* Inline General Info */}
+        <div className="flex flex-wrap items-center gap-4 bg-[#1a1a1a] p-3 rounded-2xl border border-slate-800/50 shadow-sm">
+          <div className="flex flex-col gap-1 min-w-[140px]">
+            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
+              <Calculator size={8} className="text-[#d4ff3f]" /> Obra
+            </label>
+            <select 
+              value={selectedProjectId}
+              onChange={(e) => setSelectedProjectId(e.target.value)}
+              className="bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+            >
+              <option value="">Selecione...</option>
+              {projects.map(p => (
+                <option key={p.id} value={p.id}>{p.nome}</option>
+              ))}
+            </select>
+          </div>
 
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Nome do Orçamento</label>
+          <div className="flex flex-col gap-1 min-w-[140px]">
+            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Nome</label>
+            <input 
+              type="text" 
+              placeholder="Nome do orçamento"
+              value={budgetName}
+              onChange={(e) => setBudgetName(e.target.value)}
+              className="bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 min-w-[200px]">
+            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Escopo / IA</label>
+            <div className="flex gap-1">
               <input 
-                type="text" 
-                placeholder="Ex: Orçamento Inicial - Fase 1"
-                value={budgetName}
-                onChange={(e) => setBudgetName(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Descrição / Escopo</label>
-              <textarea 
-                rows={4}
-                placeholder="Descreva o escopo da obra para sugestões de IA..."
+                type="text"
+                placeholder="Descreva para IA..."
                 value={budgetDesc}
                 onChange={(e) => setBudgetDesc(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 resize-none"
+                className="flex-1 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
               />
               <button 
                 onClick={handleAiSuggest}
                 disabled={isAiLoading}
-                className="w-full mt-2 flex items-center justify-center gap-2 py-2 rounded-xl bg-[#d4ff3f]/10 text-[#d4ff3f] text-[10px] font-black uppercase tracking-widest hover:bg-[#d4ff3f]/20 transition-all disabled:opacity-50"
+                className="p-1 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f] hover:bg-[#d4ff3f]/20 transition-all disabled:opacity-50"
+                title="Sugerir com IA"
               >
-                {isAiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                Sugerir Itens com IA
+                {isAiLoading ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
               </button>
             </div>
           </div>
-
-          <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-slate-800/50 space-y-4 shadow-sm">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400">Resumo de Custos</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Mão de Obra</span>
-                <span className="font-bold">{formatCurrency(totals.mo)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Materiais</span>
-                <span className="font-bold">{formatCurrency(totals.mat)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Equipamentos</span>
-                <span className="font-bold">{formatCurrency(totals.eq)}</span>
-              </div>
-              <div className="pt-3 border-t border-slate-800/50 flex justify-between items-baseline">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Geral (com BDI)</span>
-                <span className="text-2xl font-black text-[#d4ff3f]">{formatCurrency(totals.total)}</span>
-              </div>
-            </div>
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className="w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#d4ff3f] text-[#0a0a0a] text-xs font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10 disabled:opacity-50"
-            >
-              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              Salvar Orçamento
-            </button>
-          </div>
         </div>
+      </div>
 
-        {/* Right Column: Items Table */}
-        <div className="lg:col-span-2 space-y-6">
+      <div className="space-y-8">
+        {/* Items Table Section */}
+        <div className="space-y-6">
           {/* Autocomplete Search */}
           <div className="relative">
             <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
@@ -288,19 +292,19 @@ export default function NewBudgetPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                    <th className="px-6 py-4">Item / Serviço</th>
-                    <th className="px-6 py-4 w-24">Qtd</th>
-                    <th className="px-6 py-4 w-20">Un</th>
-                    <th className="px-6 py-4 w-32">Custo Unit.</th>
-                    <th className="px-6 py-4 w-20">BDI %</th>
+                    <th className="px-6 py-4 w-24">Código</th>
+                    <th className="px-6 py-4">Discriminação dos Serviços</th>
+                    <th className="px-6 py-4 w-20">Unid.</th>
+                    <th className="px-6 py-4 w-24">Quant.</th>
+                    <th className="px-6 py-4 w-32">Preço Unit.</th>
                     <th className="px-6 py-4 w-32 text-right">Subtotal</th>
-                    <th className="px-6 py-4 w-16"></th>
+                    <th className="px-6 py-4 w-24"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
                   {items.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-20 text-center">
+                      <td colSpan={8} className="px-6 py-20 text-center">
                         <div className="size-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
                           <Plus size={32} className="text-slate-600" />
                         </div>
@@ -312,52 +316,135 @@ export default function NewBudgetPage() {
                     items.map((item, idx) => {
                       const unitTotal = (item.custo_unit_mo || 0) + (item.custo_unit_mat || 0) + (item.custo_unit_eq || 0);
                       const subtotal = (unitTotal * (item.quantidade || 0)) * (1 + (item.bdi || 0) / 100);
+                      const isExpanded = expandedItems.has(idx);
                       
                       return (
-                        <tr key={idx} className="hover:bg-[#0a0a0a] transition-colors">
-                          <td className="px-6 py-4 min-w-[200px]">
-                            <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
-                            <input 
-                              type="text" 
-                              value={item.descricao_personalizada}
-                              onChange={(e) => updateItem(idx, { descricao_personalizada: e.target.value })}
-                              className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="number" 
-                              value={item.quantidade}
-                              onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
-                              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-bold text-white">{formatCurrency(unitTotal)}</p>
-                          </td>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="number" 
-                              value={item.bdi}
-                              onChange={(e) => updateItem(idx, { bdi: Number(e.target.value) })}
-                              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
-                            />
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <button 
-                              onClick={() => removeItem(idx)}
-                              className="p-1 text-slate-600 hover:text-rose-500 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </td>
-                        </tr>
+                        <React.Fragment key={idx}>
+                          <tr 
+                            className={`hover:bg-[#0a0a0a] transition-colors group cursor-pointer ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
+                            onClick={() => toggleExpand(idx)}
+                          >
+                            <td className="px-6 py-4">
+                              <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
+                            </td>
+                            <td className="px-6 py-4 min-w-[200px]">
+                              <input 
+                                type="text" 
+                                value={item.descricao_personalizada}
+                                onChange={(e) => updateItem(idx, { descricao_personalizada: e.target.value })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <input 
+                                type="number" 
+                                value={item.quantidade}
+                                onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
+                              />
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-xs font-bold text-white">{formatCurrency(unitTotal * (1 + (item.bdi || 0) / 100))}</p>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveItemIndex(idx);
+                                    setIsCompModalOpen(true);
+                                  }}
+                                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-[#d4ff3f] transition-all"
+                                  title="Editar Composição (Modal)"
+                                >
+                                  <Calculator size={14} />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeItem(idx);
+                                  }}
+                                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-rose-500 transition-all"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          {isExpanded && item.composicao && item.composicao.length > 0 && (
+                            <tr className="bg-[#0d0d0d]">
+                              <td colSpan={7} className="px-6 py-0">
+                                <div className="py-2 pl-12 pr-6">
+                                  <table className="w-full text-left border-collapse border-spacing-0">
+                                    <thead>
+                                      <tr className="text-[8px] font-black text-slate-600 uppercase tracking-widest bg-[#1a1a1a]">
+                                        <th className="py-1 px-2 border border-slate-800 w-20">Código</th>
+                                        <th className="py-1 px-2 border border-slate-800">Insumo</th>
+                                        <th className="py-1 px-2 border border-slate-800 w-10 text-center">Un</th>
+                                        <th className="py-1 px-2 border border-slate-800 w-20 text-center">Consumo</th>
+                                        <th className="py-1 px-2 border border-slate-800 w-24 text-center">P. Unit</th>
+                                        <th className="py-1 px-2 border border-slate-800 w-28 text-right">P. Total</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {item.composicao.map((comp, cIdx) => (
+                                        <tr key={cIdx} className="hover:bg-white/5 transition-colors group">
+                                          <td className="py-0.5 px-2 border border-slate-800/50">
+                                            <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">{comp.codigo || '-'}</p>
+                                          </td>
+                                          <td className="py-0.5 px-2 border border-slate-800/50">
+                                            <div className="flex items-center gap-2">
+                                              <p className="text-[10px] font-bold text-slate-300 leading-tight">{comp.insumo}</p>
+                                              <span className="text-[6px] font-black uppercase text-slate-600 shrink-0">{comp.tipo}</span>
+                                            </div>
+                                          </td>
+                                          <td className="py-0.5 px-2 border border-slate-800/50 text-center">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase">{comp.un}</span>
+                                          </td>
+                                          <td className="py-0.5 px-2 border border-slate-800/50">
+                                            <input 
+                                              type="number" 
+                                              step="0.001"
+                                              value={comp.coef}
+                                              onChange={(e) => updateCompositionItem(idx, cIdx, { coef: Number(e.target.value) })}
+                                              className="w-full bg-transparent border-none p-0 text-[10px] text-white text-center outline-none focus:ring-0 font-bold"
+                                            />
+                                          </td>
+                                          <td className="py-0.5 px-2 border border-slate-800/50">
+                                            <div className="flex items-center justify-center gap-0.5">
+                                              <span className="text-[8px] text-slate-600 font-bold">R$</span>
+                                              <input 
+                                                type="number" 
+                                                step="0.01"
+                                                value={comp.p_unit}
+                                                onChange={(e) => updateCompositionItem(idx, cIdx, { p_unit: Number(e.target.value) })}
+                                                className="w-full bg-transparent border-none p-0 text-[10px] text-white outline-none focus:ring-0 font-bold"
+                                              />
+                                            </div>
+                                          </td>
+                                          <td className="py-0.5 px-2 border border-slate-800/50 text-right">
+                                            <p className="text-[10px] font-black text-[#d4ff3f]">
+                                              {formatCurrency(comp.p_total)}
+                                            </p>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       );
                     })
                   )}
@@ -366,7 +453,60 @@ export default function NewBudgetPage() {
             </div>
           </div>
         </div>
+
+        {/* Summary Section */}
+        <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-slate-800/50 shadow-lg mt-auto">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="flex flex-wrap gap-8 items-center">
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Mão de Obra</p>
+                <p className="text-lg font-black text-blue-500">{formatCurrency(totals.mo)}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Materiais</p>
+                <p className="text-lg font-black text-orange-500">{formatCurrency(totals.mat)}</p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Equipamentos</p>
+                <p className="text-lg font-black text-purple-500">{formatCurrency(totals.eq)}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-8 bg-[#0a0a0a] p-4 rounded-2xl border border-slate-800/50 flex-1 md:flex-none">
+              <div className="text-right">
+                <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Total Geral (com BDI)</p>
+                <p className="text-2xl font-black text-[#d4ff3f]">{formatCurrency(totals.total)}</p>
+              </div>
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10 disabled:opacity-50"
+              >
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                Salvar Orçamento
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Composition Modal */}
+      {activeItemIndex !== null && (
+        <CompositionModal 
+          isOpen={isCompModalOpen}
+          onClose={() => {
+            setIsCompModalOpen(false);
+            setActiveItemIndex(null);
+          }}
+          onSave={(composition, totals) => {
+            updateItemComposition(activeItemIndex, composition, totals);
+            setIsCompModalOpen(false);
+            setActiveItemIndex(null);
+          }}
+          initialComposition={items[activeItemIndex]?.composicao || []}
+          itemName={items[activeItemIndex]?.descricao_personalizada || ''}
+        />
+      )}
     </div>
   );
 }

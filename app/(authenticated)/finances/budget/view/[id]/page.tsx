@@ -9,7 +9,9 @@ import {
   Building2, 
   Calendar,
   FileText,
-  PieChart
+  PieChart,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -31,6 +33,14 @@ interface AnalyticalItem {
   subtotal_custo: number;
   subtotal_preco: number;
   ordem: number;
+  composicao?: {
+    insumo: string;
+    un: string;
+    coef: number;
+    p_unit: number;
+    p_total: number;
+    tipo: 'mo' | 'mat' | 'eq';
+  }[];
 }
 
 export default function ViewBudgetPage() {
@@ -38,6 +48,17 @@ export default function ViewBudgetPage() {
   const [budget, setBudget] = useState<Budget | null>(null);
   const [items, setItems] = useState<AnalyticalItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+  const toggleItem = (itemId: string) => {
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(itemId)) {
+      newExpanded.delete(itemId);
+    } else {
+      newExpanded.add(itemId);
+    }
+    setExpandedItems(newExpanded);
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -187,41 +208,88 @@ export default function ViewBudgetPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50 print:bg-gray-100 print:text-black print:border-black">
-                <th className="px-6 py-4">Código / Descrição</th>
-                <th className="px-6 py-4 w-20">Un</th>
-                <th className="px-6 py-4 w-24">Qtd</th>
-                <th className="px-6 py-4 w-32">Custo Unit.</th>
-                <th className="px-6 py-4 w-20">BDI %</th>
+                <th className="px-6 py-4 w-24">Código</th>
+                <th className="px-6 py-4">Discriminação dos Serviços</th>
+                <th className="px-6 py-4 w-20">Unid.</th>
+                <th className="px-6 py-4 w-24">Quant.</th>
                 <th className="px-6 py-4 w-32">Preço Unit.</th>
                 <th className="px-6 py-4 w-32 text-right">Subtotal</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 print:divide-black/10">
               {items.map((item) => (
-                <tr key={item.id} className="hover:bg-[#0a0a0a] transition-colors print:text-black">
-                  <td className="px-6 py-4">
-                    <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black">{item.tcpo_id}</p>
-                    <p className="text-sm font-bold text-white print:text-black mt-1">{item.descricao}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-xs font-bold text-slate-500 uppercase print:text-black">{item.unidade}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold print:text-black">{item.quantidade}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-xs text-slate-400 print:text-black">{formatCurrency(item.custo_unit_total)}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-xs text-slate-400 print:text-black">{item.bdi}%</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-bold print:text-black">{formatCurrency(item.preco_unit_com_bdi)}</p>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <p className="text-sm font-black text-[#d4ff3f] print:text-black">{formatCurrency(item.subtotal_preco)}</p>
-                  </td>
-                </tr>
+                <React.Fragment key={item.id}>
+                  <tr 
+                    className="hover:bg-[#0a0a0a] transition-colors print:text-black cursor-pointer group"
+                    onClick={() => toggleItem(item.id)}
+                  >
+                    <td className="px-6 py-4">
+                      <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black">{item.tcpo_id}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <div className="print:hidden">
+                          {expandedItems.has(item.id) ? <ChevronDown size={14} className="text-[#d4ff3f]" /> : <ChevronRight size={14} className="text-slate-600 group-hover:text-white" />}
+                        </div>
+                        <p className="text-sm font-bold text-white print:text-black">{item.descricao}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-xs font-bold text-slate-500 uppercase print:text-black">{item.unidade}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold print:text-black">{item.quantidade}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-bold print:text-black">{formatCurrency(item.preco_unit_com_bdi)}</p>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <p className="text-sm font-black text-[#d4ff3f] print:text-black">{formatCurrency(item.subtotal_preco)}</p>
+                    </td>
+                  </tr>
+                  {/* Composition Details */}
+                  {expandedItems.has(item.id) && item.composicao && item.composicao.length > 0 && (
+                    <tr className="bg-[#050505] print:bg-white">
+                      <td colSpan={7} className="px-12 py-4">
+                        <div className="border-l-2 border-[#d4ff3f]/30 pl-6 py-2 space-y-4">
+                          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Composição Analítica (Insumos)</p>
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="text-[9px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-800/30">
+                                <th className="pb-2">Insumo</th>
+                                <th className="pb-2 w-16">Tipo</th>
+                                <th className="pb-2 w-16">Un</th>
+                                <th className="pb-2 w-20">Coef.</th>
+                                <th className="pb-2 w-24">P. Unit</th>
+                                <th className="pb-2 w-24 text-right">P. Total</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/10">
+                              {item.composicao.map((insumo, iIdx) => (
+                                <tr key={iIdx} className="text-[11px]">
+                                  <td className="py-2 text-slate-300 print:text-black">{insumo.insumo}</td>
+                                  <td className="py-2">
+                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                      insumo.tipo === 'mo' ? 'bg-blue-500/10 text-blue-500' :
+                                      insumo.tipo === 'mat' ? 'bg-orange-500/10 text-orange-500' :
+                                      'bg-purple-500/10 text-purple-500'
+                                    }`}>
+                                      {insumo.tipo}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 text-slate-500 print:text-black uppercase">{insumo.un}</td>
+                                  <td className="py-2 text-slate-300 print:text-black">{insumo.coef}</td>
+                                  <td className="py-2 text-slate-500 print:text-black">{formatCurrency(insumo.p_unit)}</td>
+                                  <td className="py-2 text-slate-300 print:text-black text-right">{formatCurrency(insumo.p_total)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
             <tfoot>

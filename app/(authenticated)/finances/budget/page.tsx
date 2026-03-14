@@ -79,8 +79,32 @@ export default function BudgetPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este orçamento?')) return;
     try {
+      // Get budget info first to know which project to update
+      const { data: budgetToDelete } = await supabase
+        .from('orcamentos')
+        .select('projeto_id')
+        .eq('id', id)
+        .single();
+
       const { error } = await supabase.from('orcamentos').delete().eq('id', id);
       if (error) throw error;
+
+      // If budget had a project, update project's budget value
+      if (budgetToDelete?.projeto_id) {
+        // Recalculate total of remaining budgets for this project
+        const { data: remainingBudgets } = await supabase
+          .from('orcamentos')
+          .select('total_geral')
+          .eq('projeto_id', budgetToDelete.projeto_id);
+        
+        const newTotal = (remainingBudgets || []).reduce((acc, curr) => acc + (curr.total_geral || 0), 0);
+
+        await supabase
+          .from('projetos')
+          .update({ orcamento: newTotal })
+          .eq('id', budgetToDelete.projeto_id);
+      }
+
       fetchBudgets();
     } catch (err) {
       console.error('Error deleting budget:', err);

@@ -819,10 +819,12 @@ export default function DocumentManagementPage() {
               <div className="flex-1 bg-white/5 relative">
                 {selectedDoc.tipo_arquivo.includes('image') ? (
                   <div className="absolute inset-0 flex items-center justify-center p-8">
-                    <img 
+                    <Image 
                       src={getFileUrl(selectedDoc.file_path)} 
                       alt={selectedDoc.nome}
-                      className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
+                      fill
+                      className="object-contain p-8"
+                      referrerPolicy="no-referrer"
                     />
                   </div>
                 ) : selectedDoc.tipo_arquivo.includes('pdf') ? (
