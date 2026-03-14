@@ -32,17 +32,30 @@ export default function CompositionModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Insumo[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const [composition, setComposition] = useState<CompositionItem[]>(initialComposition);
+
+  // New Insumo Form State
+  const [newInsumo, setNewInsumo] = useState<Partial<Insumo>>({
+    descricao: '',
+    unidade: '',
+    preco_unitario: 0,
+    tipo: 'mat'
+  });
 
   useEffect(() => {
     if (isOpen) {
       setComposition(initialComposition);
+      setIsRegistering(false);
+      setSearchQuery('');
+      setSearchResults([]);
     }
   }, [isOpen, initialComposition]);
 
   const handleSearch = async () => {
     if (!searchQuery) return;
     setIsSearching(true);
+    setIsRegistering(false);
     try {
       const { data, error } = await supabase
         .from('tcpo_insumos')
@@ -54,6 +67,49 @@ export default function CompositionModal({
       setSearchResults(data || []);
     } catch (error) {
       console.error('Error searching insumos:', error);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleRegisterInsumo = async () => {
+    if (!newInsumo.descricao || !newInsumo.unidade || newInsumo.preco_unitario === undefined) {
+      alert('Preencha todos os campos do insumo.');
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // Generate a unique ID
+      const prefix = newInsumo.tipo === 'mo' ? 'MO' : newInsumo.tipo === 'mat' ? 'MAT' : 'EQ';
+      const randomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const id = `${prefix}-USR-${randomId}`;
+
+      const insumoData = {
+        id,
+        descricao: newInsumo.descricao,
+        unidade: newInsumo.unidade,
+        preco_unitario: newInsumo.preco_unitario,
+        tipo: newInsumo.tipo
+      };
+
+      const { data, error } = await supabase
+        .from('tcpo_insumos')
+        .insert([insumoData])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        addInsumo(data as Insumo);
+        setIsRegistering(false);
+        setSearchQuery('');
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error registering insumo:', error);
+      alert('Erro ao cadastrar insumo.');
     } finally {
       setIsSearching(false);
     }
@@ -191,6 +247,81 @@ export default function CompositionModal({
                   </div>
                 </button>
               ))}
+
+              {!isSearching && searchQuery && searchResults.length === 0 && !isRegistering && (
+                <div className="p-5 text-center bg-[#1a1a1a] border border-dashed border-slate-800 rounded-2xl">
+                  <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-3">Nenhum insumo encontrado</p>
+                  <button 
+                    onClick={() => {
+                      setIsRegistering(true);
+                      setNewInsumo({
+                        descricao: searchQuery,
+                        unidade: '',
+                        preco_unitario: 0,
+                        tipo: 'mat'
+                      });
+                    }}
+                    className="w-full py-2 rounded-xl bg-[#d4ff3f]/10 text-[#d4ff3f] text-[9px] font-black uppercase tracking-widest hover:bg-[#d4ff3f]/20 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Plus size={14} /> Cadastrar Novo Insumo
+                  </button>
+                </div>
+              )}
+
+              {isRegistering && (
+                <div className="p-4 bg-[#1a1a1a] border border-[#d4ff3f]/30 rounded-2xl space-y-3 animate-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between mb-1">
+                    <h4 className="text-[9px] font-black text-[#d4ff3f] uppercase tracking-widest">Novo Insumo</h4>
+                    <button onClick={() => setIsRegistering(false)} className="text-slate-500 hover:text-white">
+                      <X size={12} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <input 
+                      type="text" 
+                      placeholder="Descrição"
+                      value={newInsumo.descricao}
+                      onChange={(e) => setNewInsumo({...newInsumo, descricao: e.target.value})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Unidade (ex: h, kg, m3)"
+                        value={newInsumo.unidade}
+                        onChange={(e) => setNewInsumo({...newInsumo, unidade: e.target.value})}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+                      />
+                      <input 
+                        type="number" 
+                        placeholder="Preço Unit."
+                        value={newInsumo.preco_unitario}
+                        onChange={(e) => setNewInsumo({...newInsumo, preco_unitario: Number(e.target.value)})}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+                      />
+                    </div>
+                    <select 
+                      value={newInsumo.tipo}
+                      onChange={(e) => setNewInsumo({...newInsumo, tipo: e.target.value as 'mo' | 'mat' | 'eq'})}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-3 py-2 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+                    >
+                      <option value="mat">Material</option>
+                      <option value="mo">Mão de Obra</option>
+                      <option value="eq">Equipamento</option>
+                    </select>
+                  </div>
+
+                  <button 
+                    onClick={handleRegisterInsumo}
+                    disabled={isSearching}
+                    className="w-full py-2 rounded-xl bg-[#d4ff3f] text-[#0a0a0a] text-[9px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all flex items-center justify-center gap-2"
+                  >
+                    {isSearching ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    Salvar e Adicionar
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
