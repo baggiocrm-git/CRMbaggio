@@ -149,9 +149,10 @@ CREATE INDEX IF NOT EXISTS idx_tcpo_insumos_busca ON tcpo_insumos USING gin (to_
 
 -- Inserindo alguns insumos base conforme solicitado
 INSERT INTO tcpo_insumos (id, descricao, unidade, preco_unitario, tipo) VALUES
-('MO-001', 'Servente', 'h', 15.50, 'mo'),
-('MO-002', 'Pedreiro', 'h', 22.00, 'mo'),
-('MO-003', 'Carpinteiro', 'h', 22.00, 'mo'),
+('01270.0.45.1', 'Servente', 'h', 15.50, 'mo'),
+('01270.0.4', 'Pedreiro', 'h', 22.00, 'mo'),
+('01270.0.19.1', 'Carpinteiro', 'h', 22.00, 'mo'),
+('012700.1-11', 'Ajudante de carpinteiro', 'h', 18.00, 'mo'),
 ('MAT-001', 'Cimento Portland CP II-32', 'kg', 0.85, 'mat'),
 ('MAT-002', 'Areia média lavada', 'm3', 120.00, 'mat'),
 ('MAT-003', 'Prego 15x15 com cabeça', 'kg', 18.50, 'mat'),
