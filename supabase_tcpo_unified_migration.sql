@@ -154,6 +154,9 @@ INSERT INTO tcpo_insumos (id, descricao, unidade, preco_unitario, tipo) VALUES
 ('09706.1.1.1', 'Mão-de-obra empreitada para assentamento de azulejos', 'm²', 30.00, 'mo'),
 ('09310.3.14.28', 'Revestimento cerâmico esmaltado liso (200x200mm)', 'm²', 55.00, 'mat'),
 ('01270.0.40.1', 'Pedreiro (especializado)', 'h', 22.00, 'mo'),
+('02060.3.3.1', 'Pedra britada 1', 'm³', 120.00, 'mat'),
+('02060.3.3.2', 'Pedra britada 2', 'm³', 120.00, 'mat'),
+('22300.9.2.5', 'Betoneira elétrica 2HP', 'h prod.', 5.00, 'eq'),
 ('04060.8.1.14', 'Argamassa de cal hidratada e areia sem peneirar traço 1:2', 'm³', 380.00, 'mat'),
 ('04060.8.1.15', 'Argamassa de cal hidratada e areia sem peneirar traço 1:3', 'm³', 380.00, 'mat'),
 ('04060.8.1.17', 'Argamassa de cal hidratada e areia peneirada traço 1:2', 'm³', 400.00, 'mat'),
@@ -972,12 +975,13 @@ VALUES
 -- 03320.8.1.2 - CONCRETO NÃO-ESTRUTURAL PREPARO COM BETONEIRA
 ('03320.8.1.2', '03.320', 'CONCRETO NÃO-ESTRUTURAL, preparo com betoneira', 'm³', 0, 0, 0, 25,
 '[
-  {"insumo": "Servente", "codigo": "01270.0.45.1", "un": "h", "coef": 6.00, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Areia lavada tipo média", "codigo": "02060.3.2.2", "un": "m³", "coef": 0.677, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Pedra britada 1", "codigo": "02060.3.3.1", "un": "m³", "coef": 0.263, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Pedra britada 2", "codigo": "02060.3.3.2", "un": "m³", "coef": 0.615, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Cimento Portland CP II-E-32", "codigo": "02065.3.5.1", "un": "kg", "coef": 220.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Betoneira elétrica 2HP", "codigo": "22300.9.2.5", "un": "h prod.", "coef": 0.3060, "p_unit": 0, "p_total": 0, "tipo": "eq"}
+  {"insumo": "Pedreiro", "codigo": "01270.0.40.1", "un": "h", "coef": 1.18, "p_unit": 0, "p_total": 0, "tipo": "mo"},
+  {"insumo": "Servente", "codigo": "01270.0.45.1", "un": "h", "coef": 4.54, "p_unit": 0, "p_total": 0, "tipo": "mo"},
+  {"insumo": "Areia lavada tipo média", "codigo": "02060.3.2.2", "un": "m³", "coef": 0.02766, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Pedra britada 1", "codigo": "02060.3.3.1", "un": "m³", "coef": 0.00627, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Pedra britada 2", "codigo": "02060.3.3.2", "un": "m³", "coef": 0.01881, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Cimento Portland CP II-E-32 (resistência: 32,00 MPa)", "codigo": "02065.3.5.1", "un": "kg", "coef": 8.43, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Betoneira, elétrica, potência 2 HP (1,5 kW), capacidade 400 l - vida útil 10.000 h", "codigo": "22300.9.2.5", "un": "h prod.", "coef": 0.00918, "p_unit": 0, "p_total": 0, "tipo": "eq"}
 ]'),
 
 -- 03350.8.1.1 - ADENSAMENTO E REGULARIZAÇÃO DE SUPERFÍCIE
@@ -2320,8 +2324,8 @@ VALUES
 '[
   {"insumo": "Ajudante de encanador", "codigo": "01270.0.1.14", "un": "h", "coef": 2.00, "p_unit": 0, "p_total": 0, "tipo": "mo"},
   {"insumo": "Eletricista", "codigo": "01270.0.22.1", "un": "h", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Caixa de ligação de PVC para eletroduto flexível corrugado de embutir 4\\"x4\\"", "codigo": "16132.3.14.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Eletroduto de PVC rígido de encaixe 3/4\\"", "codigo": "16132.8.10.2", "un": "m", "coef": 6.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Caixa de ligação de PVC para eletroduto flexível corrugado de embutir 4x4", "codigo": "16132.3.14.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Eletroduto de PVC rígido de encaixe 3/4", "codigo": "16132.8.10.2", "un": "m", "coef": 6.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
   {"insumo": "Placa (espelho) para caixa 4x4", "codigo": "16140.3.1.3", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
@@ -2330,8 +2334,8 @@ VALUES
 '[
   {"insumo": "Ajudante de eletricista", "codigo": "01270.0.1.13", "un": "h", "coef": 2.50, "p_unit": 0, "p_total": 0, "tipo": "mo"},
   {"insumo": "Eletricista", "codigo": "01270.0.22.1", "un": "h", "coef": 2.50, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Caixa de ligação de PVC para eletroduto flexível corrugado de embutir 4\\"x4\\"", "codigo": "16132.3.14.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
-  {"insumo": "Eletroduto de PVC flexível corrugado 3/4\\"", "codigo": "16132.8.3.2", "un": "m", "coef": 10.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Caixa de ligação de PVC para eletroduto flexível corrugado de embutir 4x4", "codigo": "16132.3.14.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
+  {"insumo": "Eletroduto de PVC flexível corrugado 3/4", "codigo": "16132.8.3.2", "un": "m", "coef": 10.00, "p_unit": 0, "p_total": 0, "tipo": "mat"},
   {"insumo": "Placa (espelho) para caixa 4x4", "codigo": "16140.3.1.3", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
@@ -2447,28 +2451,28 @@ VALUES
   {"insumo": "Interruptor e tomada de embutir duas teclas paralelo e 1 tomada", "codigo": "16143.3.2.32", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
--- 16143.8.5.1 - PLACA (ESPELHO) 3"x3"
+-- 16143.8.5.1 - PLACA (ESPELHO) 3x3
 ('16143.8.5.1', '16.143', 'PLACA (ESPELHO) PARA CAIXA - tamanho 3" x 3"', 'un', 0, 0, 0, 25,
 '[
   {"insumo": "Ajudante de eletricista", "codigo": "01270.0.1.13", "un": "h", "coef": 0.05, "p_unit": 0, "p_total": 0, "tipo": "mo"},
   {"insumo": "Eletricista", "codigo": "01270.0.22.1", "un": "h", "coef": 0.05, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Placa (espelho) para caixa 3\\"x3\\"", "codigo": "16143.3.1.1", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
+  {"insumo": "Placa (espelho) para caixa 3x3", "codigo": "16143.3.1.1", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
--- 16143.8.5.2 - PLACA (ESPELHO) 4"x2"
+-- 16143.8.5.2 - PLACA (ESPELHO) 4x2
 ('16143.8.5.2', '16.143', 'PLACA (ESPELHO) PARA CAIXA - tamanho 4" x 2"', 'un', 0, 0, 0, 25,
 '[
   {"insumo": "Ajudante de eletricista", "codigo": "01270.0.1.13", "un": "h", "coef": 0.05, "p_unit": 0, "p_total": 0, "tipo": "mo"},
   {"insumo": "Eletricista", "codigo": "01270.0.22.1", "un": "h", "coef": 0.05, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Placa (espelho) para caixa 4\\"x2\\"", "codigo": "16143.3.1.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
+  {"insumo": "Placa (espelho) para caixa 4x2", "codigo": "16143.3.1.2", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
--- 16143.8.5.3 - PLACA (ESPELHO) 4"x4"
+-- 16143.8.5.3 - PLACA (ESPELHO) 4x4
 ('16143.8.5.3', '16.143', 'PLACA (ESPELHO) PARA CAIXA - tamanho 4" x 4"', 'un', 0, 0, 0, 25,
 '[
   {"insumo": "Ajudante de eletricista", "codigo": "01270.0.1.13", "un": "h", "coef": 0.06, "p_unit": 0, "p_total": 0, "tipo": "mo"},
   {"insumo": "Eletricista", "codigo": "01270.0.22.1", "un": "h", "coef": 0.06, "p_unit": 0, "p_total": 0, "tipo": "mo"},
-  {"insumo": "Placa (espelho) para caixa 4\\"x4\\"", "codigo": "16143.3.1.3", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
+  {"insumo": "Placa (espelho) para caixa 4x4", "codigo": "16143.3.1.3", "un": "un", "coef": 1.00, "p_unit": 0, "p_total": 0, "tipo": "mat"}
 ]'),
 
 -- 16143.8.6.1 - TOMADA 2P+T 20A
@@ -2515,19 +2519,19 @@ ON CONFLICT (id) DO UPDATE SET
   composicao = EXCLUDED.composicao;
 
 -- 3. Handle Foreign Key Constraints and Cleanup
--- First, update references in orcamento_itens to the new IDs (without prefix)
--- We assume the mapping is simply removing 'TCPO08-'
+-- First, update references in orcamento_itens to the new IDs (without prefix) where a replacement exists
 UPDATE orcamento_itens
 SET tcpo_id = REPLACE(tcpo_id, 'TCPO08-', '')
 WHERE tcpo_id LIKE 'TCPO08-%'
 AND EXISTS (SELECT 1 FROM tcpo_itens WHERE id = REPLACE(orcamento_itens.tcpo_id, 'TCPO08-', ''));
 
--- Now we can safely delete the old records that were replaced by the new ones
-DELETE FROM tcpo_itens 
-WHERE id LIKE 'TCPO08-%'
-AND EXISTS (SELECT 1 FROM tcpo_itens t2 WHERE t2.id = REPLACE(tcpo_itens.id, 'TCPO08-', ''));
+-- For items that don't have a direct replacement, set tcpo_id to NULL 
+-- so we can safely delete the old catalog items without breaking the budget records.
+-- The budget items will still keep their custom descriptions and costs.
+UPDATE orcamento_itens
+SET tcpo_id = NULL
+WHERE tcpo_id LIKE 'TCPO08-%';
 
--- For any remaining TCPO08- that didn't have a direct replacement in the INSERT above, 
--- we can try to rename them if they are not referenced, or just leave them.
--- But the best is to rename them if possible.
--- To rename a PK that is referenced, we'd need CASCADE or the insert-update-delete dance.
+-- Now delete ALL records with the TCPO08- prefix.
+DELETE FROM tcpo_itens 
+WHERE id LIKE 'TCPO08-%';
