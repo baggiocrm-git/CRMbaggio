@@ -330,13 +330,13 @@ export default function EditBudgetPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                    <th className="px-6 py-4 w-24">Código</th>
-                    <th className="px-6 py-4">Discriminação dos Serviços</th>
-                    <th className="px-6 py-4 w-20">Unid.</th>
-                    <th className="px-6 py-4 w-24">Quant.</th>
-                    <th className="px-6 py-4 w-32">Preço Unit.</th>
-                    <th className="px-6 py-4 w-32 text-right">Subtotal</th>
-                    <th className="px-6 py-4 w-24"></th>
+                    <th className="px-4 py-4 w-20">Código</th>
+                    <th className="px-4 py-4">Discriminação dos Serviços</th>
+                    <th className="px-2 py-4 w-16 text-center">Unid.</th>
+                    <th className="px-2 py-4 w-20 text-center">Quant.</th>
+                    <th className="px-2 py-4 w-28 text-right">Preço Unit.</th>
+                    <th className="px-2 py-4 w-28 text-right">Subtotal</th>
+                    <th className="px-4 py-4 w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -347,42 +347,42 @@ export default function EditBudgetPage() {
                     
                     return (
                       <React.Fragment key={idx}>
-                        <tr 
-                          className={`hover:bg-[#0a0a0a] transition-colors group cursor-pointer ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
-                          onClick={() => toggleExpand(idx)}
-                        >
-                          <td className="px-6 py-4">
-                            <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
-                          </td>
-                          <td className="px-6 py-4 min-w-[200px]">
-                            <input 
-                              type="text" 
-                              value={item.descricao_personalizada}
-                              onChange={(e) => updateItem(idx, { descricao_personalizada: e.target.value })}
-                              onClick={(e) => e.stopPropagation()}
-                              className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
-                          </td>
-                          <td className="px-6 py-4">
-                            <input 
-                              type="number" 
-                              value={item.quantidade}
-                              onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
-                            />
-                          </td>
-                          <td className="px-6 py-4">
-                            <p className="text-xs font-bold text-white">{formatCurrency(unitTotal * (1 + (item.bdi || 0) / 100))}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
-                          </td>
-                          <td className="px-6 py-4 text-right">
-                            <div className="flex items-center justify-end gap-2">
+                          <tr 
+                            className={`hover:bg-[#0a0a0a] transition-colors group cursor-pointer ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
+                            onClick={() => toggleExpand(idx)}
+                          >
+                            <td className="px-4 py-4">
+                              <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
+                            </td>
+                            <td className="px-4 py-4 min-w-[200px]">
+                              <input 
+                                type="text" 
+                                value={item.descricao_personalizada}
+                                onChange={(e) => updateItem(idx, { descricao_personalizada: e.target.value })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
+                              />
+                            </td>
+                            <td className="px-2 py-4 text-center">
+                              <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
+                            </td>
+                            <td className="px-2 py-4">
+                              <input 
+                                type="number" 
+                                value={item.quantidade}
+                                onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
+                              />
+                            </td>
+                            <td className="px-2 py-4 text-right">
+                              <p className="text-xs font-bold text-white">{formatCurrency(unitTotal * (1 + (item.bdi || 0) / 100))}</p>
+                            </td>
+                            <td className="px-2 py-4 text-right">
+                              <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
+                            </td>
+                            <td className="px-4 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2">
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();

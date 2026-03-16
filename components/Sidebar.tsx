@@ -49,7 +49,6 @@ const navItems: NavGroup[] = [
   { group: 'FINANCEIRO', items: [
     { name: 'Dashboard', icon: BarChart3, href: '/finances' },
     { name: 'DRE', icon: PieChart, href: '/finances/dre' },
-    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
     { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
   ]},
   { group: 'FISCAL', items: [
@@ -58,6 +57,8 @@ const navItems: NavGroup[] = [
   ]},
   { group: 'OUTROS', items: [
     { name: 'Projetos', icon: Briefcase, href: '/projects' },
+    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
+    { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
     { name: 'Equipe', icon: Users, href: '/staff' },
     { name: 'Contatos', icon: Contact, href: '/contacts' },
     { name: 'Configurações', icon: Settings, href: '/settings' },

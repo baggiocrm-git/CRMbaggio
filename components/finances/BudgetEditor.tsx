@@ -357,8 +357,8 @@ export default function BudgetEditor({ budgetId }: BudgetEditorProps) {
                       {/* Items Table */}
                       <div className="space-y-2">
                         {stageItems.map((item) => (
-                          <div key={item.id} className="grid grid-cols-12 gap-3 items-center bg-[#0a0a0a] p-3 rounded-2xl border border-slate-800/30 group">
-                            <div className="col-span-5">
+                          <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-[#0a0a0a] p-3 rounded-2xl border border-slate-800/30 group">
+                            <div className="col-span-7">
                               <input 
                                 type="text" 
                                 value={item.descricao}
@@ -384,7 +384,7 @@ export default function BudgetEditor({ budgetId }: BudgetEditorProps) {
                                 className="w-full bg-transparent border-none text-xs font-black text-white text-center outline-none"
                               />
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-1">
                               <CurrencyInput
                                 prefix="R$ "
                                 decimalSeparator=","
@@ -394,7 +394,7 @@ export default function BudgetEditor({ budgetId }: BudgetEditorProps) {
                                 className="w-full bg-transparent border-none text-xs font-black text-[#d4ff3f] text-right outline-none"
                               />
                             </div>
-                            <div className="col-span-2 text-right">
+                            <div className="col-span-1 text-right">
                               <p className="text-xs font-black text-white">{formatCurrencyValue(item.total)}</p>
                             </div>
                             <div className="col-span-1 text-right">
