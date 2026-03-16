@@ -393,12 +393,12 @@ export default function InsumosPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4">Código</th>
-                <th className="px-6 py-4">Descrição do Insumo</th>
-                <th className="px-6 py-4 text-center">Unid.</th>
-                <th className="px-6 py-4 text-center">Tipo</th>
-                <th className="px-6 py-4 text-right">Preço Unitário</th>
-                <th className="px-6 py-4"></th>
+                <th className="px-6 py-2">Código</th>
+                <th className="px-6 py-2">Descrição do Insumo</th>
+                <th className="px-6 py-2 text-center">Unid.</th>
+                <th className="px-6 py-2 text-center">Tipo</th>
+                <th className="px-6 py-2 text-right">Preço Unitário</th>
+                <th className="px-6 py-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
@@ -418,21 +418,21 @@ export default function InsumosPage() {
               ) : (
                 filteredInsumos.map((insumo) => (
                   <tr key={insumo.id} className="hover:bg-[#0a0a0a] transition-colors group">
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-1.5">
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{insumo.id}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-1.5">
                       <p className="text-sm font-bold text-white">{insumo.descricao}</p>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-1.5 text-center">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{insumo.unidade}</span>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-1.5 text-center">
                       <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${getTypeColor(insumo.tipo)}`}>
                         {getTypeName(insumo.tipo)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-1.5 text-right">
                       <div className="flex justify-end">
                         <CurrencyInput
                           prefix="R$ "
@@ -440,14 +440,14 @@ export default function InsumosPage() {
                           groupSeparator="."
                           value={insumo.preco_unitario}
                           onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, values?.float || 0)}
-                          className="w-32 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1.5 text-xs font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                          className="w-32 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-xs font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-1.5 text-right">
                       <button 
                         onClick={() => handleDeleteInsumo(insumo.id)}
-                        className="p-2 text-slate-500 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-1 text-slate-500 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
                       >
                         <Trash2 size={16} />
                       </button>

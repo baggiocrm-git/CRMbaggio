@@ -78,7 +78,14 @@ export default function EditBudgetPage() {
           .order('ordem');
         
         if (itemsError) throw itemsError;
-        setItems(budgetItems || []);
+
+        // Heurística para corrigir BDIs que foram salvos multiplicados por 100 erroneamente
+        const correctedItems = (budgetItems || []).map(item => ({
+          ...item,
+          bdi: item.bdi > 100 ? item.bdi / 100 : item.bdi
+        }));
+
+        setItems(correctedItems);
       } catch (error) {
         console.error('Error fetching budget for edit:', error);
         alert('Erro ao carregar orçamento.');
@@ -334,6 +341,7 @@ export default function EditBudgetPage() {
                     <th className="px-4 py-4">Discriminação dos Serviços</th>
                     <th className="px-2 py-4 w-16 text-center">Unid.</th>
                     <th className="px-2 py-4 w-20 text-center">Quant.</th>
+                    <th className="px-2 py-4 w-20 text-center">BDI (%)</th>
                     <th className="px-2 py-4 w-28 text-right">Preço Unit.</th>
                     <th className="px-2 py-4 w-28 text-right">Subtotal</th>
                     <th className="px-4 py-4 w-16"></th>
@@ -372,7 +380,16 @@ export default function EditBudgetPage() {
                                 value={item.quantidade}
                                 onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
                                 onClick={(e) => e.stopPropagation()}
-                                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none"
+                                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+                              />
+                            </td>
+                            <td className="px-2 py-4">
+                              <input 
+                                type="number" 
+                                value={item.bdi}
+                                onChange={(e) => updateItem(idx, { bdi: Number(e.target.value) })}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                               />
                             </td>
                             <td className="px-2 py-4 text-right">

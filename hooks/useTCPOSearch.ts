@@ -81,8 +81,8 @@ export function useOrcamento() {
       custo_unit_mo: tcpoItem.custo_mo,
       custo_unit_mat: tcpoItem.custo_mat,
       custo_unit_eq: tcpoItem.custo_eq,
-      // Converte 0.30 para 30 para exibição na UI
-      bdi: (tcpoItem.bdi_padrao || 0) * 100,
+      // BDI padrão já vem em porcentagem (ex: 25)
+      bdi: tcpoItem.bdi_padrao || 0,
       ordem: items.length,
       composicao: tcpoItem.composicao || []
     };

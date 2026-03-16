@@ -52,6 +52,7 @@ export default function StaffPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [formData, setFormData] = useState({
@@ -87,6 +88,8 @@ export default function StaffPage() {
     setIsMounted(true);
     fetchData();
   }, [fetchData]);
+
+  if (!isMounted) return null;
 
   const stats = [
     { label: 'Total de Equipe Ativa', value: staffList.filter(s => s.status === 'Ativo').length.toString(), change: '+4 este mês', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
