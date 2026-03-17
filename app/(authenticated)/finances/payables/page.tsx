@@ -558,7 +558,7 @@ export default function PayablesPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('fornecedor')}>
+                <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors min-w-[200px]" onClick={() => handleSort('fornecedor')}>
                   <div className="flex items-center gap-2">
                     Fornecedor
                     {sortConfig.key === 'fornecedor' ? (
@@ -566,7 +566,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors min-w-[250px]" onClick={() => handleSort('descricao')}>
                   <div className="flex items-center gap-2">
                     Descrição
                     {sortConfig.key === 'descricao' ? (
@@ -574,7 +574,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('data_vencimento')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-24" onClick={() => handleSort('data_vencimento')}>
                   <div className="flex items-center gap-2">
                     Vencimento
                     {sortConfig.key === 'data_vencimento' ? (
@@ -582,7 +582,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('data_pagamento')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-24" onClick={() => handleSort('data_pagamento')}>
                   <div className="flex items-center gap-2">
                     Pagamento
                     {sortConfig.key === 'data_pagamento' ? (
@@ -590,7 +590,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('valor')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-28" onClick={() => handleSort('valor')}>
                   <div className="flex items-center gap-2">
                     Valor
                     {sortConfig.key === 'valor' ? (
@@ -598,7 +598,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('valor_pago')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-28" onClick={() => handleSort('valor_pago')}>
                   <div className="flex items-center gap-2">
                     Pago
                     {sortConfig.key === 'valor_pago' ? (
@@ -606,7 +606,7 @@ export default function PayablesPage() {
                     ) : <ArrowUpDown size={12} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('situacao')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-32" onClick={() => handleSort('situacao')}>
                   <div className="flex items-center gap-2">
                     Situação
                     {sortConfig.key === 'situacao' ? (
@@ -633,28 +633,28 @@ export default function PayablesPage() {
                 </tr>
               ) : (
                 currentItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-[#0a0a0a] transition-colors group">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-white">{item.fornecedor}</p>
+                  <tr key={item.id} className="hover:bg-[#0a0a0a] transition-colors group text-[11px]">
+                    <td className="px-4 py-4">
+                      <p className="font-bold text-white leading-tight">{item.fornecedor}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-slate-400">{item.descricao}</p>
+                    <td className="px-4 py-4">
+                      <p className="text-slate-400 leading-tight">{item.descricao}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-slate-500">{formatDate(item.data_vencimento)}</p>
+                    <td className="px-2 py-4">
+                      <p className="text-slate-500">{formatDate(item.data_vencimento)}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-slate-500">{formatDate(item.data_pagamento)}</p>
+                    <td className="px-2 py-4">
+                      <p className="text-slate-500">{formatDate(item.data_pagamento)}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-black text-white">{formatCurrency(item.valor)}</p>
+                    <td className="px-2 py-4">
+                      <p className="font-black text-white">{formatCurrency(item.valor)}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-emerald-500">{formatCurrency(item.valor_pago)}</p>
+                    <td className="px-2 py-4">
+                      <p className="font-bold text-emerald-500">{formatCurrency(item.valor_pago)}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-2 py-4">
                       <span className={cn(
-                        "inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                        "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest",
                         item.situacao === 'Pago' ? "bg-emerald-500/10 text-emerald-500" : 
                         item.situacao === 'Aberto' ? "bg-orange-500/10 text-orange-500" : 
                         "bg-blue-500/10 text-blue-500"

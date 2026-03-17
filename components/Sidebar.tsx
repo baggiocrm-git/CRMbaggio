@@ -46,19 +46,21 @@ const navItems: NavGroup[] = [
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
+  { group: 'ENGENHARIA', items: [
+    { name: 'Projetos', icon: Briefcase, href: '/projects' },
+    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
+    { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
+    { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
+  ]},
   { group: 'FINANCEIRO', items: [
     { name: 'Dashboard', icon: BarChart3, href: '/finances' },
     { name: 'DRE', icon: PieChart, href: '/finances/dre' },
-    { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
   ]},
   { group: 'FISCAL', items: [
     { name: 'Impostos', icon: Percent, href: '/finances/taxes' },
     { name: 'Obrigações', icon: ClipboardList, href: '/finances/obligations' },
   ]},
   { group: 'OUTROS', items: [
-    { name: 'Projetos', icon: Briefcase, href: '/projects' },
-    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
-    { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
     { name: 'Equipe', icon: Users, href: '/staff' },
     { name: 'Contatos', icon: Contact, href: '/contacts' },
     { name: 'Configurações', icon: Settings, href: '/settings' },

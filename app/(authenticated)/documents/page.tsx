@@ -96,8 +96,6 @@ export default function DocumentManagementPage() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isFolderModalOpen, setIsFolderModalOpen] = useState(false);
   const [isDocRenameModalOpen, setIsDocRenameModalOpen] = useState(false);
-  const [isViewerOpen, setIsViewerOpen] = useState(false);
-  const [selectedDoc, setSelectedDoc] = useState<Document | null>(null);
   const [docRenameForm, setDocRenameForm] = useState({ id: '', nome: '' });
   const [isMoveModalOpen, setIsMoveModalOpen] = useState(false);
   const [docToMove, setDocToMove] = useState<Document | null>(null);
@@ -454,8 +452,8 @@ export default function DocumentManagementPage() {
   };
 
   const handleViewDocument = (doc: Document) => {
-    setSelectedDoc(doc);
-    setIsViewerOpen(true);
+    const url = getFileUrl(doc.file_path);
+    window.open(url, '_blank');
   };
 
   const getFileUrl = (path: string) => {
@@ -768,85 +766,6 @@ export default function DocumentManagementPage() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Document Viewer Modal */}
-        {isViewerOpen && selectedDoc && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsViewerOpen(false)}
-              className="absolute inset-0 bg-black/90 backdrop-blur-md"
-            />
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="relative w-full max-w-5xl h-[85vh] bg-[#1a1a1a] border border-slate-800 rounded-[32px] overflow-hidden shadow-2xl flex flex-col"
-            >
-              <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-[#0a0a0a]/50">
-                <div className="flex items-center gap-4">
-                  <div className="size-10 rounded-xl bg-[#1a1a1a] border border-slate-800 flex items-center justify-center text-[#d4ff3f]">
-                    <FileText size={20} />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-black text-white uppercase tracking-tight">{selectedDoc.nome}</h2>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{selectedDoc.Categoria} • {selectedDoc.tamanho_arquivo}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <a 
-                    href={getFileUrl(selectedDoc.file_path)} 
-                    download={selectedDoc.nome}
-                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all"
-                    title="Download"
-                  >
-                    <Download size={18} />
-                  </a>
-                  <button 
-                    onClick={() => setIsViewerOpen(false)}
-                    className="p-3 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white transition-all"
-                  >
-                    <Plus size={18} className="rotate-45" />
-                  </button>
-                </div>
-              </div>
-              
-              <div className="flex-1 bg-white/5 relative">
-                {selectedDoc.tipo_arquivo.includes('image') ? (
-                  <div className="absolute inset-0 flex items-center justify-center p-8">
-                    <Image 
-                      src={getFileUrl(selectedDoc.file_path)} 
-                      alt={selectedDoc.nome}
-                      fill
-                      className="object-contain p-8"
-                      referrerPolicy="no-referrer"
-                    />
-                  </div>
-                ) : selectedDoc.tipo_arquivo.includes('pdf') ? (
-                  <iframe 
-                    src={`${getFileUrl(selectedDoc.file_path)}#toolbar=0`}
-                    className="w-full h-full border-none"
-                    title={selectedDoc.nome}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-slate-500">
-                    <AlertCircle size={48} strokeWidth={1} />
-                    <p className="text-sm font-bold">Visualização não disponível para este tipo de arquivo.</p>
-                    <a 
-                      href={getFileUrl(selectedDoc.file_path)} 
-                      download
-                      className="text-[#d4ff3f] text-xs font-black uppercase tracking-widest hover:underline"
-                    >
-                      Baixar para visualizar
-                    </a>
-                  </div>
-                )}
-              </div>
             </motion.div>
           </div>
         )}
