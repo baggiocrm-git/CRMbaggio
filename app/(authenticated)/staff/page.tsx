@@ -7,18 +7,27 @@ import Image from 'next/image';
 import { 
   Users, 
   FileText, 
-  ShieldCheck, 
-  Download, 
   CheckCircle2,
   Circle,
-  Info,
-  HardHat,
   Loader2,
   X,
-  Trash2,
-  Edit2
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+
+interface Curso {
+  id: string;
+  nome: string;
+  duracao: string;
+  validade: string;
+}
+
+interface DocumentoAnexo {
+  id: string;
+  nome: string;
+  url: string;
+  tipo: string;
+}
 
 interface StaffMember {
   id: string;
@@ -28,29 +37,13 @@ interface StaffMember {
   departamento: string;
   status: 'Ativo' | 'Em Licença' | 'Inativo';
   url_imagem: string;
+  cursos?: Curso[];
+  documentos_anexos?: DocumentoAnexo[];
   created_at: string;
 }
-
-interface Document {
-  id: string;
-  nome: string;
-  tipo_arquivo: string;
-  tamanho_arquivo: string;
-  nome_icone: string;
-  classe_cor: string;
-  classe_fundo: string;
-  created_at: string;
-}
-
-const iconMap: Record<string, React.ElementType> = {
-  FileText,
-  ShieldCheck,
-  HardHat,
-};
 
 export default function StaffPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,21 +55,20 @@ export default function StaffPage() {
     departamento: '',
     status: 'Ativo' as StaffMember['status'],
     url_imagem: '',
+    cursos: [] as Curso[],
+    documentos_anexos: [] as DocumentoAnexo[],
   });
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [staffRes, docsRes] = await Promise.all([
-        supabase.from('equipe').select('*').order('created_at', { ascending: false }),
-        supabase.from('documentos').select('*').order('created_at', { ascending: false })
-      ]);
+      const { data: staffData, error: staffError } = await supabase
+        .from('equipe')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (staffRes.error) throw staffRes.error;
-      if (docsRes.error) throw docsRes.error;
-
-      setStaffList(staffRes.data || []);
-      setDocuments(docsRes.data || []);
+      if (staffError) throw staffError;
+      setStaffList(staffData || []);
     } catch (error) {
       console.error('Erro ao buscar dados da equipe:', error instanceof Error ? error.message : String(error));
     } finally {
@@ -94,7 +86,7 @@ export default function StaffPage() {
   const stats = [
     { label: 'Total de Equipe Ativa', value: staffList.filter(s => s.status === 'Ativo').length.toString(), change: '+4 este mês', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
     { label: 'Contratos Pendentes', value: '12', change: 'Revisão necessária', icon: FileText, color: 'text-orange-500', bg: 'bg-orange-500/10' },
-    { label: 'Certificações de Segurança', value: '89%', change: '8 expirando', icon: ShieldCheck, color: 'text-red-500', bg: 'bg-red-500/10' },
+    { label: 'Certificações de Segurança', value: '89%', change: '8 expirando', icon: CheckCircle2, color: 'text-red-500', bg: 'bg-red-500/10' },
   ];
 
   const handleOpenModal = (member?: StaffMember) => {
@@ -107,6 +99,8 @@ export default function StaffPage() {
         departamento: member.departamento,
         status: member.status,
         url_imagem: member.url_imagem || '',
+        cursos: member.cursos || [],
+        documentos_anexos: member.documentos_anexos || [],
       });
     } else {
       setEditingMember(null);
@@ -117,6 +111,8 @@ export default function StaffPage() {
         departamento: '',
         status: 'Ativo',
         url_imagem: '',
+        cursos: [],
+        documentos_anexos: [],
       });
     }
     setIsModalOpen(true);
@@ -165,11 +161,32 @@ export default function StaffPage() {
       }
     }
   };
+  const getCourseStatus = (cursos?: Curso[]) => {
+    if (!cursos || cursos.length === 0) return { label: 'Sem Cursos', color: 'text-slate-500', bg: 'bg-slate-500/10' };
+    
+    const now = new Date();
+    let mostUrgentDays = Infinity;
+    
+    cursos.forEach(curso => {
+      const expiry = new Date(curso.validade);
+      const diffTime = expiry.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      if (diffDays < mostUrgentDays) mostUrgentDays = diffDays;
+    });
+
+    if (mostUrgentDays <= 5) return { label: 'Vencimento Crítico (5d)', color: 'text-red-600', bg: 'bg-red-600/10' };
+    if (mostUrgentDays <= 15) return { label: 'Vencimento Próximo (15d)', color: 'text-red-500', bg: 'bg-red-500/10' };
+    if (mostUrgentDays <= 30) return { label: 'Atenção (30d)', color: 'text-orange-500', bg: 'bg-orange-500/10' };
+    if (mostUrgentDays <= 45) return { label: 'Aviso (45d)', color: 'text-amber-500', bg: 'bg-amber-500/10' };
+    
+    return { label: 'Cursos em Dia', color: 'text-[#d4ff3f]', bg: 'bg-[#d4ff3f]/10' };
+  };
+
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
-        title="Gestão de Equipe e Documentos" 
-        subtitle="Controle centralizado para pessoal de engenharia e registros de conformidade."
+        title="R.H." 
+        subtitle="Gestão centralizada de pessoal, cursos e conformidade."
         action={{ label: 'Novo Membro', onClick: () => handleOpenModal() }}
       />
 
@@ -198,9 +215,9 @@ export default function StaffPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 gap-8">
           {/* Staff Directory */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
             <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
               <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
                 <h3 className="font-black text-lg tracking-tight">Diretório de Equipe</h3>
@@ -214,16 +231,15 @@ export default function StaffPage() {
                   <thead className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest">
                     <tr>
                       <th className="px-6 py-4">Funcionário</th>
-                      <th className="px-6 py-4">Cargo e Departamento</th>
+                      <th className="px-6 py-4">Cargo</th>
                       <th className="px-6 py-4">Status</th>
                       <th className="px-6 py-4">Docs</th>
-                      <th className="px-6 py-4"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
                     {isLoading ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center">
+                        <td colSpan={4} className="px-6 py-12 text-center">
                           <div className="flex flex-col items-center gap-3">
                             <Loader2 size={24} className="text-[#d4ff3f] animate-spin" />
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando equipe...</p>
@@ -231,112 +247,62 @@ export default function StaffPage() {
                         </td>
                       </tr>
                     ) : (
-                      staffList.map((person) => (
-                        <tr key={person.id} className="hover:bg-[#2a2a2a]/30 transition-colors group">
-                          <td className="px-6 py-5">
-                            <div className="flex items-center gap-4">
-                              <div className="size-10 rounded-full bg-slate-800 overflow-hidden border-2 border-slate-700 shadow-sm relative">
-                                <Image src={person.url_imagem || `https://picsum.photos/seed/${person.id}/100/100`} alt={person.nome} fill className="object-cover" referrerPolicy="no-referrer" />
+                      staffList.map((person) => {
+                        const courseStatus = getCourseStatus(person.cursos);
+                        return (
+                          <tr 
+                            key={person.id} 
+                            onClick={() => handleOpenModal(person)}
+                            className="hover:bg-[#2a2a2a]/30 transition-colors group cursor-pointer"
+                          >
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-4">
+                                <div className="size-10 rounded-full bg-slate-800 overflow-hidden border-2 border-slate-700 shadow-sm relative">
+                                  <Image src={person.url_imagem || `https://picsum.photos/seed/${person.id}/100/100`} alt={person.nome} fill className="object-cover" referrerPolicy="no-referrer" />
+                                </div>
+                                <div>
+                                  <p className="font-black text-sm">{person.nome}</p>
+                                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Func #{person.id_funcionario}</p>
+                                </div>
                               </div>
-                              <div>
-                                <p className="font-black text-sm">{person.nome}</p>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Func #{person.id_funcionario}</p>
+                            </td>
+                            <td className="px-6 py-5">
+                              <p className="text-sm font-black tracking-tight">{person.cargo}</p>
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{person.departamento}</p>
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="flex flex-col gap-1">
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit ${
+                                  person.status === 'Ativo' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-orange-500/10 text-orange-500'
+                                }`}>
+                                  {person.status}
+                                </span>
+                                <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit ${courseStatus.bg} ${courseStatus.color}`}>
+                                  {courseStatus.label}
+                                </span>
                               </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-5">
-                            <p className="text-sm font-black tracking-tight">{person.cargo}</p>
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{person.departamento}</p>
-                          </td>
-                          <td className="px-6 py-5">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest ${
-                              person.status === 'Ativo' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-orange-500/10 text-orange-500'
-                            }`}>
-                              {person.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-5">
-                            <div className="flex gap-1.5">
-                              {[true, true, false].map((done, i) => (
-                                done 
-                                  ? <CheckCircle2 key={i} size={16} className="text-[#d4ff3f]" />
-                                  : <Circle key={i} size={16} className="text-slate-700" />
-                              ))}
-                            </div>
-                          </td>
-                          <td className="px-6 py-5 text-right">
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button onClick={() => handleOpenModal(person)} className="p-1 hover:text-[#d4ff3f] transition-colors">
-                                <Edit2 size={16} />
-                              </button>
-                              <button onClick={() => handleDelete(person.id)} className="p-1 hover:text-rose-500 transition-colors">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                            </td>
+                            <td className="px-6 py-5">
+                              <div className="flex gap-1.5">
+                                {(person.documentos_anexos || []).length > 0 ? (
+                                  <CheckCircle2 size={16} className="text-[#d4ff3f]" />
+                                ) : (
+                                  <Circle size={16} className="text-slate-700" />
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
               <div className="p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibindo {staffList.length > 0 ? 3 : 0} de {staffList.length} funcionários</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibindo {staffList.length} funcionários</span>
                 <div className="flex gap-2">
                   <button className="px-4 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:bg-[#2a2a2a] transition-all">Anterior</button>
                   <button className="px-4 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all">Próximo</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Document Vault Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-slate-800/50">
-                <h3 className="font-black text-lg tracking-tight">Cofre de Documentos</h3>
-              </div>
-              <div className="p-4 space-y-3">
-                {isLoading ? (
-                  <div className="py-8 flex justify-center">
-                    <Loader2 size={20} className="text-[#d4ff3f] animate-spin" />
-                  </div>
-                ) : (
-                  documents.map((doc) => {
-                    const Icon = iconMap[doc.nome_icone] || FileText;
-                    return (
-                      <div key={doc.id} className="p-4 border border-slate-800/30 rounded-2xl flex items-center gap-4 hover:border-[#d4ff3f]/30 transition-all cursor-pointer group bg-[#0a0a0a]">
-                        <div className={`size-10 bg-slate-800/50 text-slate-400 rounded-xl flex items-center justify-center group-hover:text-[#d4ff3f] transition-colors`}>
-                          <Icon size={20} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-black tracking-tight truncate">{doc.nome}</p>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                            {doc.tipo_arquivo} • {doc.tamanho_arquivo}
-                          </p>
-                        </div>
-                        <Download size={16} className="text-slate-500 group-hover:text-[#d4ff3f] transition-colors" />
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              <div className="p-4 border-t border-slate-800/50">
-                <button className="w-full py-3 bg-[#0a0a0a] text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-[#2a2a2a] transition-all border border-slate-800/50">
-                  Ver Todos os Documentos
-                </button>
-              </div>
-            </div>
-
-            <div className="bg-[#d4ff3f]/5 border border-[#d4ff3f]/20 p-6 rounded-3xl">
-              <div className="flex items-start gap-4">
-                <Info size={24} className="text-[#d4ff3f] flex-shrink-0" />
-                <div>
-                  <h4 className="font-black text-[10px] text-[#d4ff3f] uppercase tracking-widest mb-2">Próximas Renovações</h4>
-                  <p className="text-xs text-slate-400 font-bold leading-relaxed">
-                    Existem 8 certificações profissionais e 2 licenças de obra prestes a expirar nos próximos 30 dias.
-                  </p>
-                  <button className="text-[10px] font-black uppercase tracking-widest underline text-[#d4ff3f] mt-4">Ver Itens Expirando</button>
                 </div>
               </div>
             </div>
@@ -362,14 +328,26 @@ export default function StaffPage() {
             >
               <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
                 <h3 className="text-lg font-black tracking-tight">
-                  {editingMember ? 'Editar Membro' : 'Novo Membro'}
+                  {editingMember ? 'Ficha do Funcionário' : 'Novo Membro'}
                 </h3>
-                <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  {editingMember && (
+                    <button 
+                      type="button"
+                      onClick={() => handleDelete(editingMember.id)}
+                      className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
+                      title="Excluir Funcionário"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
+                  <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nome Completo</label>
@@ -427,29 +405,149 @@ export default function StaffPage() {
                       placeholder="ex: Divisão Estrutural"
                     />
                   </div>
-                  <div className="col-span-2">
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">URL da Imagem</label>
-                    <input 
-                      type="text" 
-                      value={formData.url_imagem}
-                      onChange={(e) => setFormData({...formData, url_imagem: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                      placeholder="https://picsum.photos/..."
-                    />
+                </div>
+
+                {/* Cursos Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">Cursos e Treinamentos</h4>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const newCurso: Curso = { id: Math.random().toString(36).substr(2, 9), nome: '', duracao: '', validade: '' };
+                        setFormData({ ...formData, cursos: [...formData.cursos, newCurso] });
+                      }}
+                      className="text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-all"
+                    >
+                      + Adicionar Curso
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {formData.cursos.map((curso, idx) => (
+                      <div key={curso.id} className="p-4 bg-[#0a0a0a] border border-slate-800 rounded-2xl space-y-3 relative group/curso">
+                        <button 
+                          type="button"
+                          onClick={() => setFormData({ ...formData, cursos: formData.cursos.filter(c => c.id !== curso.id) })}
+                          className="absolute top-2 right-2 p-1 text-slate-600 hover:text-rose-500 opacity-0 group-hover/curso:opacity-100 transition-all"
+                        >
+                          <X size={14} />
+                        </button>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="col-span-2">
+                            <label className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Nome do Curso</label>
+                            <input 
+                              type="text"
+                              value={curso.nome}
+                              onChange={(e) => {
+                                const newCursos = [...formData.cursos];
+                                newCursos[idx].nome = e.target.value;
+                                setFormData({ ...formData, cursos: newCursos });
+                              }}
+                              className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/50"
+                              placeholder="ex: NR-35 Trabalho em Altura"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Duração</label>
+                            <input 
+                              type="text"
+                              value={curso.duracao}
+                              onChange={(e) => {
+                                const newCursos = [...formData.cursos];
+                                newCursos[idx].duracao = e.target.value;
+                                setFormData({ ...formData, cursos: newCursos });
+                              }}
+                              className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/50"
+                              placeholder="ex: 8h"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Validade</label>
+                            <input 
+                              type="date"
+                              value={curso.validade}
+                              onChange={(e) => {
+                                const newCursos = [...formData.cursos];
+                                newCursos[idx].validade = e.target.value;
+                                setFormData({ ...formData, cursos: newCursos });
+                              }}
+                              className="w-full bg-[#1a1a1a] border border-slate-800 rounded-lg px-3 py-2 text-xs text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/50"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="pt-4 flex gap-3">
+                {/* Documentos Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">Documentos Anexos</h4>
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const newDoc: DocumentoAnexo = { id: Math.random().toString(36).substr(2, 9), nome: '', url: '', tipo: 'PDF' };
+                        setFormData({ ...formData, documentos_anexos: [...formData.documentos_anexos, newDoc] });
+                      }}
+                      className="text-[10px] font-black uppercase tracking-widest px-3 py-1 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-all"
+                    >
+                      + Anexar Documento
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {formData.documentos_anexos.map((doc, idx) => (
+                      <div key={doc.id} className="p-4 bg-[#0a0a0a] border border-slate-800 rounded-2xl flex items-center gap-4 relative group/doc">
+                        <button 
+                          type="button"
+                          onClick={() => setFormData({ ...formData, documentos_anexos: formData.documentos_anexos.filter(d => d.id !== doc.id) })}
+                          className="absolute top-2 right-2 p-1 text-slate-600 hover:text-rose-500 opacity-0 group-hover/doc:opacity-100 transition-all"
+                        >
+                          <X size={14} />
+                        </button>
+                        <div className="size-10 bg-slate-800/50 text-slate-400 rounded-xl flex items-center justify-center">
+                          <FileText size={20} />
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <input 
+                            type="text"
+                            value={doc.nome}
+                            onChange={(e) => {
+                              const newDocs = [...formData.documentos_anexos];
+                              newDocs[idx].nome = e.target.value;
+                              setFormData({ ...formData, documentos_anexos: newDocs });
+                            }}
+                            className="w-full bg-transparent border-b border-slate-800 text-xs text-white outline-none focus:border-[#d4ff3f] py-1"
+                            placeholder="Nome do documento (ex: RG, CPF, Diploma)"
+                          />
+                          <input 
+                            type="text"
+                            value={doc.url}
+                            onChange={(e) => {
+                              const newDocs = [...formData.documentos_anexos];
+                              newDocs[idx].url = e.target.value;
+                              setFormData({ ...formData, documentos_anexos: newDocs });
+                            }}
+                            className="w-full bg-transparent border-b border-slate-800 text-[10px] text-slate-500 outline-none focus:border-[#d4ff3f] py-1"
+                            placeholder="URL do arquivo"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-6 flex gap-3">
                   <button 
                     type="button"
                     onClick={handleCloseModal}
-                    className="flex-1 px-4 py-2.5 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#2a2a2a] transition-all"
+                    className="flex-1 px-4 py-3 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#2a2a2a] transition-all"
                   >
                     Cancelar
                   </button>
                   <button 
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
+                    className="flex-1 px-4 py-3 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
                   >
                     {editingMember ? 'Salvar Alterações' : 'Adicionar Membro'}
                   </button>

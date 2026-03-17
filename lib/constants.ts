@@ -6,6 +6,12 @@ export const COST_CATEGORIES = [
   'Diversos'
 ] as const;
 
+export const COST_CENTER_TYPES = [
+  'Obra',
+  'Administrativo',
+  'Pessoal'
+] as const;
+
 export const CONSTRUCTION_STAGES = [
   'SERVIÇOS PRELIMINARES E ADMINISTRATIVOS',
   'FUNDAÇÕES',

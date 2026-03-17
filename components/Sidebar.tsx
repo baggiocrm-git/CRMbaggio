@@ -42,29 +42,26 @@ const navItems: NavGroup[] = [
   { group: 'PRINCIPAL', items: [
     { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
+    { name: 'Contatos', icon: Contact, href: '/contacts' },
+    { name: 'R.H.', icon: Users, href: '/staff' },
     { name: 'Gestão de Documentos', icon: FileText, href: '/documents' },
-  ]},
-  { group: 'ENGENHARIA', items: [
-    { name: 'Projetos', icon: Briefcase, href: '/projects' },
-    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
-    { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
-    { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
   ]},
   { group: 'FINANCEIRO', items: [
     { name: 'Dashboard', icon: BarChart3, href: '/finances' },
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
-    { name: 'DRE', icon: PieChart, href: '/finances/dre' },
+    { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
+  ]},
+  { group: 'ENGENHARIA', items: [
+    { name: 'Projetos', icon: Briefcase, href: '/projects' },
+    { name: 'Orçamento', icon: Target, href: '/finances/budget' },
+    { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
   ]},
   { group: 'FISCAL', items: [
     { name: 'Impostos', icon: Percent, href: '/finances/taxes' },
     { name: 'Obrigações', icon: ClipboardList, href: '/finances/obligations' },
+    { name: 'DRE', icon: PieChart, href: '/finances/dre' },
   ]},
-  { group: 'OUTROS', items: [
-    { name: 'Equipe', icon: Users, href: '/staff' },
-    { name: 'Contatos', icon: Contact, href: '/contacts' },
-    { name: 'Configurações', icon: Settings, href: '/settings' },
-  ]}
 ];
 
 export default function Sidebar() {
@@ -168,6 +165,20 @@ export default function Sidebar() {
         ))}
 
         <div className="pt-4 border-t border-slate-800/50">
+          <Link 
+            href="/settings"
+            className={cn(
+              "flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group",
+              pathname === '/settings' ? "bg-[#d4ff3f]/10 text-[#d4ff3f]" : "text-slate-400 hover:bg-[#1a1a1a] hover:text-white"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <Settings size={18} className={cn(pathname === '/settings' ? "text-[#d4ff3f]" : "text-slate-500 group-hover:text-white transition-colors")} />
+              <span className="text-xs font-bold">Configurações</span>
+            </div>
+            {pathname === '/settings' && <div className="size-1.5 rounded-full bg-[#d4ff3f]" />}
+          </Link>
+
           <button 
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500/80 hover:bg-rose-500/10 hover:text-rose-500 rounded-xl transition-all mt-1 group"

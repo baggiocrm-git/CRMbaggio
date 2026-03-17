@@ -457,6 +457,8 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
     projeto_id UUID REFERENCES public.projetos(id),
     categoria_custo TEXT,
     etapa_obra TEXT,
+    centro_custo_tipo TEXT DEFAULT 'Obra',
+    socio_id UUID REFERENCES public.equipe(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -484,6 +486,8 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
     projeto_id UUID REFERENCES public.projetos(id),
     categoria_custo TEXT,
     etapa_obra TEXT,
+    centro_custo_tipo TEXT DEFAULT 'Obra',
+    socio_id UUID REFERENCES public.equipe(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -512,6 +516,31 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
                         <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">
                           Após executar o script, a página de Contas a Receber estará totalmente funcional e sincronizada com seu banco de dados.
                         </p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-sm font-black">Script SQL: R.H. (Equipe)</p>
+                      <div className="relative group">
+                        <pre className="p-4 bg-[#0a0a0a] border border-slate-800 rounded-xl text-[10px] font-mono text-slate-400 overflow-x-auto">
+                          {`-- Adicionar colunas para cursos e documentos na tabela equipe
+ALTER TABLE public.equipe 
+ADD COLUMN IF NOT EXISTS cursos JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb;`}
+                        </pre>
+                        <button 
+                          onClick={() => {
+                            const sql = `-- Adicionar colunas para cursos e documentos na tabela equipe
+ALTER TABLE public.equipe 
+ADD COLUMN IF NOT EXISTS cursos JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb;`;
+                            navigator.clipboard.writeText(sql);
+                            alert('Script SQL copiado para a área de transferência!');
+                          }}
+                          className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <Copy size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>

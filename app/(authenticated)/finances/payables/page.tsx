@@ -40,7 +40,14 @@ interface Payable {
   projeto_id?: string;
   categoria_custo?: string;
   etapa_obra?: string;
+  centro_custo_tipo?: 'Obra' | 'Administrativo' | 'Pessoal';
+  socio_id?: string;
   created_at?: string;
+}
+
+interface TeamMember {
+  id: string;
+  nome: string;
 }
 
 interface Project {
@@ -89,19 +96,28 @@ export default function PayablesPage() {
     situacao: 'Aberto' as Payable['situacao'],
     projeto_id: '',
     categoria_custo: '',
-    etapa_obra: ''
+    etapa_obra: '',
+    centro_custo_tipo: 'Obra' as 'Obra' | 'Administrativo' | 'Pessoal',
+    socio_id: ''
   });
 
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
 
   const fetchProjects = async () => {
     const { data } = await supabase.from('projetos').select('id, nome');
     if (data) setProjects(data);
   };
 
+  const fetchTeamMembers = async () => {
+    const { data } = await supabase.from('equipe').select('id, nome');
+    if (data) setTeamMembers(data);
+  };
+
   useEffect(() => {
     fetchProjects();
+    fetchTeamMembers();
   }, []);
 
   const generateNextId = async () => {
@@ -216,7 +232,9 @@ export default function PayablesPage() {
         situacao: item.situacao,
         projeto_id: item.projeto_id || '',
         categoria_custo: item.categoria_custo || '',
-        etapa_obra: item.etapa_obra || ''
+        etapa_obra: item.etapa_obra || '',
+        centro_custo_tipo: item.centro_custo_tipo || 'Obra',
+        socio_id: item.socio_id || ''
       });
     } else {
       setEditingItem(null);
@@ -230,7 +248,9 @@ export default function PayablesPage() {
         situacao: 'Aberto',
         projeto_id: '',
         categoria_custo: '',
-        etapa_obra: ''
+        etapa_obra: '',
+        centro_custo_tipo: 'Obra',
+        socio_id: ''
       });
     }
     setIsModalOpen(true);
@@ -239,7 +259,7 @@ export default function PayablesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload: any = {
+      const payload: Record<string, string | number | null> = {
         fornecedor: formData.fornecedor,
         descricao: formData.descricao,
         data_vencimento: formData.data_vencimento,
@@ -250,9 +270,11 @@ export default function PayablesPage() {
       };
 
       // Only include these if they have a value to avoid errors with older table schemas
-      if (formData.projeto_id) payload.projeto_id = formData.projeto_id;
+      if (formData.projeto_id && formData.centro_custo_tipo === 'Obra') payload.projeto_id = formData.projeto_id;
       if (formData.categoria_custo) payload.categoria_custo = formData.categoria_custo;
       if (formData.etapa_obra) payload.etapa_obra = formData.etapa_obra;
+      if (formData.centro_custo_tipo) payload.centro_custo_tipo = formData.centro_custo_tipo;
+      if (formData.socio_id && formData.centro_custo_tipo === 'Pessoal') payload.socio_id = formData.socio_id;
 
       if (editingItem) {
         const { error } = await supabase
@@ -827,18 +849,57 @@ export default function PayablesPage() {
                     />
                   </div>
                   <div className="col-span-2">
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Obra / Projeto</label>
-                    <select 
-                      value={formData.projeto_id}
-                      onChange={(e) => setFormData({...formData, projeto_id: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                    >
-                      <option value="">Nenhum</option>
-                      {projects.map(p => (
-                        <option key={p.id} value={p.id}>{p.nome}</option>
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Tipo de Centro de Custo</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Obra', 'Administrativo', 'Pessoal'].map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setFormData({...formData, centro_custo_tipo: t as 'Obra' | 'Administrativo' | 'Pessoal'})}
+                          className={cn(
+                            "px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                            formData.centro_custo_tipo === t 
+                              ? "bg-[#d4ff3f] border-[#d4ff3f] text-black shadow-[0_0_20px_rgba(212,255,63,0.3)]"
+                              : "bg-[#0a0a0a] border-slate-800/50 text-slate-400 hover:border-slate-700"
+                          )}
+                        >
+                          {t}
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
+
+                  {formData.centro_custo_tipo === 'Obra' && (
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Obra / Projeto</label>
+                      <select 
+                        value={formData.projeto_id}
+                        onChange={(e) => setFormData({...formData, projeto_id: e.target.value})}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      >
+                        <option value="">Nenhum</option>
+                        {projects.map(p => (
+                          <option key={p.id} value={p.id}>{p.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {formData.centro_custo_tipo === 'Pessoal' && (
+                    <div className="col-span-2">
+                      <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Indivíduo / Sócio</label>
+                      <select 
+                        value={formData.socio_id}
+                        onChange={(e) => setFormData({...formData, socio_id: e.target.value})}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      >
+                        <option value="">Selecione um Sócio</option>
+                        {teamMembers.map(m => (
+                          <option key={m.id} value={m.id}>{m.nome}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Categoria de Custo</label>
                     <select 
