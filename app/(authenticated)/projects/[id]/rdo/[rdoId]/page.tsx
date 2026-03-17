@@ -261,7 +261,7 @@ export default function RDODetailPage() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] pb-20">
-      <div className="max-w-3xl mx-auto px-4 pt-8">
+      <div className="max-w-5xl mx-auto px-4 pt-8">
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
             <button 
@@ -306,7 +306,7 @@ export default function RDODetailPage() {
               <h2 className="text-xs font-black uppercase tracking-widest text-white">Informações Básicas</h2>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Data do Relatório</label>
                 <input 
@@ -318,183 +318,183 @@ export default function RDODetailPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Manhã</label>
-                  <select 
-                    disabled={!isEditing}
-                    value={formData.clima_manha}
-                    onChange={(e) => setFormData({...formData, clima_manha: e.target.value})}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
-                  >
-                    {CLIMA_OPTIONS.map(opt => (
-                      <option key={opt.label} value={opt.label}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Tarde</label>
-                  <select 
-                    disabled={!isEditing}
-                    value={formData.clima_tarde}
-                    onChange={(e) => setFormData({...formData, clima_tarde: e.target.value})}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
-                  >
-                    {CLIMA_OPTIONS.map(opt => (
-                      <option key={opt.label} value={opt.label}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Labor */}
-          <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f]">
-                  <Users size={16} />
-                </div>
-                <h2 className="text-xs font-black uppercase tracking-widest text-white">Mão de Obra</h2>
-              </div>
-              {isEditing && (
-                <button 
-                  type="button"
-                  onClick={handleAddMaoDeObra}
-                  className="p-2 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-colors"
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Manhã</label>
+                <select 
+                  disabled={!isEditing}
+                  value={formData.clima_manha}
+                  onChange={(e) => setFormData({...formData, clima_manha: e.target.value})}
+                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
                 >
-                  <Plus size={16} />
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {formData.mao_de_obra?.map((item, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Função</label>
-                    <input 
-                      type="text"
-                      disabled={!isEditing}
-                      value={item.funcao}
-                      onChange={(e) => {
-                        const newList = [...(formData.mao_de_obra || [])];
-                        newList[index].funcao = e.target.value;
-                        setFormData({ ...formData, mao_de_obra: newList });
-                      }}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="w-20">
-                    <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
-                    <input 
-                      type="number"
-                      disabled={!isEditing}
-                      value={item.quantidade}
-                      onChange={(e) => {
-                        const newList = [...(formData.mao_de_obra || [])];
-                        newList[index].quantidade = parseInt(e.target.value) || 0;
-                        setFormData({ ...formData, mao_de_obra: newList });
-                      }}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
-                    />
-                  </div>
-                  {isEditing && (
-                    <button 
-                      type="button"
-                      onClick={() => handleRemoveMaoDeObra(index)}
-                      className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Equipment */}
-          <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f]">
-                  <HardHat size={16} />
-                </div>
-                <h2 className="text-xs font-black uppercase tracking-widest text-white">Equipamentos</h2>
+                  {CLIMA_OPTIONS.map(opt => (
+                    <option key={opt.label} value={opt.label}>{opt.label}</option>
+                  ))}
+                </select>
               </div>
-              {isEditing && (
-                <button 
-                  type="button"
-                  onClick={handleAddEquipamento}
-                  className="p-2 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-colors"
+              <div>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Tarde</label>
+                <select 
+                  disabled={!isEditing}
+                  value={formData.clima_tarde}
+                  onChange={(e) => setFormData({...formData, clima_tarde: e.target.value})}
+                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
                 >
-                  <Plus size={16} />
-                </button>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              {formData.equipamentos?.map((item, index) => (
-                <div key={index} className="flex gap-2 items-end">
-                  <div className="flex-1">
-                    <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Equipamento</label>
-                    <input 
-                      type="text"
-                      disabled={!isEditing}
-                      value={item.nome}
-                      onChange={(e) => {
-                        const newList = [...(formData.equipamentos || [])];
-                        newList[index].nome = e.target.value;
-                        setFormData({ ...formData, equipamentos: newList });
-                      }}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="w-16">
-                    <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
-                    <input 
-                      type="number"
-                      disabled={!isEditing}
-                      value={item.quantidade}
-                      onChange={(e) => {
-                        const newList = [...(formData.equipamentos || [])];
-                        newList[index].quantidade = parseInt(e.target.value) || 0;
-                        setFormData({ ...formData, equipamentos: newList });
-                      }}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
-                    />
-                  </div>
-                  <div className="w-24">
-                    <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Status</label>
-                    <select 
-                      disabled={!isEditing}
-                      value={item.status}
-                      onChange={(e) => {
-                        const newList = [...(formData.equipamentos || [])];
-                        newList[index].status = e.target.value;
-                        setFormData({ ...formData, equipamentos: newList });
-                      }}
-                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2 py-2 text-[10px] text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
-                    >
-                      <option value="Operacional">Operacional</option>
-                      <option value="Manutenção">Manutenção</option>
-                      <option value="Parado">Parado</option>
-                    </select>
-                  </div>
-                  {isEditing && (
-                    <button 
-                      type="button"
-                      onClick={() => handleRemoveEquipamento(index)}
-                      className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                  {CLIMA_OPTIONS.map(opt => (
+                    <option key={opt.label} value={opt.label}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Labor */}
+            <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f]">
+                    <Users size={16} />
+                  </div>
+                  <h2 className="text-xs font-black uppercase tracking-widest text-white">Mão de Obra</h2>
+                </div>
+                {isEditing && (
+                  <button 
+                    type="button"
+                    onClick={handleAddMaoDeObra}
+                    className="p-2 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {formData.mao_de_obra?.map((item, index) => (
+                  <div key={index} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Função</label>
+                      <input 
+                        type="text"
+                        disabled={!isEditing}
+                        value={item.funcao}
+                        onChange={(e) => {
+                          const newList = [...(formData.mao_de_obra || [])];
+                          newList[index].funcao = e.target.value;
+                          setFormData({ ...formData, mao_de_obra: newList });
+                        }}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="w-16">
+                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
+                      <input 
+                        type="number"
+                        disabled={!isEditing}
+                        value={item.quantidade}
+                        onChange={(e) => {
+                          const newList = [...(formData.mao_de_obra || [])];
+                          newList[index].quantidade = parseInt(e.target.value) || 0;
+                          setFormData({ ...formData, mao_de_obra: newList });
+                        }}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    {isEditing && (
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveMaoDeObra(index)}
+                        className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Equipment */}
+            <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f]">
+                    <HardHat size={16} />
+                  </div>
+                  <h2 className="text-xs font-black uppercase tracking-widest text-white">Equipamentos</h2>
+                </div>
+                {isEditing && (
+                  <button 
+                    type="button"
+                    onClick={handleAddEquipamento}
+                    className="p-2 bg-[#d4ff3f]/10 text-[#d4ff3f] rounded-lg hover:bg-[#d4ff3f]/20 transition-colors"
+                  >
+                    <Plus size={16} />
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {formData.equipamentos?.map((item, index) => (
+                  <div key={index} className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Equipamento</label>
+                      <input 
+                        type="text"
+                        disabled={!isEditing}
+                        value={item.nome}
+                        onChange={(e) => {
+                          const newList = [...(formData.equipamentos || [])];
+                          newList[index].nome = e.target.value;
+                          setFormData({ ...formData, equipamentos: newList });
+                        }}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="w-12">
+                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
+                      <input 
+                        type="number"
+                        disabled={!isEditing}
+                        value={item.quantidade}
+                        onChange={(e) => {
+                          const newList = [...(formData.equipamentos || [])];
+                          newList[index].quantidade = parseInt(e.target.value) || 0;
+                          setFormData({ ...formData, equipamentos: newList });
+                        }}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all disabled:opacity-50"
+                      />
+                    </div>
+                    <div className="w-20">
+                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Status</label>
+                      <select 
+                        disabled={!isEditing}
+                        value={item.status}
+                        onChange={(e) => {
+                          const newList = [...(formData.equipamentos || [])];
+                          newList[index].status = e.target.value;
+                          setFormData({ ...formData, equipamentos: newList });
+                        }}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-1 py-2 text-[9px] text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none disabled:opacity-50"
+                      >
+                        <option value="Operacional">Operacional</option>
+                        <option value="Manutenção">Manutenção</option>
+                        <option value="Parado">Parado</option>
+                      </select>
+                    </div>
+                    {isEditing && (
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveEquipamento(index)}
+                        className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
 
           {/* Activities */}
           <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
