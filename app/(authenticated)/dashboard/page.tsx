@@ -9,8 +9,6 @@ import {
   Users, 
   TrendingUp, 
   DollarSign, 
-  AlertCircle, 
-  CheckCircle2, 
   FileText,
   Loader2
 } from 'lucide-react';
@@ -32,16 +30,21 @@ export default function DashboardPage() {
     receivable: 0,
     payable: 0,
   });
+  const [recentRdos, setRecentRdos] = useState<{id: string, data: string, created_at: string, projetos?: {nome: string}}[]>([]);
+  const [chartData, setChartData] = useState<{name: string, value: number}[]>([]);
+  const [priorityTasks, setPriorityTasks] = useState<{id: string, title: string, site: string, status: string, color: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
-      const [projectsRes, staffRes, receivablesRes, payablesRes] = await Promise.all([
+      const [projectsRes, staffRes, receivablesRes, payablesRes, rdosRes, delayedProjectsRes] = await Promise.all([
         supabase.from('projetos').select('id', { count: 'exact' }).neq('status', 'Concluído'),
         supabase.from('equipe').select('id', { count: 'exact' }).eq('status', 'Ativo'),
         supabase.from('contas_receber').select('valor').neq('situacao', 'Recebido'),
-        supabase.from('contas_pagar').select('valor').neq('situacao', 'Pago')
+        supabase.from('contas_pagar').select('valor').neq('situacao', 'Pago'),
+        supabase.from('rdos').select('*, projetos(nome)').order('created_at', { ascending: false }).limit(5),
+        supabase.from('projetos').select('*').eq('status', 'Atrasado').limit(3)
       ]);
 
       const receivable = (receivablesRes.data || [])
@@ -56,6 +59,56 @@ export default function DashboardPage() {
         receivable,
         payable,
       });
+
+      setRecentRdos(rdosRes.data || []);
+
+      // Process chart data (RDOs per day for the last 7 days)
+      const last7Days = [...Array(7)].map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return {
+          date: d.toISOString().split('T')[0],
+          label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', ''),
+          count: 0
+        };
+      });
+
+      // We need more RDOs for the chart
+      const { data: chartRdos } = await supabase
+        .from('rdos')
+        .select('data')
+        .gte('data', last7Days[0].date);
+
+      if (chartRdos) {
+        chartRdos.forEach(r => {
+          const day = last7Days.find(d => d.date === r.data);
+          if (day) day.count++;
+        });
+      }
+      setChartData(last7Days.map(d => ({ name: d.label, value: d.count })));
+
+      // Process priority tasks
+      const tasks = (delayedProjectsRes.data || []).map(p => ({
+        id: p.id,
+        title: `Projeto Atrasado: ${p.nome}`,
+        site: p.localizacao || 'Local não informado',
+        status: 'Atrasado',
+        color: 'bg-red-500'
+      }));
+
+      // Add RDOs with occurrences
+      const rdosWithOccurrences = (rdosRes.data || [])
+        .filter(r => r.ocorrencias && r.ocorrencias.trim().length > 0)
+        .map(r => ({
+          id: r.id,
+          title: `Ocorrência: ${r.projetos?.nome}`,
+          site: r.ocorrencias.substring(0, 30) + '...',
+          status: 'Verificar',
+          color: 'bg-orange-500'
+        }));
+
+      setPriorityTasks([...tasks, ...rdosWithOccurrences].slice(0, 3));
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error instanceof Error ? error.message : String(error));
     } finally {
@@ -74,27 +127,30 @@ export default function DashboardPage() {
     { label: 'A Pagar', value: `R$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
 
-  const performanceData = React.useMemo(() => [
-    { name: 'Seg', value: 40 },
-    { name: 'Ter', value: 60 },
-    { name: 'Qua', value: 80 },
-    { name: 'Qui', value: 95 },
-    { name: 'Sex', value: 70 },
-    { name: 'Sáb', value: 50 },
-    { name: 'Dom', value: 45 },
-  ], []);
+  const performanceData = chartData.length > 0 ? chartData : [
+    { name: 'Seg', value: 0 },
+    { name: 'Ter', value: 0 },
+    { name: 'Qua', value: 0 },
+    { name: 'Qui', value: 0 },
+    { name: 'Sex', value: 0 },
+    { name: 'Sáb', value: 0 },
+    { name: 'Dom', value: 0 },
+  ];
 
-  const highPriorityTasks = React.useMemo(() => [
-    { id: 1, title: 'Concretagem - Fase 4', site: 'Complexo Torre Norte', status: 'Vence Hoje', color: 'bg-red-500' },
-    { id: 2, title: 'Auditoria de Inspeção de Segurança', site: 'Ponte Riverside', status: 'Vence Amanhã', color: 'bg-orange-500' },
-    { id: 3, title: 'Realocação de Equipamentos', site: 'Múltiplos Locais', status: 'Em Andamento', color: 'bg-blue-500' },
-  ], []);
+  const highPriorityTasks = priorityTasks.length > 0 ? priorityTasks : [
+    { id: 1, title: 'Nenhuma tarefa crítica', site: '-', status: 'OK', color: 'bg-emerald-500' },
+  ];
 
-  const recentActivity = React.useMemo(() => [
-    { id: 1, type: 'upload', title: 'Novo Relatório de Inspeção', desc: "Sarah Jenkins enviou 'Site-B_Struct_Final.pdf'", time: '12 minutos atrás', icon: FileText, iconColor: 'text-blue-500', iconBg: 'bg-blue-500/10' },
-    { id: 2, type: 'milestone', title: 'Marco Concluído', desc: 'Fase de escavação concluída na Metro Tower', time: '2 horas atrás', icon: CheckCircle2, iconColor: 'text-emerald-500', iconBg: 'bg-emerald-500/10' },
-    { id: 3, type: 'alert', title: 'Alerta de Atraso Climático', desc: 'Operações de guindaste suspensas devido a ventos fortes', time: '5 horas atrás', icon: AlertCircle, iconColor: 'text-orange-500', iconBg: 'bg-orange-500/10' },
-  ], []);
+  const recentActivity = recentRdos.map(r => ({
+    id: r.id,
+    type: 'upload',
+    title: `RDO Enviado: ${r.projetos?.nome}`,
+    desc: `Relatório do dia ${new Date(r.data).toLocaleDateString('pt-BR')}`,
+    time: new Date(r.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    icon: FileText,
+    iconColor: 'text-blue-500',
+    iconBg: 'bg-blue-500/10'
+  }));
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
@@ -148,7 +204,7 @@ export default function DashboardPage() {
             {/* Performance Chart */}
             <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 shadow-sm">
               <div className="flex items-center justify-between mb-8">
-                <h3 className="text-lg font-black tracking-tight">Desempenho do Projeto</h3>
+                <h3 className="text-lg font-black tracking-tight">Desempenho (RDOs por dia)</h3>
                 <div className="flex bg-[#0a0a0a] p-1 rounded-xl">
                   {['Mensal', 'Semanal'].map((t) => (
                     <button 
