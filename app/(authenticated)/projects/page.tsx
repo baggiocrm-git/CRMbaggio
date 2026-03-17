@@ -29,13 +29,22 @@ export default function ProjectsPage() {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('projetos')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [projectsRes, rdosRes] = await Promise.all([
+        supabase.from('projetos').select('*').order('created_at', { ascending: false }),
+        supabase.from('rdos').select('projeto_id')
+      ]);
       
-      if (error) throw error;
-      setProjects(data || []);
+      if (projectsRes.error) throw projectsRes.error;
+      if (rdosRes.error) throw rdosRes.error;
+
+      const rdoProjectIds = new Set(rdosRes.data.map(r => r.projeto_id));
+      
+      const projectsWithRdoStatus = (projectsRes.data || []).map(p => ({
+        ...p,
+        has_rdo: rdoProjectIds.has(p.id)
+      }));
+
+      setProjects(projectsWithRdoStatus);
     } catch (error) {
       console.error('Error fetching projects:', error);
     } finally {

@@ -41,7 +41,26 @@ export default function LoginPage() {
       }
 
       console.log('Login Supabase bem-sucedido:', data.user?.id);
-      window.location.href = '/dashboard';
+      
+      const userRole = data.user?.user_metadata?.role;
+      if (userRole === 'Cliente') {
+        // Fetch the project linked to this client
+        const { data: projectData } = await supabase
+          .from('projetos')
+          .select('id')
+          .eq('cliente_id', data.user.id)
+          .limit(1)
+          .single();
+        
+        if (projectData) {
+          window.location.href = `/client/rdo/${projectData.id}`;
+        } else {
+          // If no project linked, maybe show a message or just go to dashboard (which will likely deny access)
+          window.location.href = '/dashboard';
+        }
+      } else {
+        window.location.href = '/dashboard';
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Credenciais inválidas';
       setError(message);

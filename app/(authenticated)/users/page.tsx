@@ -33,7 +33,7 @@ export default function UsersManagementPage() {
     name: '',
     email: '',
     password: '',
-    role: 'Usuário' as 'Administrador' | 'Usuário'
+    role: 'Usuário' as 'Administrador' | 'Usuário' | 'Cliente'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -378,7 +378,7 @@ export default function UsersManagementPage() {
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Privilégios</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {(['Usuário', 'Administrador'] as const).map((r) => (
+                      {(['Usuário', 'Administrador', 'Cliente'] as const).map((r) => (
                         <button
                           key={r}
                           type="button"

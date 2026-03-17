@@ -16,6 +16,37 @@ interface ProjectModalProps {
 }
 
 export default function ProjectModal({ isOpen, onClose, onSuccess, project }: ProjectModalProps) {
+  const [clients, setClients] = React.useState<{id: string, email: string, name: string}[]>([]);
+
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        const response = await fetch('/api/admin/list-users', {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        });
+        const data = await response.json();
+        if (data.users) {
+          const clientUsers = data.users
+            .filter((u: { user_metadata?: { role?: string } }) => u.user_metadata?.role === 'Cliente')
+            .map((u: { id: string, email: string, user_metadata?: { full_name?: string } }) => ({
+              id: u.id,
+              email: u.email,
+              name: u.user_metadata?.full_name || u.email
+            }));
+          setClients(clientUsers);
+        }
+      } catch (err) {
+        console.error('Error fetching clients:', err);
+      }
+    };
+    if (isOpen) fetchClients();
+  }, [isOpen]);
+
   const { register, handleSubmit, reset, control, formState: { errors, isSubmitting } } = useForm<Partial<Project>>({
     defaultValues: {
       nome: '',
@@ -26,6 +57,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
       localizacao: '',
       fase: '',
       liquidez: 0,
+      cliente_id: '',
     }
   });
 
@@ -40,6 +72,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
         localizacao: project.localizacao || '',
         fase: project.fase || '',
         liquidez: project.liquidez,
+        cliente_id: project.cliente_id || '',
       });
     } else {
       reset({
@@ -51,6 +84,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
         localizacao: '',
         fase: '',
         liquidez: 0,
+        cliente_id: '',
       });
     }
   }, [project, reset, isOpen]);
@@ -62,6 +96,7 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
         orcamento: data.orcamento ? parseFloat(data.orcamento.toString().replace(',', '.')) : 0,
         gasto: data.gasto ? parseFloat(data.gasto.toString().replace(',', '.')) : 0,
         liquidez: data.liquidez ? parseInt(data.liquidez.toString()) : 0,
+        cliente_id: data.cliente_id && data.cliente_id.trim() !== '' ? data.cliente_id : null,
       };
 
       if (project) {
@@ -185,6 +220,19 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                   {...register('liquidez')}
                   className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cliente (Dono da Obra)</label>
+                <select 
+                  {...register('cliente_id')}
+                  className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all appearance-none cursor-pointer"
+                >
+                  <option value="">Nenhum Cliente Vinculado</option>
+                  {clients.map(client => (
+                    <option key={client.id} value={client.id}>{client.name} ({client.email})</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2">

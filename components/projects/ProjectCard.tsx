@@ -12,6 +12,8 @@ import { motion } from 'motion/react';
 import { Draggable } from '@hello-pangea/dnd';
 import { Project, ProjectStatus } from '@/lib/types';
 
+import Link from 'next/link';
+
 interface ProjectCardProps {
   project: Project;
   index: number;
@@ -101,15 +103,28 @@ export default function ProjectCard({ project, index, onEdit, onDelete }: Projec
               </div>
             </div>
 
-            <div className="pt-3 border-t border-slate-800/50 grid grid-cols-2 gap-2">
-              <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
-                <MapPin size={12} className="flex-shrink-0" />
-                <span className="text-[10px] font-bold truncate">{project.localizacao || 'N/A'}</span>
+            <div className="pt-3 border-t border-slate-800/50 flex flex-col gap-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
+                  <MapPin size={12} className="flex-shrink-0" />
+                  <span className="text-[10px] font-bold truncate">{project.localizacao || 'N/A'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
+                  <TrendingUp size={12} className="flex-shrink-0" />
+                  <span className="text-[10px] font-bold truncate">{project.fase || 'N/A'}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5 text-slate-500 min-w-0">
-                <TrendingUp size={12} className="flex-shrink-0" />
-                <span className="text-[10px] font-bold truncate">{project.fase || 'N/A'}</span>
-              </div>
+              
+              <Link 
+                href={`/projects/${project.id}/rdo`}
+                className={`w-full mt-1 py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${
+                  project.has_rdo 
+                    ? 'bg-[#d4ff3f]/10 border-[#d4ff3f]/30 text-[#d4ff3f] hover:bg-[#d4ff3f]/20' 
+                    : 'bg-[#0a0a0a] border-slate-800/50 text-slate-400 hover:text-[#d4ff3f] hover:border-[#d4ff3f]/30'
+                }`}
+              >
+                Relatório Diário (RDO)
+              </Link>
             </div>
           </div>
         </motion.div>

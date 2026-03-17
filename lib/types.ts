@@ -65,6 +65,22 @@ export interface BudgetItem {
   composicao?: CompositionItem[];
 }
 
+export interface RDO {
+  id: string;
+  projeto_id: string;
+  data: string;
+  clima_manha: string;
+  clima_tarde: string;
+  mao_de_obra: { funcao: string; quantidade: number }[];
+  equipamentos: { nome: string; quantidade: number; status: string }[];
+  atividades: string;
+  ocorrencias: string;
+  fotos: string[];
+  assinatura_responsavel: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Project {
   id: string;
   nome: string;
@@ -76,6 +92,8 @@ export interface Project {
   liquidez: number;
   localizacao?: string;
   fase?: string;
+  cliente_id?: string;
+  has_rdo?: boolean;
   created_at: string;
   updated_at: string;
 }
