@@ -12,10 +12,8 @@ import {
   Eye, 
   Trash2, 
   Calendar as CalendarIcon,
-  Tag,
   CheckCircle2,
   AlertCircle,
-  Archive,
   LayoutGrid,
   List as ListIcon,
   MoreVertical,
@@ -267,22 +265,6 @@ export default function DocumentManagementPage() {
     if (doc.tipo_arquivo.includes('text/plain')) return '.txt';
     
     return '';
-  };
-
-  const getStatusColor = (status: DocumentStatus) => {
-    switch (status) {
-      case 'Vigente': return 'text-emerald-500 bg-emerald-500/10';
-      case 'Vencido': return 'text-rose-500 bg-rose-500/10';
-      case 'Arquivado': return 'text-slate-500 bg-slate-500/10';
-    }
-  };
-
-  const getStatusIcon = (status: DocumentStatus) => {
-    switch (status) {
-      case 'Vigente': return <CheckCircle2 size={12} />;
-      case 'Vencido': return <AlertCircle size={12} />;
-      case 'Arquivado': return <Archive size={12} />;
-    }
   };
 
   const handleUpload = async (e: React.FormEvent) => {
@@ -1020,7 +1002,7 @@ export default function DocumentManagementPage() {
                   <thead>
                     <tr className="border-b border-slate-800/50">
                       <th 
-                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
+                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors w-1/2"
                         onClick={() => toggleSort('nome')}
                       >
                         <div className="flex items-center">
@@ -1044,29 +1026,11 @@ export default function DocumentManagementPage() {
                         onClick={() => toggleSort('Categoria')}
                       >
                         <div className="flex items-center">
-                          Área / Tipo
+                          Tipo
                           {getSortIcon('Categoria')}
                         </div>
                       </th>
-                      <th 
-                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
-                        onClick={() => toggleSort('status')}
-                      >
-                        <div className="flex items-center">
-                          Status
-                          {getSortIcon('status')}
-                        </div>
-                      </th>
-                      <th 
-                        className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
-                        onClick={() => toggleSort('created_at')}
-                      >
-                        <div className="flex items-center">
-                          Ano
-                          {getSortIcon('created_at')}
-                        </div>
-                      </th>
-                      <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest">Ações</th>
+                      <th className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">Ações</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/30">
@@ -1079,7 +1043,8 @@ export default function DocumentManagementPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             key={doc.id || `doc-list-${index}`} 
-                            className="group hover:bg-white/[0.02] transition-colors"
+                            className="group hover:bg-white/[0.02] transition-colors cursor-pointer"
+                            onClick={() => handleViewDocument(doc)}
                           >
                             <td className="px-4 py-4">
                               <div className="flex items-center gap-3">
@@ -1087,7 +1052,7 @@ export default function DocumentManagementPage() {
                                   <FileText size={20} />
                                 </div>
                                 <div>
-                                  <p className="text-sm font-bold text-white line-clamp-1">{doc.nome}</p>
+                                  <p className="text-sm font-bold text-white line-clamp-1 group-hover:text-[#d4ff3f] transition-colors">{doc.nome}</p>
                                   <p className="text-[10px] text-slate-500 font-medium">{doc.tamanho_arquivo}</p>
                                 </div>
                               </div>
@@ -1103,31 +1068,10 @@ export default function DocumentManagementPage() {
                               </td>
                             )}
                             <td className="px-4 py-4">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5">
-                                  <Tag size={10} className="text-slate-500" />
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider line-clamp-1">{doc.area || 'N/A'}</span>
-                                </div>
-                                <p className="text-xs font-bold text-slate-300 uppercase">{getFileExtension(doc)}</p>
-                              </div>
+                              <p className="text-xs font-bold text-slate-300 uppercase">{getFileExtension(doc)}</p>
                             </td>
-                            <td className="px-4 py-4">
-                              <span className={cn(
-                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                                getStatusColor(doc.status)
-                              )}>
-                                {getStatusIcon(doc.status)}
-                                {doc.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-1.5 text-white">
-                                <CalendarIcon size={10} className="text-slate-500" />
-                                <span className="text-xs font-black">{doc.Ano}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-4">
-                              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
                                   onClick={() => handleViewDocument(doc)}
                                   className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
@@ -1220,7 +1164,7 @@ export default function DocumentManagementPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={selectedFolderId === 'root' ? 6 : 5} className="px-6 py-20 text-center">
+                          <td colSpan={selectedFolderId === 'root' ? 4 : 3} className="px-6 py-20 text-center">
                             <div className="flex flex-col items-center gap-3 text-slate-600">
                               <Search size={40} strokeWidth={1} />
                               <p className="text-sm font-bold">Nenhum documento encontrado com estes filtros.</p>
@@ -1273,19 +1217,16 @@ export default function DocumentManagementPage() {
                       className="group bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-6 hover:border-[#d4ff3f]/30 transition-all"
                     >
                       <div className="flex items-start justify-between mb-4">
-                        <div className="size-12 rounded-2xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors">
+                        <div 
+                          className="size-12 rounded-2xl bg-[#0a0a0a] border border-slate-800/50 flex items-center justify-center text-slate-400 group-hover:text-[#d4ff3f] transition-colors cursor-pointer"
+                          onClick={() => handleViewDocument(doc)}
+                        >
                           <FileText size={24} />
-                        </div>
-                        <div className={cn(
-                          "px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider",
-                          getStatusColor(doc.status)
-                        )}>
-                          {doc.status}
                         </div>
                       </div>
                       
-                      <div className="space-y-1 mb-6">
-                        <h3 className="text-sm font-bold text-white line-clamp-1">{doc.nome}</h3>
+                      <div className="space-y-1 mb-6 cursor-pointer" onClick={() => handleViewDocument(doc)}>
+                        <h3 className="text-sm font-bold text-white line-clamp-1 group-hover:text-[#d4ff3f] transition-colors">{doc.nome}</h3>
                         <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
                           <span>{doc.tamanho_arquivo}</span>
                           <span className="size-1 rounded-full bg-slate-800" />

@@ -454,6 +454,9 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
     valor DECIMAL(12,2) NOT NULL DEFAULT 0,
     valor_pago DECIMAL(12,2) NOT NULL DEFAULT 0,
     situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Pago', 'Em andamento')),
+    projeto_id UUID REFERENCES public.projetos(id),
+    categoria_custo TEXT,
+    etapa_obra TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -478,6 +481,9 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
     valor DECIMAL(12,2) NOT NULL DEFAULT 0,
     valor_pago DECIMAL(12,2) NOT NULL DEFAULT 0,
     situacao TEXT NOT NULL CHECK (situacao IN ('Aberto', 'Pago', 'Em andamento')),
+    projeto_id UUID REFERENCES public.projetos(id),
+    categoria_custo TEXT,
+    etapa_obra TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 

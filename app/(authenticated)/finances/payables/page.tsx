@@ -18,8 +18,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  Trash2,
-  Edit2,
   ArrowUp,
   ArrowDown,
   ArrowUpDown
@@ -241,10 +239,20 @@ export default function PayablesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const payload = {
-        ...formData,
+      const payload: any = {
+        fornecedor: formData.fornecedor,
+        descricao: formData.descricao,
+        data_vencimento: formData.data_vencimento,
         data_pagamento: formData.data_pagamento || null,
+        valor: formData.valor,
+        valor_pago: formData.valor_pago,
+        situacao: formData.situacao,
       };
+
+      // Only include these if they have a value to avoid errors with older table schemas
+      if (formData.projeto_id) payload.projeto_id = formData.projeto_id;
+      if (formData.categoria_custo) payload.categoria_custo = formData.categoria_custo;
+      if (formData.etapa_obra) payload.etapa_obra = formData.etapa_obra;
 
       if (editingItem) {
         const { error } = await supabase
@@ -554,123 +562,116 @@ export default function PayablesPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors min-w-[200px]" onClick={() => handleSort('fornecedor')}>
-                  <div className="flex items-center gap-2">
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[15%]" onClick={() => handleSort('fornecedor')}>
+                  <div className="flex items-center gap-1">
                     Fornecedor
                     {sortConfig.key === 'fornecedor' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-4 py-4 cursor-pointer hover:text-white transition-colors min-w-[250px]" onClick={() => handleSort('descricao')}>
-                  <div className="flex items-center gap-2">
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[25%]" onClick={() => handleSort('descricao')}>
+                  <div className="flex items-center gap-1">
                     Descrição
                     {sortConfig.key === 'descricao' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-24" onClick={() => handleSort('data_vencimento')}>
-                  <div className="flex items-center gap-2">
-                    Vencimento
+                <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('data_vencimento')}>
+                  <div className="flex items-center gap-1">
+                    Venc.
                     {sortConfig.key === 'data_vencimento' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-24" onClick={() => handleSort('data_pagamento')}>
-                  <div className="flex items-center gap-2">
-                    Pagamento
+                <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('data_pagamento')}>
+                  <div className="flex items-center gap-1">
+                    Pag.
                     {sortConfig.key === 'data_pagamento' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-28" onClick={() => handleSort('valor')}>
-                  <div className="flex items-center gap-2">
+                <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('valor')}>
+                  <div className="flex items-center gap-1">
                     Valor
                     {sortConfig.key === 'valor' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-28" onClick={() => handleSort('valor_pago')}>
-                  <div className="flex items-center gap-2">
+                <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('valor_pago')}>
+                  <div className="flex items-center gap-1">
                     Pago
                     {sortConfig.key === 'valor_pago' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-32" onClick={() => handleSort('situacao')}>
-                  <div className="flex items-center gap-2">
+                <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[12%]" onClick={() => handleSort('situacao')}>
+                  <div className="flex items-center gap-1">
                     Situação
                     {sortConfig.key === 'situacao' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />
-                    ) : <ArrowUpDown size={12} className="opacity-30" />}
+                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
+                    ) : <ArrowUpDown size={10} className="opacity-30" />}
                   </div>
                 </th>
-                <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
                   </td>
                 </tr>
               ) : currentItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
                     Nenhuma conta encontrada.
                   </td>
                 </tr>
               ) : (
                 currentItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-[#0a0a0a] transition-colors group text-[11px]">
-                    <td className="px-4 py-4">
-                      <p className="font-bold text-white leading-tight">{item.fornecedor}</p>
+                  <tr 
+                    key={item.id} 
+                    onClick={() => handleOpenModal(item)}
+                    className="hover:bg-[#0a0a0a] transition-colors group text-[10px] cursor-pointer"
+                  >
+                    <td className="px-2 py-2">
+                      <p className="font-bold text-white leading-tight truncate" title={item.fornecedor}>{item.fornecedor}</p>
                     </td>
-                    <td className="px-4 py-4">
-                      <p className="text-slate-400 leading-tight">{item.descricao}</p>
+                    <td className="px-2 py-2">
+                      <p className="text-slate-400 leading-tight truncate" title={item.descricao}>{item.descricao}</p>
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-1 py-2">
                       <p className="text-slate-500">{formatDate(item.data_vencimento)}</p>
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-1 py-2">
                       <p className="text-slate-500">{formatDate(item.data_pagamento)}</p>
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-1 py-2">
                       <p className="font-black text-white">{formatCurrency(item.valor)}</p>
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-1 py-2">
                       <p className="font-bold text-emerald-500">{formatCurrency(item.valor_pago)}</p>
                     </td>
-                    <td className="px-2 py-4">
+                    <td className="px-1 py-2">
                       <span className={cn(
-                        "inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest",
+                        "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
                         item.situacao === 'Pago' ? "bg-emerald-500/10 text-emerald-500" : 
                         item.situacao === 'Aberto' ? "bg-orange-500/10 text-orange-500" : 
                         "bg-blue-500/10 text-blue-500"
                       )}>
                         {item.situacao}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={() => handleOpenModal(item)} className="p-1 text-slate-500 hover:text-[#d4ff3f] transition-colors">
-                          <Edit2 size={16} />
-                        </button>
-                        <button onClick={() => handleDelete(item.id)} className="p-1 text-slate-500 hover:text-rose-500 transition-colors">
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 ))
@@ -886,20 +887,36 @@ export default function PayablesPage() {
                   </div>
                 </div>
 
-                <div className="pt-4 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => setIsModalOpen(false)}
-                    className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit"
-                    className="flex-1 px-4 py-3 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
-                  >
-                    {editingItem ? 'Salvar Alterações' : 'Adicionar Conta'}
-                  </button>
+                <div className="pt-4 flex flex-col gap-3">
+                  <div className="flex gap-3">
+                    <button 
+                      type="button"
+                      onClick={() => setIsModalOpen(false)}
+                      className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
+                    >
+                      Cancelar
+                    </button>
+                    <button 
+                      type="submit"
+                      className="flex-1 px-4 py-3 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
+                    >
+                      {editingItem ? 'Salvar Alterações' : 'Adicionar Conta'}
+                    </button>
+                  </div>
+                  {editingItem && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
+                          handleDelete(editingItem.id);
+                          setIsModalOpen(false);
+                        }
+                      }}
+                      className="w-full px-4 py-3 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                    >
+                      Excluir Conta
+                    </button>
+                  )}
                 </div>
               </form>
             </motion.div>

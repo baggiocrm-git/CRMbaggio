@@ -43,8 +43,6 @@ const navItems: NavGroup[] = [
     { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
     { name: 'Gestão de Documentos', icon: FileText, href: '/documents' },
-    { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
-    { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
   ]},
   { group: 'ENGENHARIA', items: [
     { name: 'Projetos', icon: Briefcase, href: '/projects' },
@@ -54,6 +52,8 @@ const navItems: NavGroup[] = [
   ]},
   { group: 'FINANCEIRO', items: [
     { name: 'Dashboard', icon: BarChart3, href: '/finances' },
+    { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
+    { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
     { name: 'DRE', icon: PieChart, href: '/finances/dre' },
   ]},
   { group: 'FISCAL', items: [
