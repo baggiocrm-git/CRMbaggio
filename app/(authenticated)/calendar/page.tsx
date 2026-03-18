@@ -78,35 +78,57 @@ const MOCK_EVENTS: Event[] = [
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
-  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
+  const [events, setEvents] = useState<Event[]>([]); // Start empty, will fill with mock if not connected
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize with mock events only if not connected
+  useEffect(() => {
+    if (!isGoogleConnected) {
+      setEvents(MOCK_EVENTS);
+    }
+  }, [isGoogleConnected]);
 
   const fetchGoogleEvents = async () => {
     try {
       setIsSyncing(true);
+      setError(null);
       const response = await fetch('/api/google/calendar/events');
-      if (!response.ok) throw new Error('Failed to fetch Google events');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Falha ao buscar eventos do Google');
+      }
       
-      const googleEvents: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }[] = await response.json();
+      const googleEvents = await response.json();
       
-      const formattedEvents: Event[] = googleEvents.map((e) => ({
+      if (!Array.isArray(googleEvents)) {
+        throw new Error('Resposta inválida da API do Google Calendar');
+      }
+      
+      const formattedEvents: Event[] = googleEvents.map((e: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }) => ({
         id: e.id,
         title: e.summary || 'Sem título',
         start: new Date(e.start.dateTime || e.start.date),
         end: new Date(e.end.dateTime || e.end.date),
-        type: 'meeting', // Default to meeting for Google events
+        type: 'meeting',
         location: e.location,
-        attendees: e.attendees?.map((a) => a.displayName || a.email)
+        attendees: e.attendees?.map((a: { displayName?: string; email: string }) => a.displayName || a.email)
       }));
 
-      // Merge with mock events or just replace
-      setEvents(prev => {
-        const nonGoogle = prev.filter(e => !googleEvents.some((ge) => ge.id === e.id));
-        return [...nonGoogle, ...formattedEvents];
-      });
-    } catch (error) {
-      console.error('Error fetching Google events:', error);
+      // Replace events with Google events when connected
+      setEvents(formattedEvents);
+      setIsGoogleConnected(true);
+    } catch (err: unknown) {
+      console.error('Error fetching Google events:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido';
+      setError(errorMsg);
+      
+      // If unauthorized, it means tokens are invalid, so reset connection state
+      if (errorMsg.toLowerCase().includes('unauthorized') || errorMsg.toLowerCase().includes('invalid_grant')) {
+        setIsGoogleConnected(false);
+        setEvents(MOCK_EVENTS);
+      }
     } finally {
       setIsSyncing(false);
     }
@@ -231,6 +253,24 @@ export default function CalendarPage() {
           {isGoogleConnected ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
           {isGoogleConnected ? 'Google Conectado' : 'Conectar Google'}
         </button>
+
+        {isGoogleConnected && (
+          <button 
+            onClick={async () => {
+              if (confirm('Deseja realmente desconectar sua conta Google?')) {
+                const { error } = await supabase.from('google_tokens').delete().eq('id', 1);
+                if (!error) {
+                  setIsGoogleConnected(false);
+                  setEvents(MOCK_EVENTS);
+                  setError(null);
+                }
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20"
+          >
+            Desconectar
+          </button>
+        )}
 
         <button className="flex items-center gap-2 px-6 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10">
           <Plus size={14} /> Novo Evento
@@ -467,6 +507,14 @@ export default function CalendarPage() {
 
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white flex flex-col overflow-hidden">
+      {error && (
+        <div className="bg-rose-500/10 border border-rose-500/20 p-4 mx-8 mt-4 rounded-xl flex items-center justify-between">
+          <p className="text-rose-500 text-xs font-bold uppercase tracking-widest">Erro: {error}</p>
+          <button onClick={() => setError(null)} className="text-rose-500 hover:text-white transition-colors">
+            <Plus size={16} className="rotate-45" />
+          </button>
+        </div>
+      )}
       {renderHeader()}
       
       <div className="flex-1 flex overflow-hidden">
