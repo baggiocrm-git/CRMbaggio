@@ -45,6 +45,7 @@ interface Event {
   type: 'meeting' | 'task' | 'project' | 'personal';
   location?: string;
   attendees?: string[];
+  calendarColor?: string;
 }
 
 const MOCK_EVENTS: Event[] = [
@@ -75,10 +76,21 @@ const MOCK_EVENTS: Event[] = [
   }
 ];
 
+interface GoogleCalendar {
+  id: string;
+  summary: string;
+  backgroundColor?: string;
+  foregroundColor?: string;
+  selected?: boolean;
+  primary?: boolean;
+}
+
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
   const [events, setEvents] = useState<Event[]>([]); // Start empty, will fill with mock if not connected
+  const [calendars, setCalendars] = useState<GoogleCalendar[]>([]);
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>(['primary']);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,37 +99,84 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!isGoogleConnected) {
       setEvents(MOCK_EVENTS);
+      setCalendars([
+        { id: 'pessoal', summary: 'Pessoal', backgroundColor: '#3b82f6' },
+        { id: 'trabalho', summary: 'Trabalho', backgroundColor: '#d4ff3f' },
+        { id: 'projetos', summary: 'Projetos', backgroundColor: '#f97316' },
+        { id: 'feriados', summary: 'Feriados', backgroundColor: '#f43f5e' },
+      ]);
     }
   }, [isGoogleConnected]);
 
-  const fetchGoogleEvents = async () => {
+  const fetchGoogleCalendars = React.useCallback(async () => {
+    try {
+      const response = await fetch('/api/google/calendar/list');
+      if (response.ok) {
+        const data: GoogleCalendar[] = await response.json();
+        
+        // Deduplicate by summary/name to avoid "Feriados no Brasil" appearing twice
+        const uniqueCalendars = data.reduce((acc: GoogleCalendar[], current) => {
+          const x = acc.find(item => item.summary === current.summary);
+          if (!x) {
+            return acc.concat([current]);
+          } else {
+            return acc;
+          }
+        }, []);
+
+        setCalendars(uniqueCalendars);
+        const primary = uniqueCalendars.find((c: GoogleCalendar) => c.primary);
+        if (primary) {
+          setSelectedCalendarIds([primary.id]);
+        } else if (uniqueCalendars.length > 0) {
+          setSelectedCalendarIds([uniqueCalendars[0].id]);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching calendar list:', err);
+    }
+  }, []);
+
+  const fetchGoogleEvents = React.useCallback(async () => {
     try {
       setIsSyncing(true);
       setError(null);
-      const response = await fetch('/api/google/calendar/events');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Falha ao buscar eventos do Google');
+      
+      if (selectedCalendarIds.length === 0) {
+        setEvents([]);
+        setIsSyncing(false);
+        return;
       }
-      
-      const googleEvents = await response.json();
-      
-      if (!Array.isArray(googleEvents)) {
-        throw new Error('Resposta inválida da API do Google Calendar');
-      }
-      
-      const formattedEvents: Event[] = googleEvents.map((e: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }) => ({
-        id: e.id,
-        title: e.summary || 'Sem título',
-        start: new Date(e.start.dateTime || e.start.date),
-        end: new Date(e.end.dateTime || e.end.date),
-        type: 'meeting',
-        location: e.location,
-        attendees: e.attendees?.map((a: { displayName?: string; email: string }) => a.displayName || a.email)
-      }));
+
+      // Fetch from all selected calendars
+      const allEventsPromises = selectedCalendarIds.map(async (calendarId) => {
+        const response = await fetch(`/api/google/calendar/events?calendarId=${encodeURIComponent(calendarId)}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Falha ao buscar eventos da agenda ${calendarId}`);
+        }
+        const data = await response.json();
+        
+        // Find calendar color
+        const calendar = calendars.find(c => c.id === calendarId);
+        
+        return data.map((e: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }) => ({
+          id: e.id,
+          title: e.summary || 'Sem título',
+          start: new Date(e.start.dateTime || e.start.date),
+          end: new Date(e.end.dateTime || e.end.date),
+          type: 'meeting',
+          location: e.location,
+          attendees: e.attendees?.map((a: { displayName?: string; email: string }) => a.displayName || a.email),
+          calendarColor: calendar?.backgroundColor || '#d4ff3f'
+        }));
+      });
+
+      const results = await Promise.all(allEventsPromises);
+      const mergedEvents = results.flat();
 
       // Replace events with Google events when connected
-      setEvents(formattedEvents);
+      setEvents(mergedEvents);
       setIsGoogleConnected(true);
     } catch (err: unknown) {
       console.error('Error fetching Google events:', err);
@@ -132,7 +191,14 @@ export default function CalendarPage() {
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [selectedCalendarIds, calendars]);
+
+  // Re-fetch events when selected calendars change
+  useEffect(() => {
+    if (isGoogleConnected && selectedCalendarIds.length > 0) {
+      fetchGoogleEvents();
+    }
+  }, [isGoogleConnected, selectedCalendarIds, fetchGoogleEvents]);
 
   const next = () => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, 1));
@@ -178,6 +244,7 @@ export default function CalendarPage() {
       
       if (tokens) {
         setIsGoogleConnected(true);
+        fetchGoogleCalendars();
         fetchGoogleEvents();
       }
     };
@@ -187,15 +254,16 @@ export default function CalendarPage() {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         setIsGoogleConnected(true);
+        fetchGoogleCalendars();
         fetchGoogleEvents();
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []);
+  }, [fetchGoogleCalendars, fetchGoogleEvents]);
 
   const renderHeader = () => (
-    <header className="p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-slate-800/50">
+    <header className="p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/20">
       <div>
         <h1 className="text-4xl font-black tracking-tight italic">
           Agenda <span className="text-[#d4ff3f]">Inteligente</span>
@@ -296,8 +364,8 @@ export default function CalendarPage() {
         <div 
           key={day.toString()} 
           className={cn(
-            "min-h-[120px] p-2 border-r border-b border-slate-800/30 flex flex-col gap-1 transition-colors",
-            !isSameMonth(day, monthStart) ? "bg-[#0a0a0a]/50 opacity-30" : "bg-[#0a0a0a]",
+            "min-h-[120px] p-2 border-r border-b border-white/20 flex flex-col gap-1 transition-colors",
+            !isSameMonth(day, monthStart) ? "bg-[#141414]/50 opacity-30" : "bg-[#141414]",
             isToday(day) && "bg-[#d4ff3f]/5"
           )}
         >
@@ -317,11 +385,16 @@ export default function CalendarPage() {
                 key={event.id}
                 className={cn(
                   "px-2 py-1 rounded-md text-[9px] font-bold truncate border",
-                  event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                  event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                  event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
-                  "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                  !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                  !event.calendarColor && event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                  !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
+                  !event.calendarColor ? "bg-slate-500/10 text-slate-400 border-slate-500/20" : ""
                 )}
+                style={event.calendarColor ? { 
+                  backgroundColor: `${event.calendarColor}15`, 
+                  color: event.calendarColor,
+                  borderColor: `${event.calendarColor}30`
+                } : {}}
               >
                 {format(event.start, 'HH:mm')} {event.title}
               </div>
@@ -338,9 +411,9 @@ export default function CalendarPage() {
 
     return (
       <div className="flex-1 flex flex-col">
-        <div className="grid grid-cols-7 border-b border-slate-800/50 bg-[#1a1a1a]">
+        <div className="grid grid-cols-7 border-b border-white/20 bg-[#1a1a1a]">
           {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
-            <div key={d} className="py-3 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest">
+            <div key={d} className="py-3 text-center text-[10px] font-black text-slate-500 uppercase tracking-widest border-r border-white/20 last:border-r-0">
               {d}
             </div>
           ))}
@@ -359,11 +432,11 @@ export default function CalendarPage() {
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="grid grid-cols-[80px_1fr] border-b border-slate-800/50 bg-[#1a1a1a]">
-          <div className="border-r border-slate-800/30"></div>
+        <div className="grid grid-cols-[80px_1fr] border-b border-white/20 bg-[#1a1a1a]">
+          <div className="border-r border-white/20"></div>
           <div className="grid grid-cols-7">
             {days.map(day => (
-              <div key={day.toString()} className="py-4 text-center border-r border-slate-800/30">
+              <div key={day.toString()} className="py-4 text-center border-r border-white/20">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{format(day, 'EEE', { locale: ptBR })}</p>
                 <p className={cn(
                   "text-lg font-black",
@@ -376,18 +449,18 @@ export default function CalendarPage() {
         
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-[80px_1fr] min-h-full">
-            <div className="border-r border-slate-800/30">
+            <div className="border-r border-white/20">
               {hours.map(hour => (
-                <div key={hour} className="h-20 border-b border-slate-800/10 flex items-start justify-center pt-2">
+                <div key={hour} className="h-20 border-b border-white/10 flex items-start justify-center pt-2">
                   <span className="text-[10px] font-black text-slate-600">{format(new Date().setHours(hour, 0), 'HH:mm')}</span>
                 </div>
               ))}
             </div>
-            <div className="grid grid-cols-7 relative">
+            <div className="grid grid-cols-7 relative bg-[#141414]">
               {days.map(day => (
-                <div key={day.toString()} className="border-r border-slate-800/30 relative">
+                <div key={day.toString()} className="border-r border-white/20 relative">
                   {hours.map(hour => (
-                    <div key={hour} className="h-20 border-b border-slate-800/10"></div>
+                    <div key={hour} className="h-20 border-b border-white/10"></div>
                   ))}
                   {events.filter(e => isSameDay(e.start, day)).map(event => {
                     const top = (event.start.getHours() * 80) + (event.start.getMinutes() / 60 * 80);
@@ -397,12 +470,20 @@ export default function CalendarPage() {
                         key={event.id}
                         className={cn(
                           "absolute left-1 right-1 p-2 rounded-xl border z-10 overflow-hidden",
-                          event.type === 'meeting' ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
-                          event.type === 'task' ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
-                          event.type === 'project' ? "bg-[#d4ff3f]/20 text-[#d4ff3f] border-[#d4ff3f]/30" :
-                          "bg-slate-500/20 text-slate-400 border-slate-500/30"
+                          !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
+                          !event.calendarColor && event.type === 'task' ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
+                          !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/20 text-[#d4ff3f] border-[#d4ff3f]/30" :
+                          !event.calendarColor ? "bg-slate-500/20 text-slate-400 border-slate-500/30" : ""
                         )}
-                        style={{ top: `${top}px`, height: `${height}px` }}
+                        style={{ 
+                          top: `${top}px`, 
+                          height: `${height}px`,
+                          ...(event.calendarColor ? {
+                            backgroundColor: `${event.calendarColor}20`,
+                            color: event.calendarColor,
+                            borderColor: `${event.calendarColor}40`
+                          } : {})
+                        }}
                       >
                         <p className="text-[10px] font-black truncate">{event.title}</p>
                         <p className="text-[8px] font-bold opacity-70">{format(event.start, 'HH:mm')} - {format(event.end, 'HH:mm')}</p>
@@ -424,7 +505,7 @@ export default function CalendarPage() {
 
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="p-6 bg-[#1a1a1a] border-b border-slate-800/50 flex items-center justify-between">
+        <div className="p-6 bg-[#1a1a1a] border-b border-white/20 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="size-12 rounded-2xl bg-[#d4ff3f] flex flex-col items-center justify-center text-[#0a0a0a]">
               <span className="text-[10px] font-black uppercase tracking-tighter">{format(currentDate, 'EEE', { locale: ptBR })}</span>
@@ -439,16 +520,16 @@ export default function CalendarPage() {
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           <div className="grid grid-cols-[100px_1fr] min-h-full">
-            <div className="border-r border-slate-800/30">
+            <div className="border-r border-white/20">
               {hours.map(hour => (
-                <div key={hour} className="h-24 border-b border-slate-800/10 flex items-start justify-center pt-4">
+                <div key={hour} className="h-24 border-b border-white/10 flex items-start justify-center pt-4">
                   <span className="text-xs font-black text-slate-600">{format(new Date().setHours(hour, 0), 'HH:mm')}</span>
                 </div>
               ))}
             </div>
-            <div className="relative p-4">
+            <div className="relative p-4 bg-[#141414]">
               {hours.map(hour => (
-                <div key={hour} className="h-24 border-b border-slate-800/10"></div>
+                <div key={hour} className="h-24 border-b border-white/10"></div>
               ))}
               {dayEvents.map(event => {
                 const top = (event.start.getHours() * 96) + (event.start.getMinutes() / 60 * 96);
@@ -460,12 +541,20 @@ export default function CalendarPage() {
                     animate={{ opacity: 1, x: 0 }}
                     className={cn(
                       "absolute left-8 right-8 p-4 rounded-2xl border z-10 flex flex-col justify-between shadow-2xl",
-                      event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
-                      event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
-                      event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
-                      "bg-slate-500/10 text-slate-400 border-slate-500/20"
+                      !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
+                      !event.calendarColor && event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
+                      !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
+                      !event.calendarColor ? "bg-slate-500/10 text-slate-400 border-slate-500/20" : ""
                     )}
-                    style={{ top: `${top + 16}px`, height: `${height - 8}px` }}
+                    style={{ 
+                      top: `${top + 16}px`, 
+                      height: `${height - 8}px`,
+                      ...(event.calendarColor ? {
+                        backgroundColor: `${event.calendarColor}15`,
+                        color: event.calendarColor,
+                        borderColor: `${event.calendarColor}30`
+                      } : {})
+                    }}
                   >
                     <div>
                       <div className="flex justify-between items-start mb-2">
@@ -519,7 +608,7 @@ export default function CalendarPage() {
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Mini Calendar & Filters */}
-        <aside className="w-80 border-r border-slate-800/50 p-8 hidden xl:flex flex-col gap-8 overflow-y-auto custom-scrollbar">
+        <aside className="w-80 border-r border-white/20 p-8 hidden xl:flex flex-col gap-8 overflow-y-auto custom-scrollbar">
           <div className="space-y-4">
             <div className="flex items-center gap-2 bg-[#1a1a1a] p-3 rounded-2xl border border-slate-800/50">
               <Search size={16} className="text-slate-500" />
@@ -532,20 +621,29 @@ export default function CalendarPage() {
           </div>
 
           <div className="space-y-4">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Meus Calendários</h4>
+            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">MINHAS AGENDAS</h4>
             <div className="space-y-2">
-              {[
-                { name: 'Pessoal', color: 'bg-blue-500' },
-                { name: 'Trabalho', color: 'bg-[#d4ff3f]' },
-                { name: 'Projetos', color: 'bg-orange-500' },
-                { name: 'Feriados', color: 'bg-rose-500' },
-              ].map(cal => (
-                <label key={cal.name} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-xl border border-slate-800/30 cursor-pointer hover:border-slate-700 transition-all">
+              {calendars.map(cal => (
+                <label key={cal.id} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-xl border border-slate-800/30 cursor-pointer hover:border-slate-700 transition-all">
                   <div className="flex items-center gap-3">
-                    <div className={cn("size-3 rounded-full", cal.color)}></div>
-                    <span className="text-xs font-bold">{cal.name}</span>
+                    <div 
+                      className="size-3 rounded-full" 
+                      style={{ backgroundColor: cal.backgroundColor || '#d4ff3f' }}
+                    ></div>
+                    <span className="text-xs font-bold truncate max-w-[160px]">{cal.summary}</span>
                   </div>
-                  <input type="checkbox" defaultChecked className="size-4 rounded border-slate-800 bg-transparent text-[#d4ff3f] focus:ring-[#d4ff3f]/30" />
+                  <input 
+                    type="checkbox" 
+                    checked={selectedCalendarIds.includes(cal.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedCalendarIds(prev => [...prev, cal.id]);
+                      } else {
+                        setSelectedCalendarIds(prev => prev.filter(id => id !== cal.id));
+                      }
+                    }}
+                    className="size-4 rounded border-slate-800 bg-transparent text-[#d4ff3f] focus:ring-[#d4ff3f]/30" 
+                  />
                 </label>
               ))}
             </div>

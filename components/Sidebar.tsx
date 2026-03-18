@@ -56,6 +56,7 @@ const navItems: NavGroup[] = [
     { name: 'Projetos', icon: Briefcase, href: '/projects' },
     { name: 'Orçamento', icon: Target, href: '/finances/budget' },
     { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
+    { name: 'Serviços', icon: Layers, href: '/finances/services' },
   ]},
   { group: 'FISCAL', items: [
     { name: 'Impostos', icon: Percent, href: '/finances/taxes' },
