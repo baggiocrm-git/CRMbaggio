@@ -11,7 +11,8 @@ import {
   Search,
   MoreHorizontal,
   ExternalLink,
-  CheckCircle2
+  CheckCircle2,
+  TrendingUp
 } from 'lucide-react';
 import { 
   format, 
@@ -32,6 +33,7 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/lib/supabase';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -76,8 +78,39 @@ const MOCK_EVENTS: Event[] = [
 export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<ViewType>('month');
-  const [events] = useState<Event[]>(MOCK_EVENTS);
+  const [events, setEvents] = useState<Event[]>(MOCK_EVENTS);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const fetchGoogleEvents = async () => {
+    try {
+      setIsSyncing(true);
+      const response = await fetch('/api/google/calendar/events');
+      if (!response.ok) throw new Error('Failed to fetch Google events');
+      
+      const googleEvents: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }[] = await response.json();
+      
+      const formattedEvents: Event[] = googleEvents.map((e) => ({
+        id: e.id,
+        title: e.summary || 'Sem título',
+        start: new Date(e.start.dateTime || e.start.date),
+        end: new Date(e.end.dateTime || e.end.date),
+        type: 'meeting', // Default to meeting for Google events
+        location: e.location,
+        attendees: e.attendees?.map((a) => a.displayName || a.email)
+      }));
+
+      // Merge with mock events or just replace
+      setEvents(prev => {
+        const nonGoogle = prev.filter(e => !googleEvents.some((ge) => ge.id === e.id));
+        return [...nonGoogle, ...formattedEvents];
+      });
+    } catch (error) {
+      console.error('Error fetching Google events:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   const next = () => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, 1));
@@ -107,9 +140,32 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
+    const checkConnection = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.app_metadata?.provider === 'google') {
+        setIsGoogleConnected(true);
+        return;
+      }
+
+      // Check if we have tokens in the database
+      const { data: tokens } = await supabase
+        .from('google_tokens')
+        .select('id')
+        .limit(1)
+        .maybeSingle();
+      
+      if (tokens) {
+        setIsGoogleConnected(true);
+        fetchGoogleEvents();
+      }
+    };
+
+    checkConnection();
+
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         setIsGoogleConnected(true);
+        fetchGoogleEvents();
       }
     };
     window.addEventListener('message', handleMessage);
@@ -148,6 +204,20 @@ export default function CalendarPage() {
           <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-[10px] font-black uppercase tracking-widest hover:text-white">Hoje</button>
           <button onClick={next} className="p-1.5 hover:text-[#d4ff3f] transition-colors"><ChevronRight size={16} /></button>
         </div>
+
+        <button 
+          onClick={fetchGoogleEvents}
+          disabled={isSyncing}
+          className={cn(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]",
+            isSyncing && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          <div className={cn(isSyncing && "animate-spin")}>
+            <TrendingUp size={14} />
+          </div>
+          {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+        </button>
 
         <button 
           onClick={handleConnectGoogle}

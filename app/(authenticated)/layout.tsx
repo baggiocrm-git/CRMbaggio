@@ -4,21 +4,58 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<{ email?: string; id: string; user_metadata?: { role?: string } } | null>(null);
 
   useEffect(() => {
-    const checkRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata?.role === 'Cliente') {
-        // Fetch their project to redirect
+    console.log('DashboardLayout: supabase object:', supabase);
+    console.log('DashboardLayout: supabase.auth:', supabase?.auth);
+    
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout;
+
+    const handleUserRole = async (userData: User) => {
+      if (!mounted) return;
+      
+      const userEmail = (
+        userData.email || 
+        userData.user_metadata?.email || 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (userData as any).app_metadata?.email ||
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (userData as any).identities?.[0]?.identity_data?.email ||
+        ''
+      ).toLowerCase().trim();
+
+      console.log('DashboardLayout: Processando papel do usuário:', userEmail, userData.user_metadata);
+      setUser(userData);
+
+      // Auto-fix role for the main admin email if missing in metadata
+      if (userEmail === 'lucabaggio28@gmail.com') {
+        if (userData.user_metadata?.role !== 'Administrador') {
+          console.log('Auto-atribuindo papel de Administrador para:', userEmail);
+          const { error: updateError } = await supabase.auth.updateUser({
+            data: { role: 'Administrador' }
+          });
+          if (!updateError) {
+            console.log('Papel de Administrador sincronizado com o perfil!');
+            // Force session refresh to update JWT for RLS
+            await supabase.auth.refreshSession();
+            // Refresh local state
+            const { data: { user: refreshedUser } } = await supabase.auth.getUser();
+            if (refreshedUser && mounted) setUser(refreshedUser);
+          }
+        }
+        setLoading(false);
+      } else if (userData.user_metadata?.role === 'Cliente') {
         const { data: projectData } = await supabase
           .from('projetos')
           .select('id')
-          .eq('cliente_id', user.id)
+          .eq('cliente_id', userData.id)
           .limit(1)
           .single();
         
@@ -32,13 +69,236 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         setLoading(false);
       }
     };
-    checkRole();
+
+    const syncGoogleTokens = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.provider_token && session?.user?.app_metadata?.provider === 'google') {
+        console.log('Sincronizando tokens do Google...');
+        try {
+          await supabase.from('google_tokens').upsert({
+            id: 1,
+            access_token: session.provider_token,
+            refresh_token: session.provider_refresh_token || null,
+            token_type: 'Bearer',
+            scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file',
+            updated_at: new Date().toISOString()
+          });
+        } catch (e) {
+          console.error('Erro ao sincronizar tokens:', e);
+        }
+      }
+    };
+
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    if (supabase?.auth?.onAuthStateChange) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log('Auth state changed event:', event, 'Session:', !!session);
+        if (mounted && session?.user) {
+          console.log('Sessão detectada via onAuthStateChange para:', session.user.email);
+          if (timeoutId) clearTimeout(timeoutId);
+          await handleUserRole(session.user);
+          await syncGoogleTokens();
+        } else if (mounted && event === 'SIGNED_OUT') {
+          console.log('Usuário deslogado detectado');
+          router.push('/login');
+        }
+      });
+      subscription = data.subscription;
+    } else {
+      console.error('ERRO CRÍTICO: supabase.auth.onAuthStateChange não é uma função!');
+      // Tentar fallback ou logar chaves para diagnóstico
+      console.log('Chaves disponíveis em supabase.auth:', Object.keys(supabase?.auth || {}));
+    }
+
+    // Initial check
+    const checkInitialSession = async () => {
+      console.log('Iniciando checkInitialSession...');
+      console.log('URL no checkInitialSession:', window.location.href);
+
+      if (!supabase?.auth?.getSession) {
+        console.error('ERRO CRÍTICO: supabase.auth.getSession não é uma função!');
+        router.push('/login');
+        return;
+      }
+
+      // Check if we have a hash (OAuth redirect)
+      const hash = typeof window !== 'undefined' ? window.location.hash.substring(1) : '';
+      const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+      const errorParam = searchParams.get('error');
+      const errorDesc = searchParams.get('error_description');
+      
+      if (errorParam) {
+        console.error('Erro de autenticação detectado na URL:', errorParam, errorDesc);
+        setLoading(false);
+        return;
+      }
+
+      const hasHash = hash.includes('access_token') || searchParams.has('code');
+      
+      if (hasHash) {
+        console.log('Hash/Código de acesso detectado, aguardando processamento do Supabase...');
+        
+        // Manual hash parsing fallback if Supabase is slow
+        if (hash.includes('access_token')) {
+          try {
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            
+            if (accessToken) {
+              console.log('Tentando setSession manual com dados do hash...');
+              const { data: { session: manualSession } } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || '',
+              });
+              if (manualSession?.user) {
+                console.log('Sessão manual estabelecida para:', manualSession.user.email);
+                await handleUserRole(manualSession.user);
+                await syncGoogleTokens();
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Erro no parsing manual do hash:', e);
+          }
+        }
+
+        // Manual code exchange attempt if Supabase is slow and it's a code flow
+        const code = searchParams.get('code');
+        if (code) {
+          console.log('Código detectado na URL, tentando exchange manual...');
+          try {
+            const { data: { session: exchangeSession }, error: exchangeError } = await supabase.auth.getSession();
+            if (exchangeSession?.user) {
+              console.log('Exchange de código bem sucedido via getSession!');
+              await handleUserRole(exchangeSession.user);
+              await syncGoogleTokens();
+              return;
+            }
+            if (exchangeError) console.error('Erro no exchange via getSession:', exchangeError.message);
+          } catch (e) {
+            console.error('Erro ao tentar exchange manual:', e);
+          }
+        }
+      }
+
+      // Use getSession() as it triggers the hash parsing
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (session?.user) {
+        console.log('Sessão inicial encontrada para:', session.user.email);
+        await handleUserRole(session.user);
+        await syncGoogleTokens();
+      } else {
+        if (sessionError) console.warn('Erro ao buscar sessão inicial:', sessionError.message);
+        
+        console.log('Nenhuma sessão inicial encontrada. Aguardando processamento do hash ou onAuthStateChange...');
+        
+        // Fallback: If we have a hash but no session, maybe Supabase is stuck.
+        // We wait for onAuthStateChange to fire SIGNED_IN.
+        
+        timeoutId = setTimeout(async () => {
+          if (!mounted) return;
+          console.log('Tentando buscar sessão novamente após timeout...');
+          const { data: { session: retrySession } } = await supabase.auth.getSession();
+          
+          if (!retrySession) {
+            // Last attempt: check for user directly
+            const { data: { user: lastUser } } = await supabase.auth.getUser();
+            if (lastUser) {
+              console.log('Usuário encontrado via getUser() no último suspiro:', lastUser.email);
+              await handleUserRole(lastUser);
+              await syncGoogleTokens();
+              return;
+            }
+            
+            // If still nothing and we have a hash, maybe we should try to refresh the page?
+            if (hasHash) {
+              console.warn('Hash detectado mas nenhuma sessão encontrada. Tentando recarregar a página...');
+              // window.location.reload(); // This might cause a loop, let's be careful.
+              // Instead, let's show a manual button.
+              setLoading(false); // Stop loading to show the manual button
+              return;
+            }
+
+            console.log('Nenhuma sessão encontrada após timeout estendido, redirecionando para login.');
+            router.push('/login');
+          } else {
+            console.log('Sessão encontrada após retry para:', retrySession.user.email);
+            await handleUserRole(retrySession.user);
+            await syncGoogleTokens();
+          }
+        }, hasHash ? 12000 : 6000); // Wait even longer if we have a hash/code
+      }
+    };
+
+    checkInitialSession();
+
+    return () => {
+      mounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+      if (subscription) subscription.unsubscribe();
+    };
   }, [router]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] gap-6">
         <Loader2 className="animate-spin text-[#d4ff3f]" size={32} />
+        <div className="text-center">
+          <p className="text-slate-400 text-sm font-medium">Verificando sua sessão...</p>
+          <p className="text-slate-600 text-[10px] mt-2">Isso pode levar alguns segundos em conexões lentas.</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest hover:underline"
+          >
+            Tentar Novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If loading is false but we don't have a user yet, it means we are in the "fallback" state
+  if (!user) {
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const errorParam = searchParams?.get('error');
+    const errorDesc = searchParams?.get('error_description');
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] gap-8 p-6">
+        <div className="text-center space-y-4">
+          <div className={`${errorParam ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'} border rounded-full p-4 w-fit mx-auto`}>
+            <AlertCircle className={errorParam ? 'text-red-500' : 'text-amber-500'} size={32} />
+          </div>
+          <h2 className="text-white text-xl font-black uppercase tracking-tighter">
+            {errorParam ? 'Erro de Autenticação' : 'Sessão não detectada'}
+          </h2>
+          <p className="text-slate-400 text-sm max-w-xs mx-auto">
+            {errorParam 
+              ? `Ocorreu um erro ao tentar entrar: ${errorDesc || errorParam}`
+              : 'Detectamos uma tentativa de login, mas o navegador ainda não processou os dados.'}
+          </p>
+          <p className="text-slate-600 text-[8px] break-all max-w-xs mx-auto opacity-50">
+            URL: {typeof window !== 'undefined' ? window.location.href : ''}
+          </p>
+        </div>
+        
+        <div className="flex flex-col gap-3 w-full max-w-xs">
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full bg-[#d4ff3f] text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl hover:bg-[#c4ef2f] transition-all"
+          >
+            Recarregar Página
+          </button>
+          <button 
+            onClick={() => router.push('/login')}
+            className="w-full bg-transparent border border-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest py-4 rounded-2xl hover:bg-slate-900 transition-all"
+          >
+            Voltar ao Login
+          </button>
+        </div>
       </div>
     );
   }

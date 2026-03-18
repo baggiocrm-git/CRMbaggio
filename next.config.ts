@@ -11,11 +11,6 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
   productionBrowserSourceMaps: false,
-  experimental: {
-    cpus: 1,
-    webpackBuildWorker: false,
-    serverMinification: false,
-  },
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'picsum.photos' },

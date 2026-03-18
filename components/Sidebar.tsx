@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -62,53 +62,111 @@ const navItems: NavGroup[] = [
     { name: 'Obrigações', icon: ClipboardList, href: '/finances/obligations' },
     { name: 'DRE', icon: PieChart, href: '/finances/dre' },
   ]},
+  { group: 'OUTROS', items: [] },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = React.useState(false);
 
   React.useEffect(() => {
-    const getUser = async () => {
-      try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) throw error;
-        setUser(user);
-        if (user) {
-          setIsAdmin(user.email === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador');
+    // Listen for auth state changes to catch the user as soon as they log in
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Sidebar: Auth state changed:', event, !!session);
+      if (session?.user) {
+        setUser(session.user);
+        const userEmail = (
+          session.user.email || 
+          session.user.user_metadata?.email || 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (session.user as any).app_metadata?.email ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (session.user as any).identities?.[0]?.identity_data?.email ||
+          ''
+        ).toLowerCase().trim();
+        
+        const isAdm = userEmail === 'lucabaggio28@gmail.com' || session.user.user_metadata?.role === 'Administrador';
+        console.log('Sidebar: User detected:', userEmail, 'IsAdmin:', isAdm);
+        
+        // If it's the admin but role is missing, we might want to refresh session
+        if (userEmail === 'lucabaggio28@gmail.com' && session.user.user_metadata?.role !== 'Administrador') {
+          console.log('Sidebar: Admin email detected but role missing in metadata. Refreshing session...');
+          // The DashboardLayout should handle the update, but we can trigger a refresh here too
         }
-      } catch (err) {
-        console.error('Erro ao buscar usuário no Sidebar:', err);
+      } else {
         setUser(null);
       }
+    });
+
+    // Initial check
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Sidebar: Initial user check:', !!user);
+      if (user) {
+        setUser(user);
+        const userEmail = (
+          user.email || 
+          user.user_metadata?.email || 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (user as any).app_metadata?.email ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (user as any).identities?.[0]?.identity_data?.email ||
+          ''
+        ).toLowerCase().trim();
+        const isAdm = userEmail === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador';
+        console.log('Sidebar: Initial user email:', userEmail, 'IsAdmin:', isAdm);
+      }
     };
-    getUser();
+    checkUser();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+  const handleLogout = () => {
+    // Force immediate cleanup and redirect
+    try {
+      supabase.auth.signOut().catch(() => {});
+      localStorage.clear();
+      sessionStorage.clear();
+      // Use replace to prevent back-button issues
+      window.location.replace('/login');
+    } catch {
+      window.location.replace('/login');
+    }
   };
 
-  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário';
+  // Deep search for email in the user object
+  const userEmail = (
+    user?.email || 
+    user?.user_metadata?.email || 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (user as any)?.app_metadata?.email ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (user as any)?.identities?.[0]?.identity_data?.email ||
+    'Conectado'
+  ).toLowerCase().trim();
+  
+  const isAdminEmail = userEmail === 'lucabaggio28@gmail.com';
+  const userRole = isAdminEmail ? 'Administrador' : (user?.user_metadata?.role || 'Usuário');
+  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   const filteredNavItems = navItems.map(group => {
     if (group.group === 'OUTROS') {
       const items = [...group.items];
-      if (isAdmin) {
+      if (isAdminEmail || user?.user_metadata?.role === 'Administrador') {
         // Add Users management to OUTROS group if admin
         const hasUsers = items.some(i => i.name === 'Usuários');
         if (!hasUsers) {
-          items.splice(items.length - 1, 0, { name: 'Usuários', icon: Users, href: '/users' });
+          items.push({ name: 'Usuários', icon: Users, href: '/users' });
         }
       }
       return { ...group, items };
     }
     return group;
-  });
+  }).filter(group => group.items.length > 0);
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
@@ -196,8 +254,24 @@ export default function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-white truncate">{userName}</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{user?.email || 'Conectado'}</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{userRole} • {userEmail}</p>
           </div>
+        </div>
+        {/* Debug info for admin troubleshooting */}
+        <div className="mt-2 px-2 opacity-20 hover:opacity-100 transition-opacity flex flex-col gap-1">
+          <p className="text-[6px] text-slate-500 font-mono break-all">
+            E: {userEmail} | R: {userRole} | ID: {user?.id?.substring(0, 5)}
+          </p>
+          <button 
+            onClick={() => {
+              localStorage.clear();
+              sessionStorage.clear();
+              window.location.replace('/login');
+            }}
+            className="text-[6px] text-rose-500 font-black uppercase tracking-widest hover:underline text-left"
+          >
+            [ FORÇAR RESET ]
+          </button>
         </div>
       </div>
     </aside>

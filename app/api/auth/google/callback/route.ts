@@ -42,13 +42,16 @@ export async function GET(req: NextRequest) {
 
     const tokens = await tokenResponse.json();
     
-    // Store tokens in Supabase (we'll use a generic key for now since we don't have user sessions yet)
-    // In a real app, you'd associate this with the logged-in user's ID
+    // Store tokens in Supabase
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      throw new Error('Configuração do Supabase ausente no servidor');
+    }
+
     const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     await supabase.from('google_tokens').upsert({
       id: 1, // Using numeric ID for int8 column

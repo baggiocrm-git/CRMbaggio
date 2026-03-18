@@ -1,25 +1,42 @@
 'use client';
 
 import React from 'react';
-import { Search, Bell, Plus } from 'lucide-react';
+import { Search, Bell, Plus, RefreshCw } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface HeaderProps {
   title: string;
   subtitle?: string;
   searchValue?: string;
   onSearch?: (value: string) => void;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
   action?: {
     label: string;
     onClick: () => void;
   };
 }
 
-const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, action }: HeaderProps) {
+const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, onRefresh, isRefreshing, action }: HeaderProps) {
   return (
     <header className="h-20 border-b border-slate-800/50 bg-[#0a0a0a] px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
-      <div className="flex flex-col">
-        <h2 className="text-xl font-black text-white tracking-tight leading-none">{title}</h2>
-        {subtitle && <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{subtitle}</p>}
+      <div className="flex items-center gap-4">
+        <div className="flex flex-col">
+          <h2 className="text-xl font-black text-white tracking-tight leading-none">{title}</h2>
+          {subtitle && <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{subtitle}</p>}
+        </div>
+        {onRefresh && (
+          <button 
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "p-2 rounded-xl bg-[#1a1a1a] text-slate-500 hover:text-[#d4ff3f] transition-all",
+              isRefreshing && "opacity-50"
+            )}
+          >
+            <RefreshCw size={16} className={cn(isRefreshing && "animate-spin")} />
+          </button>
+        )}
       </div>
 
       <div className="flex items-center gap-6">

@@ -62,15 +62,29 @@ export default function FinanceDashboard() {
 
   const fetchData = async () => {
     try {
+      console.log('FinanceDashboard: Iniciando busca de dados...');
       const [recRes, payRes] = await Promise.all([
         supabase.from('contas_receber').select('*'),
         supabase.from('contas_pagar').select('*')
       ]);
 
-      if (recRes.data) setReceivables(recRes.data);
-      if (payRes.data) setPayables(payRes.data);
+      if (recRes.error) {
+        console.error('FinanceDashboard: Erro ao buscar contas_receber:', recRes.error);
+      }
+      if (payRes.error) {
+        console.error('FinanceDashboard: Erro ao buscar contas_pagar:', payRes.error);
+      }
+
+      if (recRes.data) {
+        console.log('FinanceDashboard: Contas a receber carregadas:', recRes.data.length);
+        setReceivables(recRes.data);
+      }
+      if (payRes.data) {
+        console.log('FinanceDashboard: Contas a pagar carregadas:', payRes.data.length);
+        setPayables(payRes.data);
+      }
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('FinanceDashboard: Erro fatal no fetchData:', error);
     }
   };
 
@@ -134,7 +148,11 @@ export default function FinanceDashboard() {
   ).sort((a, b) => new Date(a.data_vencimento).getTime() - new Date(b.data_vencimento).getTime());
 
   const latestTransactions = [
-    ...receivables.filter(r => r.data_recebimento).map(r => ({
+    ...receivables.filter(r => {
+      if (!r.data_recebimento) return false;
+      const d = new Date(r.data_recebimento);
+      return !isNaN(d.getTime());
+    }).map(r => ({
       name: `Recebimento — ${r.cliente}`,
       desc: `Vendas · ${new Date(r.data_recebimento!).toLocaleDateString('pt-BR')}`,
       amount: `+ ${formatCurrency(r.valor_recebido)}`,
@@ -142,7 +160,11 @@ export default function FinanceDashboard() {
       icon: Wallet,
       date: new Date(r.data_recebimento!).getTime()
     })),
-    ...payables.filter(p => p.data_pagamento).map(p => ({
+    ...payables.filter(p => {
+      if (!p.data_pagamento) return false;
+      const d = new Date(p.data_pagamento);
+      return !isNaN(d.getTime());
+    }).map(p => ({
       name: `Pagamento — ${p.fornecedor}`,
       desc: `Despesa · ${new Date(p.data_pagamento!).toLocaleDateString('pt-BR')}`,
       amount: `- ${formatCurrency(p.valor_pago)}`,

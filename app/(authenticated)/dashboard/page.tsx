@@ -10,7 +10,8 @@ import {
   TrendingUp, 
   DollarSign, 
   FileText,
-  Loader2
+  Loader2,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -20,6 +21,7 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
+
 import { motion } from 'motion/react';
 
 export default function DashboardPage() {
@@ -33,11 +35,20 @@ export default function DashboardPage() {
   const [recentRdos, setRecentRdos] = useState<{id: string, data: string, created_at: string, projetos?: {nome: string}}[]>([]);
   const [chartData, setChartData] = useState<{name: string, value: number}[]>([]);
   const [priorityTasks, setPriorityTasks] = useState<{id: string, title: string, site: string, status: string, color: string}[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<{ id: string; summary: string; start: { dateTime?: string; date: string } }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
+      console.log('DashboardPage: Iniciando fetchData');
       setIsLoading(true);
+      
+      // Check for session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        console.warn('DashboardPage: Nenhuma sessão encontrada no fetchData');
+      }
+
       const [projectsRes, staffRes, receivablesRes, payablesRes, rdosRes, delayedProjectsRes] = await Promise.all([
         supabase.from('projetos').select('id', { count: 'exact' }).neq('status', 'Concluído'),
         supabase.from('equipe').select('id', { count: 'exact' }).eq('status', 'Ativo'),
@@ -46,6 +57,12 @@ export default function DashboardPage() {
         supabase.from('rdos').select('*, projetos(nome)').order('created_at', { ascending: false }).limit(5),
         supabase.from('projetos').select('*').eq('status', 'Atrasado').limit(3)
       ]);
+
+      console.log('DashboardPage: Resultados das queries:', { 
+        projects: projectsRes.count, 
+        staff: staffRes.count,
+        rdos: rdosRes.data?.length 
+      });
 
       const receivable = (receivablesRes.data || [])
         .reduce((acc, curr) => acc + Number(curr.valor), 0);
@@ -109,6 +126,17 @@ export default function DashboardPage() {
 
       setPriorityTasks([...tasks, ...rdosWithOccurrences].slice(0, 3));
 
+      // Fetch Google Events if connected
+      try {
+        const googleRes = await fetch('/api/google/calendar/events');
+        if (googleRes.ok) {
+          const events = await googleRes.json();
+          setGoogleEvents(events.slice(0, 3));
+        }
+      } catch (e) {
+        console.warn('DashboardPage: Erro ao buscar eventos do Google:', e);
+      }
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error instanceof Error ? error.message : String(error));
     } finally {
@@ -118,6 +146,26 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
+
+    // Listen for auth state changes to refresh data
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('DashboardPage: Auth state change detected:', event);
+      if (session) {
+        fetchData();
+      }
+    });
+
+    // Refresh on focus
+    const onFocus = () => {
+      console.log('DashboardPage: Window focused, refreshing data');
+      fetchData();
+    };
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('focus', onFocus);
+    };
   }, [fetchData]);
 
   const kpis = [
@@ -158,6 +206,8 @@ export default function DashboardPage() {
         title="Visão Geral Operacional" 
         subtitle={`Monitorando ${stats.activeProjects} canteiros de obras ativos em tempo real.`}
         action={{ label: 'Novo Projeto', onClick: () => {} }}
+        onRefresh={fetchData}
+        isRefreshing={isLoading}
       />
       
       <div className="p-8 space-y-8">
@@ -201,8 +251,12 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content Column */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Performance Chart */}
-            <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 shadow-sm">
+            <motion.div 
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.4 }}
+              className="lg:col-span-2 p-8 rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm"
+            >
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-lg font-black tracking-tight">Desempenho (RDOs por dia)</h3>
                 <div className="flex bg-[#0a0a0a] p-1 rounded-xl">
@@ -219,32 +273,50 @@ export default function DashboardPage() {
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={performanceData}>
-                    <Bar dataKey="value" radius={[4, 4, 0, 0]} barSize={40}>
-                      {performanceData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={index === 3 ? '#d4ff3f' : '#d4ff3f30'} />
-                      ))}
-                    </Bar>
                     <XAxis 
                       dataKey="name" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                      tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }}
+                      dy={10}
                     />
                     <Tooltip 
-                      cursor={{ fill: '#ffffff05' }}
-                      contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
+                      cursor={{ fill: '#2a2a2a', radius: 8 }}
+                      contentStyle={{ 
+                        backgroundColor: '#1a1a1a', 
+                        border: '1px solid #334155', 
+                        borderRadius: '12px',
+                        fontSize: '10px',
+                        fontWeight: 'bold'
+                      }}
                     />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={32}>
+                      {performanceData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#d4ff3f' : '#1e293b'} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
-            </div>
+            </motion.div>
 
             {/* High Priority Tasks */}
-            <div className="space-y-4">
+            <motion.div 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+              className="space-y-4"
+            >
               <h3 className="text-lg font-black tracking-tight">Tarefas Ativas de Alta Prioridade</h3>
               <div className="divide-y divide-slate-800/50 bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-                {highPriorityTasks.map((task) => (
-                  <div key={task.id} className="p-6 flex items-center justify-between hover:bg-[#2a2a2a]/30 transition-colors">
+                {highPriorityTasks.map((task, idx) => (
+                  <motion.div 
+                    key={task.id} 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.6 + (idx * 0.1) }}
+                    className="p-6 flex items-center justify-between hover:bg-[#2a2a2a]/30 transition-colors"
+                  >
                     <div className="flex items-center gap-4">
                       <div className={`size-2.5 rounded-full ${task.color} shadow-lg shadow-${task.color.split('-')[1]}-500/20`}></div>
                       <div>
@@ -255,14 +327,46 @@ export default function DashboardPage() {
                     <span className="text-[10px] font-black px-3 py-1.5 bg-[#0a0a0a] text-slate-400 rounded-lg uppercase tracking-widest border border-slate-800/50">
                       {task.status}
                     </span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Sidebar Column */}
           <div className="space-y-8">
+            {/* Google Calendar Events */}
+            {googleEvents.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.6 }}
+                className="space-y-4"
+              >
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black uppercase tracking-widest">Agenda Google</h3>
+                  <div className="size-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                </div>
+                <div className="space-y-3">
+                  {googleEvents.map((event) => (
+                    <div key={event.id} className="p-4 bg-[#1a1a1a] rounded-2xl border border-slate-800/50 hover:border-[#d4ff3f]/30 transition-all group">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-black tracking-tight truncate group-hover:text-[#d4ff3f] transition-colors">{event.summary}</p>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mt-1">
+                            {new Date(event.start.dateTime || event.start.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} • {new Date(event.start.dateTime || event.start.date).toLocaleDateString('pt-BR')}
+                          </p>
+                        </div>
+                        <div className="size-8 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center flex-shrink-0">
+                          <Calendar size={14} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+
             {/* Site Map Card */}
             <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
               <div className="p-6 border-b border-slate-800/50">
@@ -289,7 +393,12 @@ export default function DashboardPage() {
             </div>
 
             {/* Recent Activity */}
-            <div className="space-y-4">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
+              className="space-y-4"
+            >
               <h3 className="text-xs font-black uppercase tracking-widest">Atividade Recente</h3>
               <div className="space-y-6">
                 {recentActivity.map((activity, idx) => (
@@ -308,7 +417,7 @@ export default function DashboardPage() {
                   </div>
                 ))}
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>

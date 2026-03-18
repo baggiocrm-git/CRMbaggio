@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
-  const redirectUri = `${process.env.APP_URL}/api/auth/google/callback`;
+  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || '';
+  const redirectUri = `${appUrl}/api/auth/google/callback`;
   
-  if (!clientId) {
-    return NextResponse.json({ error: 'GOOGLE_CLIENT_ID not configured' }, { status: 500 });
+  if (!clientId || !appUrl) {
+    return NextResponse.json({ error: 'Google Auth not configured' }, { status: 200, url: '#' });
   }
 
   const params = new URLSearchParams({

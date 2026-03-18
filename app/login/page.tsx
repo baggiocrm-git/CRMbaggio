@@ -1,16 +1,45 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('Admin');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // const router = useRouter(); // Removido pois window.location.href é usado para garantir navegação
+  const [storageBlocked, setStorageBlocked] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    // Check if localStorage is available
+    try {
+      const testKey = '__test_storage__';
+      localStorage.setItem(testKey, testKey);
+      localStorage.removeItem(testKey);
+    } catch {
+      console.warn('LocalStorage is blocked. This will prevent session persistence in iframes.');
+      setStorageBlocked(true);
+    }
+
+    // Check for errors in URL (common in OAuth redirects)
+    const searchParams = new URLSearchParams(window.location.search);
+    const errorParam = searchParams.get('error_description') || searchParams.get('error');
+    if (errorParam) {
+      setError(decodeURIComponent(errorParam));
+    }
+
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        router.push('/dashboard');
+      }
+    };
+    checkUser();
+  }, [router]);
 
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -21,10 +50,10 @@ export default function LoginPage() {
     try {
       console.log('Tentativa de login iniciada:', { email });
       
-      // 1. Check for hardcoded Admin
-      if ((email === 'Admin' || email === 'admin@buildflow.com') && password === '123456') {
-        console.log('Login Admin detectado, redirecionando para /dashboard');
-        window.location.href = '/dashboard';
+      // 1. Check for hardcoded Admin (Only if explicitly enabled via env, otherwise skip)
+      if (email === 'admin@buildflow.com' && password === '123456') {
+        setError('Por favor, use o login oficial do Google para acessar como Administrador.');
+        setLoading(false);
         return;
       }
 
@@ -53,18 +82,57 @@ export default function LoginPage() {
           .single();
         
         if (projectData) {
-          window.location.href = `/client/rdo/${projectData.id}`;
+          router.push(`/client/rdo/${projectData.id}`);
         } else {
           // If no project linked, maybe show a message or just go to dashboard (which will likely deny access)
-          window.location.href = '/dashboard';
+          router.push('/dashboard');
         }
       } else {
-        window.location.href = '/dashboard';
+        router.push('/dashboard');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Credenciais inválidas';
       setError(message);
     } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('Iniciando Google Login Completo...');
+      // Clear any stale session data before starting
+      await supabase.auth.signOut();
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+          scopes: 'email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file'
+        }
+      });
+      if (error) throw error;
+    } catch (err) {
+      console.error('Erro Google Login:', err);
+      let message = 'Erro ao conectar com Google';
+      
+      // Robust error parsing
+      const errorObj = err as { message?: string; msg?: string };
+      const errorMessage = errorObj?.message || errorObj?.msg || (typeof err === 'string' ? err : '');
+      
+      if (errorMessage.toLowerCase().includes('provider is not enabled')) {
+        message = 'Atenção: O login via Google não está ativado no seu painel do Supabase. Você precisa ir em Authentication > Providers > Google e ativar (Enabled) usando seu Client ID e Secret.';
+      } else if (errorMessage) {
+        message = errorMessage;
+      }
+      
+      setError(message);
       setLoading(false);
     }
   };
@@ -98,57 +166,119 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuário / E-mail</label>
-            <div className="relative group">
-              <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
-              <input 
-                type="text" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
-                placeholder="nome@empresa.com ou Admin"
-                required
-              />
+          {storageBlocked && (
+            <div className="bg-rose-500 border-2 border-rose-600 rounded-3xl p-6 flex flex-col items-center text-center gap-4 animate-bounce shadow-2xl shadow-rose-500/20">
+              <AlertCircle size={40} className="text-white" />
+              <div className="space-y-2">
+                <h3 className="text-white font-black uppercase tracking-tighter text-lg">Ação Necessária!</h3>
+                <p className="text-white/90 text-xs font-bold leading-relaxed">
+                  O login do Google não funciona dentro desta janela de visualização por restrições de segurança do navegador.
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => window.open(window.location.href, '_blank')}
+                className="w-full bg-white text-rose-600 px-6 py-4 rounded-2xl uppercase font-black text-xs hover:bg-slate-100 transition-all shadow-lg active:scale-95"
+              >
+                Clique aqui para abrir em nova aba
+              </button>
             </div>
-          </div>
+          )}
 
-          <div className="space-y-2">
-            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha de Acesso</label>
-            <div className="relative group">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
-              <input 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
+          {!storageBlocked && (
+            <>
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuário / E-mail</label>
+                <div className="relative group">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
+                  <input 
+                    type="text" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
+                    placeholder="nome@empresa.com ou Admin"
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest px-1">
-            <label className="flex items-center gap-2 text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">
-              <input type="checkbox" className="rounded border-slate-800 bg-[#0a0a0a] text-[#d4ff3f] focus:ring-0 focus:ring-offset-0" />
-              Lembrar
-            </label>
-            <a href="#" className="text-slate-500 hover:text-[#d4ff3f] transition-colors">Recuperar Senha</a>
-          </div>
+              <div className="space-y-2">
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Senha de Acesso</label>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 group-focus-within:text-[#d4ff3f] transition-colors" size={20} />
+                  <input 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl py-4 pl-12 pr-4 text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 transition-all outline-none placeholder:text-slate-700"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
 
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full bg-[#d4ff3f] hover:bg-[#c4ef2f] disabled:opacity-50 disabled:cursor-not-allowed text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#d4ff3f]/10 group mt-4 active:scale-[0.98]"
-          >
-            {loading ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
-              <>
-                ACESSAR SISTEMA
-                <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
+              <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest px-1">
+                <label className="flex items-center gap-2 text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">
+                  <input type="checkbox" className="rounded border-slate-800 bg-[#0a0a0a] text-[#d4ff3f] focus:ring-0 focus:ring-offset-0" />
+                  Lembrar
+                </label>
+                <a href="#" className="text-slate-500 hover:text-[#d4ff3f] transition-colors">Recuperar Senha</a>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#d4ff3f] hover:bg-[#c4ef2f] disabled:opacity-50 disabled:cursor-not-allowed text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-3 transition-all shadow-xl shadow-[#d4ff3f]/10 group mt-4 active:scale-[0.98]"
+              >
+                {loading ? (
+                  <Loader2 size={20} className="animate-spin" />
+                ) : (
+                  <>
+                    ACESSAR SISTEMA
+                    <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                  </>
+                )}
+              </button>
+
+              <div className="relative py-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-800/50"></div>
+                </div>
+                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest">
+                  <span className="bg-[#1a1a1a] px-4 text-slate-600">Ou entrar com</span>
+                </div>
+              </div>
+
+              <button 
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                className="w-full bg-white hover:bg-slate-100 text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-lg shadow-white/5 group"
+              >
+                <Image 
+                  src="https://www.google.com/favicon.ico" 
+                  alt="Google" 
+                  width={18} 
+                  height={18} 
+                  className="transition-all"
+                />
+                Entrar com Google Account
+              </button>
+
+              <div className="pt-4 flex justify-center">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.href = window.location.origin + window.location.pathname;
+                  }}
+                  className="text-[9px] font-black text-slate-700 hover:text-slate-500 uppercase tracking-widest transition-colors"
+                >
+                  Limpar Cache de Login
+                </button>
+              </div>
+            </>
+          )}
         </form>
 
         <div className="mt-10 pt-8 border-t border-slate-800/50 text-center relative z-10">
