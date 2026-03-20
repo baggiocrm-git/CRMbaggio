@@ -1,0 +1,50 @@
+-- Migration: Add Hidraulica items from spreadsheet
+-- Category: 06.00 HIDRÁULICA
+
+INSERT INTO tcpo_itens (id, categoria, descricao, unidade, custo_mat, custo_mo, custo_eq, bdi_padrao)
+VALUES 
+-- 06.00 HIDRÁULICA
+('06.01', 'HIDRÁULICA', 'Fornec. e inst. de bacia sifonada c/ caixa acoplada', 'un', 1161.80, 250.39, 0.00, 25),
+('06.02', 'HIDRÁULICA', 'Fornec. e inst. de bacia sifonada convencional', 'un', 871.35, 250.39, 0.00, 25),
+('06.03', 'HIDRÁULICA', 'Fornec. e inst. de lavatório de louça s/ coluna', 'un', 580.90, 200.31, 0.00, 25),
+('06.04', 'HIDRÁULICA', 'Fornec. e inst. de mictório de louça sifonado', 'un', 1452.25, 250.39, 0.00, 25),
+('06.05', 'HIDRÁULICA', 'Fornec. e inst. de cuba de embutir oval', 'un', 435.67, 200.31, 0.00, 25),
+('06.06', 'HIDRÁULICA', 'Fornec. e inst. de torneira p/ lavatório mesa', 'un', 290.45, 50.08, 0.00, 25),
+('06.07', 'HIDRÁULICA', 'Fornec. e inst. de torneira p/ lavatório parede', 'un', 290.45, 50.08, 0.00, 25),
+('06.08', 'HIDRÁULICA', 'Fornec. e inst. de torneira p/ mictório', 'un', 580.90, 50.08, 0.00, 25),
+('06.09', 'HIDRÁULICA', 'Fornec. e inst. de válvula de descarga', 'un', 871.35, 150.23, 0.00, 25),
+('06.10', 'HIDRÁULICA', 'Fornec. e inst. de assento plástico', 'un', 145.22, 25.04, 0.00, 25),
+('06.11', 'HIDRÁULICA', 'Fornec. e inst. de sifão plástico', 'un', 72.61, 50.08, 0.00, 25),
+('06.12', 'HIDRÁULICA', 'Fornec. e inst. de engate plástico', 'un', 43.57, 25.04, 0.00, 25),
+('06.13', 'HIDRÁULICA', 'Fornec. e inst. de registro de pressão 1/2"', 'un', 145.22, 100.15, 0.00, 25),
+('06.14', 'HIDRÁULICA', 'Fornec. e inst. de registro de gaveta 3/4"', 'un', 217.84, 100.15, 0.00, 25),
+('06.15', 'HIDRÁULICA', 'Fornec. e inst. de registro de gaveta 1"', 'un', 290.45, 125.19, 0.00, 25),
+('06.16', 'HIDRÁULICA', 'Fornec. e inst. de registro de gaveta 1 1/2"', 'un', 435.67, 150.23, 0.00, 25),
+('06.17', 'HIDRÁULICA', 'Fornec. e inst. de caixa de descarga', 'un', 217.84, 100.15, 0.00, 25),
+('06.18', 'HIDRÁULICA', 'Fornec. e inst. de chuveiro elétrico', 'un', 290.45, 100.15, 0.00, 25),
+('06.19', 'HIDRÁULICA', 'Fornec. e inst. de bebedouro', 'un', 2904.50, 500.78, 0.00, 25),
+('06.20', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC soldável 20mm', 'm', 14.52, 25.04, 0.00, 25),
+('06.21', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC soldável 25mm', 'm', 17.43, 30.05, 0.00, 25),
+('06.22', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC soldável 32mm', 'm', 21.78, 37.56, 0.00, 25),
+('06.23', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC soldável 40mm', 'm', 29.05, 50.08, 0.00, 25),
+('06.24', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC soldável 50mm', 'm', 43.57, 75.12, 0.00, 25),
+('06.25', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC esgoto 40mm', 'm', 21.78, 37.56, 0.00, 25),
+('06.26', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC esgoto 50mm', 'm', 29.05, 50.08, 0.00, 25),
+('06.27', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC esgoto 75mm', 'm', 43.57, 75.12, 0.00, 25),
+('06.28', 'HIDRÁULICA', 'Fornec. e inst. de tubo PVC esgoto 100mm', 'm', 58.09, 100.15, 0.00, 25),
+('06.29', 'HIDRÁULICA', 'Fornec. e inst. de caixa de gordura', 'un', 435.67, 250.39, 0.00, 25),
+('06.30', 'HIDRÁULICA', 'Fornec. e inst. de caixa de inspeção', 'un', 435.67, 250.39, 0.00, 25),
+('06.31', 'HIDRÁULICA', 'Fornec. e inst. de ralo sifonado', 'un', 72.61, 100.15, 0.00, 25),
+('06.32', 'HIDRÁULICA', 'Fornec. e inst. de grelha metálica', 'un', 43.57, 25.04, 0.00, 25),
+('06.33', 'HIDRÁULICA', 'Fornec. e inst. de reservatório de água 500L', 'un', 726.12, 500.78, 0.00, 25),
+('06.34', 'HIDRÁULICA', 'Fornec. e inst. de reservatório de água 1000L', 'un', 1161.80, 751.16, 0.00, 25),
+('06.35', 'HIDRÁULICA', 'Fornec. e inst. de bomba d''água', 'un', 2178.37, 500.78, 0.00, 25),
+('06.36', 'HIDRÁULICA', 'Fornec. e inst. de aquecedor elétrico', 'un', 1452.25, 250.39, 0.00, 25),
+('06.37', 'HIDRÁULICA', 'Fornec. e inst. de filtro de água', 'un', 290.45, 100.15, 0.00, 25)
+ON CONFLICT (id) DO UPDATE SET
+  categoria = EXCLUDED.categoria,
+  descricao = EXCLUDED.descricao,
+  unidade = EXCLUDED.unidade,
+  custo_mat = EXCLUDED.custo_mat,
+  custo_mo = EXCLUDED.custo_mo,
+  custo_eq = EXCLUDED.custo_eq;

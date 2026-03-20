@@ -36,6 +36,8 @@ export interface Insumo {
   descricao: string;
   unidade: string;
   preco_unitario: number;
+  preco_sabado?: number;
+  preco_domingo_feriado?: number;
   tipo: 'mo' | 'mat' | 'eq';
 }
 

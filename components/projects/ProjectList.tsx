@@ -1,10 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Edit2, 
   Trash2, 
-  MapPin, 
+  MapPin,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Project, ProjectStatus } from '@/lib/types';
@@ -15,7 +18,14 @@ interface ProjectListProps {
   onDelete: (id: string) => void;
 }
 
+type SortKey = 'nome' | 'status' | 'orcamento' | 'liquidez' | 'localizacao';
+
 export default function ProjectList({ projects, onEdit, onDelete }: ProjectListProps) {
+  const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' | null }>({
+    key: 'nome',
+    direction: null
+  });
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
@@ -27,22 +37,95 @@ export default function ProjectList({ projects, onEdit, onDelete }: ProjectListP
     'Concluído': 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
   };
 
+  const handleSort = (key: SortKey) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const sortedProjects = useMemo(() => {
+    if (!sortConfig.direction) return projects;
+
+    return [...projects].sort((a, b) => {
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (aValue === bValue) return 0;
+      
+      const comparison = aValue < bValue ? -1 : 1;
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+  }, [projects, sortConfig]);
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column || !sortConfig.direction) {
+      return <ChevronsUpDown size={12} className="ml-1 text-slate-600" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
+  };
+
   return (
     <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-[#0a0a0a] border-b border-slate-800/50">
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Projeto</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Orçamento</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Progresso</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Localização</th>
+              <th 
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('nome')}
+              >
+                <div className="flex items-center">
+                  Projeto
+                  <SortIcon column="nome" />
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('status')}
+              >
+                <div className="flex items-center">
+                  Status
+                  <SortIcon column="status" />
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('orcamento')}
+              >
+                <div className="flex items-center">
+                  Orçamento
+                  <SortIcon column="orcamento" />
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('liquidez')}
+              >
+                <div className="flex items-center">
+                  Progresso
+                  <SortIcon column="liquidez" />
+                </div>
+              </th>
+              <th 
+                className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 cursor-pointer hover:text-white transition-colors"
+                onClick={() => handleSort('localizacao')}
+              >
+                <div className="flex items-center">
+                  Localização
+                  <SortIcon column="localizacao" />
+                </div>
+              </th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/50">
-            {projects.map((project, index) => (
+            {sortedProjects.map((project, index) => (
               <motion.tr 
                 key={project.id}
                 initial={{ opacity: 0, x: -10 }}

@@ -9,7 +9,9 @@ import {
   FileText,
   Loader2,
   ChevronRight,
-  ChevronDown
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel } from 'docx';
@@ -22,6 +24,29 @@ export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: keyof TCPOItem | 'total'; direction: 'asc' | 'desc' | null }>({
+    key: 'id',
+    direction: 'asc'
+  });
+
+  const handleSort = (key: keyof TCPOItem | 'total') => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: keyof TCPOItem | 'total') => {
+    if (sortConfig.key !== key || sortConfig.direction === null) {
+      return <ChevronsUpDown size={12} className="ml-1 opacity-50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
+  };
 
   useEffect(() => {
     fetchServices();
@@ -44,11 +69,30 @@ export default function ServicesPage() {
     }
   }
 
-  const filteredServices = services.filter(s => 
-    s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.categoria.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredServices = services
+    .filter(s => 
+      s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.descricao.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.categoria.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortConfig.key || !sortConfig.direction) return 0;
+      
+      let aValue: number | string | boolean | null;
+      let bValue: number | string | boolean | null;
+
+      if (sortConfig.key === 'total') {
+        aValue = a.custo_mo + a.custo_mat + a.custo_eq;
+        bValue = b.custo_mo + b.custo_mat + b.custo_eq;
+      } else {
+        aValue = a[sortConfig.key as keyof TCPOItem];
+        bValue = b[sortConfig.key as keyof TCPOItem];
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const toggleExpand = (id: string) => {
     const newExpanded = new Set(expandedItems);
@@ -181,10 +225,26 @@ export default function ServicesPage() {
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-6 py-4 w-10"></th>
-                <th className="px-6 py-4">Código</th>
-                <th className="px-6 py-4">Descrição</th>
-                <th className="px-6 py-4">Un</th>
-                <th className="px-6 py-4 text-right">Custo Total</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('id')}>
+                  <div className="flex items-center">
+                    Código {getSortIcon('id')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                  <div className="flex items-center">
+                    Descrição {getSortIcon('descricao')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                  <div className="flex items-center">
+                    Un {getSortIcon('unidade')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
+                  <div className="flex items-center justify-end">
+                    Custo Total {getSortIcon('total')}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">

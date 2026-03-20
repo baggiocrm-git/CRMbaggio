@@ -273,7 +273,7 @@ export default function CalendarPage() {
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-12">
         <div className="flex bg-[#1a1a1a] p-1 rounded-xl border border-slate-800/50">
           {(['day', 'week', 'month'] as ViewType[]).map((v) => (
             <button 
@@ -299,7 +299,7 @@ export default function CalendarPage() {
           onClick={fetchGoogleEvents}
           disabled={isSyncing}
           className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]",
+            "flex items-center justify-center gap-2 px-4 py-2 w-[180px] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]",
             isSyncing && "opacity-50 cursor-not-allowed"
           )}
         >
@@ -309,36 +309,38 @@ export default function CalendarPage() {
           {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
         </button>
 
-        <button 
-          onClick={handleConnectGoogle}
-          className={cn(
-            "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-            isGoogleConnected 
-              ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-              : "bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]"
-          )}
-        >
-          {isGoogleConnected ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
-          {isGoogleConnected ? 'Google Conectado' : 'Conectar Google'}
-        </button>
-
-        {isGoogleConnected && (
+        <div className="flex items-center gap-2">
           <button 
-            onClick={async () => {
-              if (confirm('Deseja realmente desconectar sua conta Google?')) {
-                const { error } = await supabase.from('google_tokens').delete().eq('id', 1);
-                if (!error) {
-                  setIsGoogleConnected(false);
-                  setEvents(MOCK_EVENTS);
-                  setError(null);
-                }
-              }
-            }}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20"
+            onClick={handleConnectGoogle}
+            className={cn(
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+              isGoogleConnected 
+                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
+                : "bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]"
+            )}
           >
-            Desconectar
+            {isGoogleConnected ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
+            {isGoogleConnected ? 'Google Conectado' : 'Conectar Google'}
           </button>
-        )}
+
+          {isGoogleConnected && (
+            <button 
+              onClick={async () => {
+                if (confirm('Deseja realmente desconectar sua conta Google?')) {
+                  const { error } = await supabase.from('google_tokens').delete().eq('id', 1);
+                  if (!error) {
+                    setIsGoogleConnected(false);
+                    setEvents(MOCK_EVENTS);
+                    setError(null);
+                  }
+                }
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20"
+            >
+              Desconectar
+            </button>
+          )}
+        </div>
 
         <button className="flex items-center gap-2 px-6 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10">
           <Plus size={14} /> Novo Evento

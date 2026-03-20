@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
+  ChevronUp, 
+  ChevronDown,
+  ChevronsUpDown,
   ArrowLeft, 
   Save, 
   Plus,
@@ -36,7 +39,53 @@ export default function NewBudgetPage() {
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
 
   const { query, setQuery, suggestions, loading: searchLoading, clearSuggestions } = useTCPOSearch({ limit: 8 });
-  const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, totals } = useOrcamento();
+  const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, applyCorrectionFactor, totals, setItems } = useOrcamento();
+
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'tcpo_id', direction: null });
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+    
+    if (!direction) {
+      // If direction is null, we don't sort or we could revert to original order.
+      // For simplicity, let's just keep the current items if null.
+      return;
+    }
+
+    const sortedItems = [...items].sort((a, b) => {
+      let valA: number | string | boolean | null;
+      let valB: number | string | boolean | null;
+
+      if (key === 'preco_unit') {
+        valA = (a.custo_unit_mo || 0) + (a.custo_unit_mat || 0) + (a.custo_unit_eq || 0);
+        valB = (b.custo_unit_mo || 0) + (b.custo_unit_mat || 0) + (b.custo_unit_eq || 0);
+      } else if (key === 'subtotal') {
+        const unitA = (a.custo_unit_mo || 0) + (a.custo_unit_mat || 0) + (a.custo_unit_eq || 0);
+        valA = (unitA * (a.quantidade || 0)) * (1 + (a.bdi || 0) / 100);
+        const unitB = (b.custo_unit_mo || 0) + (b.custo_unit_mat || 0) + (b.custo_unit_eq || 0);
+        valB = (unitB * (b.quantidade || 0)) * (1 + (b.bdi || 0) / 100);
+      } else {
+        valA = a[key as keyof typeof a] || '';
+        valB = b[key as keyof typeof b] || '';
+      }
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+    setItems(sortedItems);
+  };
+
+  const getSortIcon = (key: string) => {
+    if (sortConfig.key !== key || !sortConfig.direction) return <ChevronsUpDown className="w-3 h-3 ml-1 opacity-50" />;
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 ml-1 text-[#d4ff3f]" /> : <ChevronDown className="w-3 h-3 ml-1 text-[#d4ff3f]" />;
+  };
 
   const toggleExpand = (index: number) => {
     const newExpanded = new Set(expandedItems);
@@ -163,7 +212,9 @@ export default function NewBudgetPage() {
         const { data: suggestedItems } = await supabase.from('tcpo_itens').select('*').in('id', ids);
         
         if (suggestedItems) {
-          suggestedItems.forEach(item => addItem(item));
+          for (const item of suggestedItems) {
+            await addItem(item);
+          }
         }
       }
     } catch (error) {
@@ -265,8 +316,8 @@ export default function NewBudgetPage() {
                 {suggestions.map((item) => (
                   <button 
                     key={item.id}
-                    onClick={() => {
-                      addItem(item);
+                    onClick={async () => {
+                      await addItem(item);
                       setQuery('');
                       clearSuggestions();
                     }}
@@ -292,13 +343,49 @@ export default function NewBudgetPage() {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                    <th className="px-4 py-4 w-20">Código</th>
-                    <th className="px-4 py-4">Discriminação dos Serviços</th>
-                    <th className="px-2 py-4 w-16 text-center">Unid.</th>
-                    <th className="px-2 py-4 w-20 text-center">Quant.</th>
-                    <th className="px-2 py-4 w-20 text-center">BDI (%)</th>
-                    <th className="px-2 py-4 w-28 text-right">Preço Unit.</th>
-                    <th className="px-2 py-4 w-28 text-right">Subtotal</th>
+                    <th 
+                      className="px-4 py-4 w-20 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('tcpo_id')}
+                    >
+                      <div className="flex items-center">
+                        Código
+                        {getSortIcon('tcpo_id')}
+                      </div>
+                    </th>
+                    <th 
+                      className="px-4 py-4 cursor-pointer hover:text-white transition-colors"
+                      onClick={() => handleSort('descricao_personalizada')}
+                    >
+                      <div className="flex items-center">
+                        Discriminação dos Serviços
+                        {getSortIcon('descricao_personalizada')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-4 w-16 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                      <div className="flex items-center justify-center">
+                        Unid. {getSortIcon('unidade')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-4 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
+                      <div className="flex items-center justify-center">
+                        Quant. {getSortIcon('quantidade')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-4 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
+                      <div className="flex items-center justify-center">
+                        BDI (%) {getSortIcon('bdi')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-4 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit')}>
+                      <div className="flex items-center justify-end">
+                        Preço Unit. {getSortIcon('preco_unit')}
+                      </div>
+                    </th>
+                    <th className="px-2 py-4 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('subtotal')}>
+                      <div className="flex items-center justify-end">
+                        Subtotal {getSortIcon('subtotal')}
+                      </div>
+                    </th>
                     <th className="px-4 py-4 w-16"></th>
                   </tr>
                 </thead>
@@ -366,6 +453,16 @@ export default function NewBudgetPage() {
                             </td>
                             <td className="px-4 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    applyCorrectionFactor(idx);
+                                  }}
+                                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-[#d4ff3f] transition-all"
+                                  title="Aplicar Fator de Correção 2026"
+                                >
+                                  <Calculator size={14} className="text-[#d4ff3f]" />
+                                </button>
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();

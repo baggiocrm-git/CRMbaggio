@@ -9,7 +9,10 @@ import {
   Trash2, 
   CheckCircle2,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Insumo } from '@/lib/types';
@@ -23,6 +26,29 @@ export default function InsumosPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Insumo; direction: 'asc' | 'desc' | null }>({
+    key: 'descricao',
+    direction: 'asc'
+  });
+
+  const handleSort = (key: keyof Insumo) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: keyof Insumo) => {
+    if (sortConfig.key !== key || sortConfig.direction === null) {
+      return <ChevronsUpDown size={12} className="ml-1 opacity-50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
+  };
 
   const fetchInsumos = async () => {
     setLoading(true);
@@ -46,18 +72,18 @@ export default function InsumosPage() {
     fetchInsumos();
   }, []);
 
-  const handleUpdatePrice = async (id: string, newPrice: number) => {
+  const handleUpdatePrice = async (id: string, field: 'preco_unitario' | 'preco_sabado' | 'preco_domingo_feriado', newPrice: number) => {
     try {
       const { error } = await supabase
         .from('tcpo_insumos')
-        .update({ preco_unitario: newPrice })
+        .update({ [field]: newPrice })
         .eq('id', id);
       
       if (error) throw error;
       
-      setInsumos(prev => prev.map(i => i.id === id ? { ...i, preco_unitario: newPrice } : i));
+      setInsumos(prev => prev.map(i => i.id === id ? { ...i, [field]: newPrice } : i));
     } catch (err) {
-      console.error('Error updating price:', err);
+      console.error(`Error updating ${field}:`, err);
       setMessage({ text: 'Erro ao atualizar preço.', type: 'error' });
     }
   };
@@ -148,6 +174,8 @@ export default function InsumosPage() {
     descricao: '',
     unidade: 'un',
     preco_unitario: 0,
+    preco_sabado: 0,
+    preco_domingo_feriado: 0,
     tipo: 'mat'
   });
 
@@ -194,11 +222,22 @@ export default function InsumosPage() {
     }
   };
 
-  const filteredInsumos = insumos.filter(i => {
-    const matchesSearch = i.descricao.toLowerCase().includes(searchTerm.toLowerCase()) || i.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesType = filterType === 'all' || i.tipo === filterType;
-    return matchesSearch && matchesType;
-  });
+  const filteredInsumos = insumos
+    .filter(i => {
+      const matchesSearch = i.descricao.toLowerCase().includes(searchTerm.toLowerCase()) || i.id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filterType === 'all' || i.tipo === filterType;
+      return matchesSearch && matchesType;
+    })
+    .sort((a, b) => {
+      if (!sortConfig.key || !sortConfig.direction) return 0;
+      
+      const aValue = a[sortConfig.key];
+      const bValue = b[sortConfig.key];
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const getTypeName = (type: string) => {
     switch (type) {
@@ -299,16 +338,48 @@ export default function InsumosPage() {
                   </select>
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Preço Unitário</label>
-                <CurrencyInput
-                  prefix="R$ "
-                  decimalSeparator=","
-                  groupSeparator="."
-                  value={newInsumo.preco_unitario}
-                  onValueChange={(_, __, values) => setNewInsumo({...newInsumo, preco_unitario: values?.float || 0})}
-                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
-                />
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Normal</label>
+                  <CurrencyInput
+                    prefix="R$ "
+                    decimalSeparator=","
+                    groupSeparator="."
+                    value={newInsumo.preco_unitario}
+                    onValueChange={(_, __, values) => {
+                      const val = values?.float || 0;
+                      setNewInsumo({
+                        ...newInsumo, 
+                        preco_unitario: val,
+                        preco_sabado: val * 1.5,
+                        preco_domingo_feriado: val * 2
+                      });
+                    }}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Sábado</label>
+                  <CurrencyInput
+                    prefix="R$ "
+                    decimalSeparator=","
+                    groupSeparator="."
+                    value={newInsumo.preco_sabado}
+                    onValueChange={(_, __, values) => setNewInsumo({...newInsumo, preco_sabado: values?.float || 0})}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Dom/Fer</label>
+                  <CurrencyInput
+                    prefix="R$ "
+                    decimalSeparator=","
+                    groupSeparator="."
+                    value={newInsumo.preco_domingo_feriado}
+                    onValueChange={(_, __, values) => setNewInsumo({...newInsumo, preco_domingo_feriado: values?.float || 0})}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                  />
+                </div>
               </div>
               <div className="flex gap-3 pt-4">
                 <button 
@@ -393,11 +464,41 @@ export default function InsumosPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-2">Código</th>
-                <th className="px-6 py-2">Descrição do Insumo</th>
-                <th className="px-6 py-2 text-center">Unid.</th>
-                <th className="px-6 py-2 text-center">Tipo</th>
-                <th className="px-6 py-2 text-right">Preço Unitário</th>
+                <th className="px-6 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('id')}>
+                  <div className="flex items-center">
+                    Código {getSortIcon('id')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                  <div className="flex items-center">
+                    Descrição do Insumo {getSortIcon('descricao')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                  <div className="flex items-center justify-center">
+                    Unid. {getSortIcon('unidade')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tipo')}>
+                  <div className="flex items-center justify-center">
+                    Tipo {getSortIcon('tipo')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unitario')}>
+                  <div className="flex items-center justify-end">
+                    Normal {getSortIcon('preco_unitario')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_sabado')}>
+                  <div className="flex items-center justify-end">
+                    Sábado {getSortIcon('preco_sabado')}
+                  </div>
+                </th>
+                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_domingo_feriado')}>
+                  <div className="flex items-center justify-end">
+                    Dom/Fer {getSortIcon('preco_domingo_feriado')}
+                  </div>
+                </th>
                 <th className="px-6 py-2"></th>
               </tr>
             </thead>
@@ -439,8 +540,32 @@ export default function InsumosPage() {
                           decimalSeparator=","
                           groupSeparator="."
                           value={insumo.preco_unitario}
-                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, values?.float || 0)}
-                          className="w-32 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-xs font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_unitario', values?.float || 0)}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-1.5 text-right">
+                      <div className="flex justify-end">
+                        <CurrencyInput
+                          prefix="R$ "
+                          decimalSeparator=","
+                          groupSeparator="."
+                          value={insumo.preco_sabado}
+                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_sabado', values?.float || 0)}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        />
+                      </div>
+                    </td>
+                    <td className="px-6 py-1.5 text-right">
+                      <div className="flex justify-end">
+                        <CurrencyInput
+                          prefix="R$ "
+                          decimalSeparator=","
+                          groupSeparator="."
+                          value={insumo.preco_domingo_feriado}
+                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_domingo_feriado', values?.float || 0)}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>

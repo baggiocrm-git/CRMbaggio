@@ -12,6 +12,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
+    storageKey: 'cbsl-erp-auth-token', // Custom key to avoid collisions
     debug: true, // Enable debug logs for auth
   }
 });

@@ -10,7 +10,10 @@ import {
   Trash2,
   Edit2,
   Building2,
-  ArrowRight
+  ArrowRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
@@ -31,6 +34,29 @@ export default function BudgetPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: keyof Budget | 'projeto.nome'; direction: 'asc' | 'desc' | null }>({
+    key: 'created_at',
+    direction: 'desc'
+  });
+
+  const handleSort = (key: keyof Budget | 'projeto.nome') => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: keyof Budget | 'projeto.nome') => {
+    if (sortConfig.key !== key || sortConfig.direction === null) {
+      return <ChevronsUpDown size={12} className="ml-1 opacity-50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
+  };
 
   const fetchBudgets = async () => {
     setLoading(true);
@@ -71,10 +97,29 @@ export default function BudgetPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  const filteredBudgets = budgets.filter(b => 
-    b.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    b.projeto?.nome.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredBudgets = budgets
+    .filter(b => 
+      b.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      b.projeto?.nome.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!sortConfig.key || !sortConfig.direction) return 0;
+      
+      let aValue: number | string | boolean | null;
+      let bValue: number | string | boolean | null;
+
+      if (sortConfig.key === 'projeto.nome') {
+        aValue = a.projeto?.nome || '';
+        bValue = b.projeto?.nome || '';
+      } else {
+        aValue = a[sortConfig.key as keyof Budget];
+        bValue = b[sortConfig.key as keyof Budget];
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const handleDelete = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este orçamento?')) return;
@@ -161,10 +206,26 @@ export default function BudgetPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4">Orçamento</th>
-                <th className="px-6 py-4">Obra / Projeto</th>
-                <th className="px-6 py-4">Valor Total</th>
-                <th className="px-6 py-4">Data de Criação</th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('nome')}>
+                  <div className="flex items-center">
+                    Orçamento {getSortIcon('nome')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('projeto.nome')}>
+                  <div className="flex items-center">
+                    Obra / Projeto {getSortIcon('projeto.nome')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total_geral')}>
+                  <div className="flex items-center">
+                    Valor Total {getSortIcon('total_geral')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('created_at')}>
+                  <div className="flex items-center">
+                    Data de Criação {getSortIcon('created_at')}
+                  </div>
+                </th>
                 <th className="px-6 py-4"></th>
               </tr>
             </thead>

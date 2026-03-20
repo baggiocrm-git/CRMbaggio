@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TCPOItem, BudgetItem, CompositionItem } from '@/lib/types';
+import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
 
 interface SearchOptions {
   categoria?: string;
@@ -72,19 +73,52 @@ export function useTCPOSearch(options: SearchOptions = {}) {
 export function useOrcamento() {
   const [items, setItems] = useState<Partial<BudgetItem>[]>([]);
 
-  const addItem = (tcpoItem: TCPOItem) => {
+  const addItem = async (tcpoItem: TCPOItem) => {
+    // Busca os preços atualizados dos insumos da composição
+    let updatedComposition = [...(tcpoItem.composicao || [])];
+    
+    if (updatedComposition.length > 0) {
+      const codigos = updatedComposition.map(c => c.codigo).filter(Boolean);
+      if (codigos.length > 0) {
+        const { data: insumos } = await supabase
+          .from('tcpo_insumos')
+          .select('id, preco_unitario')
+          .in('id', codigos);
+
+        if (insumos) {
+          const priceMap = new Map(insumos.map(i => [i.id, i.preco_unitario]));
+          updatedComposition = updatedComposition.map(c => {
+            const p_unit = priceMap.get(c.codigo) || c.p_unit || 0;
+            return {
+              ...c,
+              p_unit,
+              p_total: (c.coef || 0) * p_unit
+            };
+          });
+        }
+      }
+    }
+
+    // Recalcula totais baseados na composição atualizada
+    const totals = updatedComposition.reduce((acc, comp) => {
+      if (comp.tipo === 'mo') acc.mo += comp.p_total;
+      else if (comp.tipo === 'mat') acc.mat += comp.p_total;
+      else if (comp.tipo === 'eq') acc.eq += comp.p_total;
+      return acc;
+    }, { mo: 0, mat: 0, eq: 0 });
+
     const newItem: Partial<BudgetItem> = {
       tcpo_id: tcpoItem.id,
       descricao_personalizada: tcpoItem.descricao,
       quantidade: 1,
       unidade: tcpoItem.unidade,
-      custo_unit_mo: tcpoItem.custo_mo,
-      custo_unit_mat: tcpoItem.custo_mat,
-      custo_unit_eq: tcpoItem.custo_eq,
+      custo_unit_mo: totals.mo || tcpoItem.custo_mo,
+      custo_unit_mat: totals.mat || tcpoItem.custo_mat,
+      custo_unit_eq: totals.eq || tcpoItem.custo_eq,
       // BDI padrão já vem em porcentagem (ex: 25)
       bdi: tcpoItem.bdi_padrao || 0,
       ordem: items.length,
-      composicao: tcpoItem.composicao || []
+      composicao: updatedComposition
     };
     setItems([...items, newItem]);
   };
@@ -153,6 +187,35 @@ export function useOrcamento() {
     }
   };
 
+  const applyCorrectionFactor = (itemIndex: number) => {
+    const newItems = [...items];
+    const item = newItems[itemIndex];
+    if (!item.composicao) return;
+
+    const newComposition = item.composicao.map(c => ({
+      ...c,
+      p_unit: (c.p_unit || 0) * PRICE_CORRECTION_FACTOR_2026,
+      p_total: (c.coef || 0) * (c.p_unit || 0) * PRICE_CORRECTION_FACTOR_2026
+    }));
+
+    const newTotals = newComposition.reduce((acc, comp) => {
+      if (comp.tipo === 'mo') acc.mo += comp.p_total;
+      else if (comp.tipo === 'mat') acc.mat += comp.p_total;
+      else if (comp.tipo === 'eq') acc.eq += comp.p_total;
+      return acc;
+    }, { mo: 0, mat: 0, eq: 0 });
+
+    newItems[itemIndex] = {
+      ...item,
+      composicao: newComposition,
+      custo_unit_mo: newTotals.mo,
+      custo_unit_mat: newTotals.mat,
+      custo_unit_eq: newTotals.eq
+    };
+
+    setItems(newItems);
+  };
+
   const totals = items.reduce((acc, item) => {
     const mo = (item.custo_unit_mo || 0) * (item.quantidade || 0);
     const mat = (item.custo_unit_mat || 0) * (item.quantidade || 0);
@@ -178,6 +241,7 @@ export function useOrcamento() {
     updateItem,
     updateItemComposition,
     updateCompositionItem,
+    applyCorrectionFactor,
     setItems,
     totals
   };

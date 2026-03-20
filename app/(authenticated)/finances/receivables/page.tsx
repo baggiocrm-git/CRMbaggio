@@ -11,6 +11,9 @@ import {
   Search, 
   ChevronLeft, 
   ChevronRight,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
   Download,
   Upload,
   X,
@@ -18,9 +21,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -148,6 +148,14 @@ export default function ReceivablesPage() {
       direction = 'desc';
     }
     setSortConfig({ key, direction });
+  };
+  const getSortIcon = (key: keyof Receivable) => {
+    if (sortConfig.key !== key) {
+      return <ChevronsUpDown size={12} className="ml-1 opacity-30" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
   };
 
   const fetchReceivables = useCallback(async () => {
@@ -530,58 +538,37 @@ export default function ReceivablesPage() {
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[15%]" onClick={() => handleSort('cliente')}>
                   <div className="flex items-center gap-1">
-                    Cliente
-                    {sortConfig.key === 'cliente' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Cliente {getSortIcon('cliente')}
                   </div>
                 </th>
                 <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[25%]" onClick={() => handleSort('descricao')}>
                   <div className="flex items-center gap-1">
-                    Descrição
-                    {sortConfig.key === 'descricao' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Descrição {getSortIcon('descricao')}
                   </div>
                 </th>
                 <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('data_vencimento')}>
                   <div className="flex items-center gap-1">
-                    Venc.
-                    {sortConfig.key === 'data_vencimento' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Venc. {getSortIcon('data_vencimento')}
                   </div>
                 </th>
                 <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('data_recebimento')}>
                   <div className="flex items-center gap-1">
-                    Receb.
-                    {sortConfig.key === 'data_recebimento' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Receb. {getSortIcon('data_recebimento')}
                   </div>
                 </th>
                 <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('valor')}>
                   <div className="flex items-center gap-1">
-                    Valor
-                    {sortConfig.key === 'valor' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Valor {getSortIcon('valor')}
                   </div>
                 </th>
                 <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[10%]" onClick={() => handleSort('valor_recebido')}>
                   <div className="flex items-center gap-1">
-                    Receb.
-                    {sortConfig.key === 'valor_recebido' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Receb. {getSortIcon('valor_recebido')}
                   </div>
                 </th>
                 <th className="px-1 py-2 cursor-pointer hover:text-white transition-colors w-[12%]" onClick={() => handleSort('situacao')}>
                   <div className="flex items-center gap-1">
-                    Situação
-                    {sortConfig.key === 'situacao' ? (
-                      sortConfig.direction === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />
-                    ) : <ArrowUpDown size={10} className="opacity-30" />}
+                    Situação {getSortIcon('situacao')}
                   </div>
                 </th>
               </tr>

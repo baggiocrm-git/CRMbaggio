@@ -1,3 +1,5 @@
+export const PRICE_CORRECTION_FACTOR_2026 = 0.7557; // 75.57%
+
 export const COST_CATEGORIES = [
   'Material',
   'Mão de Obra',

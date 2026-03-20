@@ -111,7 +111,13 @@ export async function GET(req: NextRequest) {
             <p>Sincronizando seus serviços Google...</p>
             <script>
               if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
+                try {
+                  // Ensure we only send a plain object to avoid cloning issues with symbols
+                  const message = { type: 'OAUTH_AUTH_SUCCESS' };
+                  window.opener.postMessage(JSON.parse(JSON.stringify(message)), '*');
+                } catch (e) {
+                  console.error('Failed to postMessage to opener:', e);
+                }
                 setTimeout(() => window.close(), 1500);
               } else {
                 window.location.href = '/documents';

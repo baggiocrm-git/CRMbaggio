@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Insumo, CompositionItem } from '@/lib/types';
+import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
 
 interface CompositionModalProps {
   isOpen: boolean;
@@ -34,6 +35,7 @@ export default function CompositionModal({
   const [isSearching, setIsSearching] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [composition, setComposition] = useState<CompositionItem[]>(initialComposition);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // New Insumo Form State
   const [newInsumo, setNewInsumo] = useState<Partial<Insumo>>({
@@ -158,6 +160,48 @@ export default function CompositionModal({
     }
   };
 
+  const refreshPrices = async () => {
+    if (composition.length === 0) return;
+    setIsRefreshing(true);
+    try {
+      const codigos = composition.map(c => c.codigo).filter(Boolean);
+      if (codigos.length === 0) return;
+
+      const { data: insumos, error } = await supabase
+        .from('tcpo_insumos')
+        .select('id, preco_unitario')
+        .in('id', codigos);
+
+      if (error) throw error;
+
+      if (insumos) {
+        const priceMap = new Map(insumos.map(i => [i.id, i.preco_unitario]));
+        const newComp = composition.map(c => {
+          const p_unit = priceMap.get(c.codigo) || c.p_unit || 0;
+          return {
+            ...c,
+            p_unit,
+            p_total: c.coef * p_unit
+          };
+        });
+        setComposition(newComp);
+      }
+    } catch (error) {
+      console.error('Error refreshing prices:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const applyCorrection = () => {
+    const newComp = composition.map(c => ({
+      ...c,
+      p_unit: c.p_unit * PRICE_CORRECTION_FACTOR_2026,
+      p_total: c.coef * c.p_unit * PRICE_CORRECTION_FACTOR_2026
+    }));
+    setComposition(newComp);
+  };
+
   const clearComposition = () => {
     if (confirm('Deseja realmente limpar toda a composição?')) {
       setComposition([]);
@@ -188,6 +232,25 @@ export default function CompositionModal({
               <h2 className="text-lg font-black tracking-tight italic">Definição de <span className="text-[#d4ff3f]">Composição</span></h2>
               <p className="text-slate-500 text-[9px] font-black uppercase tracking-widest">Item: {itemName}</p>
             </div>
+          </div>
+          <div className="flex items-center gap-2 mr-4">
+            <button 
+              onClick={refreshPrices}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[9px] font-black uppercase tracking-widest hover:bg-slate-700 transition-all"
+              title="Atualizar preços da base"
+            >
+              <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
+              Atualizar Preços
+            </button>
+            <button 
+              onClick={applyCorrection}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f] text-[9px] font-black uppercase tracking-widest hover:bg-[#d4ff3f]/20 transition-all border border-[#d4ff3f]/20"
+              title={`Aplicar fator de correção 2026 (${(PRICE_CORRECTION_FACTOR_2026 * 100).toFixed(2)}%)`}
+            >
+              <Calculator size={12} />
+              Fator 2026
+            </button>
           </div>
           <button 
             onClick={onClose}

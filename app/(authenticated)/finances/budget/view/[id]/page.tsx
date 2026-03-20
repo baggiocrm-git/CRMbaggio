@@ -11,7 +11,9 @@ import {
   FileText,
   PieChart,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  ChevronUp,
+  ChevronsUpDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -49,6 +51,29 @@ export default function ViewBudgetPage() {
   const [items, setItems] = useState<AnalyticalItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [sortConfig, setSortConfig] = useState<{ key: keyof AnalyticalItem | 'total'; direction: 'asc' | 'desc' | null }>({
+    key: 'ordem',
+    direction: 'asc'
+  });
+
+  const handleSort = (key: keyof AnalyticalItem | 'total') => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    } else if (sortConfig.key === key && sortConfig.direction === 'desc') {
+      direction = null;
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const getSortIcon = (key: keyof AnalyticalItem | 'total') => {
+    if (sortConfig.key !== key || sortConfig.direction === null) {
+      return <ChevronsUpDown size={12} className="ml-1 opacity-50" />;
+    }
+    return sortConfig.direction === 'asc' ? 
+      <ChevronUp size={12} className="ml-1 text-[#d4ff3f]" /> : 
+      <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
+  };
 
   const toggleItem = (itemId: string) => {
     const newExpanded = new Set(expandedItems);
@@ -94,6 +119,28 @@ export default function ViewBudgetPage() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
+
+  const sortedItems = [...items].sort((a, b) => {
+    if (!sortConfig.key || !sortConfig.direction) return 0;
+    
+    let aValue: number | string | boolean | null;
+    let bValue: number | string | boolean | null;
+
+    if (sortConfig.key === 'total') {
+      aValue = a.subtotal_preco;
+      bValue = b.subtotal_preco;
+    } else {
+      aValue = a[sortConfig.key as keyof AnalyticalItem];
+      bValue = b[sortConfig.key as keyof AnalyticalItem];
+    }
+
+    if (aValue === undefined || aValue === null) return 1;
+    if (bValue === undefined || bValue === null) return -1;
+
+    if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
 
   if (loading) {
     return (
@@ -208,16 +255,40 @@ export default function ViewBudgetPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50 print:bg-gray-100 print:text-black print:border-black">
-                <th className="px-6 py-4 w-24">Código</th>
-                <th className="px-6 py-4">Discriminação dos Serviços</th>
-                <th className="px-6 py-4 w-20">Unid.</th>
-                <th className="px-6 py-4 w-24">Quant.</th>
-                <th className="px-6 py-4 w-32">Preço Unit.</th>
-                <th className="px-6 py-4 w-32 text-right">Subtotal</th>
+                <th className="px-6 py-4 w-24 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tcpo_id')}>
+                  <div className="flex items-center">
+                    Código {getSortIcon('tcpo_id')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                  <div className="flex items-center">
+                    Discriminação dos Serviços {getSortIcon('descricao')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 w-20 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                  <div className="flex items-center">
+                    Unid. {getSortIcon('unidade')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 w-24 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
+                  <div className="flex items-center">
+                    Quant. {getSortIcon('quantidade')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 w-32 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit_com_bdi')}>
+                  <div className="flex items-center">
+                    Preço Unit. {getSortIcon('preco_unit_com_bdi')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 w-32 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
+                  <div className="flex items-center justify-end">
+                    Subtotal {getSortIcon('total')}
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50 print:divide-black/10">
-              {items.map((item) => (
+              {sortedItems.map((item) => (
                 <React.Fragment key={item.id}>
                   <tr 
                     className="hover:bg-[#0a0a0a] transition-colors print:text-black cursor-pointer group"

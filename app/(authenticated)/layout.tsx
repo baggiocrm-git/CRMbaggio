@@ -10,6 +10,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<{ email?: string; id: string; user_metadata?: { role?: string } } | null>(null);
+  const userRef = React.useRef(user);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   useEffect(() => {
     console.log('DashboardLayout: supabase object:', supabase);
@@ -21,51 +26,64 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const handleUserRole = async (userData: User) => {
       if (!mounted) return;
       
-      const userEmail = (
-        userData.email || 
-        userData.user_metadata?.email || 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (userData as any).app_metadata?.email ||
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (userData as any).identities?.[0]?.identity_data?.email ||
-        ''
-      ).toLowerCase().trim();
+      try {
+        const userEmail = (
+          userData.email || 
+          userData.user_metadata?.email || 
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (userData as any).app_metadata?.email ||
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (userData as any).identities?.[0]?.identity_data?.email ||
+          ''
+        ).toLowerCase().trim();
 
-      console.log('DashboardLayout: Processando papel do usuário:', userEmail, userData.user_metadata);
-      setUser(userData);
+        console.log('DashboardLayout: Processando papel do usuário:', userEmail, userData.user_metadata);
+        setUser(userData);
 
-      // Auto-fix role for the main admin email if missing in metadata
-      if (userEmail === 'lucabaggio28@gmail.com') {
-        if (userData.user_metadata?.role !== 'Administrador') {
-          console.log('Auto-atribuindo papel de Administrador para:', userEmail);
-          const { error: updateError } = await supabase.auth.updateUser({
-            data: { role: 'Administrador' }
-          });
-          if (!updateError) {
-            console.log('Papel de Administrador sincronizado com o perfil!');
-            // Force session refresh to update JWT for RLS
-            await supabase.auth.refreshSession();
-            // Refresh local state
-            const { data: { user: refreshedUser } } = await supabase.auth.getUser();
-            if (refreshedUser && mounted) setUser(refreshedUser);
+        // Auto-fix role for the main admin email if missing in metadata
+        if (userEmail === 'lucabaggio28@gmail.com') {
+          if (userData.user_metadata?.role !== 'Administrador') {
+            console.log('Auto-atribuindo papel de Administrador para:', userEmail);
+            const { error: updateError } = await supabase.auth.updateUser({
+              data: { role: 'Administrador' }
+            });
+            if (!updateError) {
+              console.log('Papel de Administrador sincronizado com o perfil!');
+              // Force session refresh to update JWT for RLS
+              await supabase.auth.refreshSession();
+              // Refresh local state
+              const { data: { user: refreshedUser } } = await supabase.auth.getUser();
+              if (refreshedUser && mounted) setUser(refreshedUser);
+            }
           }
-        }
-        setLoading(false);
-      } else if (userData.user_metadata?.role === 'Cliente') {
-        const { data: projectData } = await supabase
-          .from('projetos')
-          .select('id')
-          .eq('cliente_id', userData.id)
-          .limit(1)
-          .single();
-        
-        if (projectData) {
-          router.push(`/client/rdo/${projectData.id}`);
+          setLoading(false);
+        } else if (userData.user_metadata?.role === 'Cliente') {
+          const { data: projectData, error: projectError } = await supabase
+            .from('projetos')
+            .select('id')
+            .eq('cliente_id', userData.id)
+            .limit(1)
+            .single();
+          
+          if (projectData) {
+            router.push(`/client/rdo/${projectData.id}`);
+            setLoading(false);
+          } else {
+            console.warn('Cliente sem projeto vinculado:', userData.id, projectError);
+            // Don't sign out automatically if it might be a temporary error
+            // But if we are sure, then sign out
+            if (projectError && projectError.code === 'PGRST116') { // No rows found
+              await supabase.auth.signOut();
+              router.push('/login');
+            } else {
+              setLoading(false); // Just show the dashboard (RLS will handle access)
+            }
+          }
         } else {
-          await supabase.auth.signOut();
-          router.push('/login');
+          setLoading(false);
         }
-      } else {
+      } catch (e) {
+        console.error('Erro ao processar papel do usuário:', e);
         setLoading(false);
       }
     };
@@ -100,7 +118,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           await handleUserRole(session.user);
           await syncGoogleTokens();
         } else if (mounted && event === 'SIGNED_OUT') {
-          console.log('Usuário deslogado detectado');
+          console.log('DashboardLayout: Evento SIGNED_OUT detectado');
+          // Only redirect if we were previously logged in or if we are absolutely sure
+          // This prevents accidental redirects on initialization if session is null
+          setUser(null);
           router.push('/login');
         }
       });
@@ -115,6 +136,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const checkInitialSession = async () => {
       console.log('Iniciando checkInitialSession...');
       console.log('URL no checkInitialSession:', window.location.href);
+
+      // Check if localStorage is accessible
+      try {
+        const testKey = 'sb-test-storage-check';
+        localStorage.setItem(testKey, 'ok');
+        localStorage.removeItem(testKey);
+        console.log('DashboardLayout: LocalStorage acessível');
+      } catch (e) {
+        console.error('DashboardLayout: LocalStorage BLOQUEADO ou INDISPONÍVEL:', e);
+        // If storage is blocked, we might not be able to persist session
+        // We should warn the user or at least log it
+      }
 
       if (!supabase?.auth?.getSession) {
         console.error('ERRO CRÍTICO: supabase.auth.getSession não é uma função!');
@@ -184,23 +217,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
 
       // Use getSession() as it triggers the hash parsing
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // We try a few times before giving up, to handle storage load delays
+      let sessionFound = false;
+      for (let i = 0; i < 4; i++) {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.log(`Sessão inicial encontrada na tentativa ${i + 1} para:`, session.user.email);
+          await handleUserRole(session.user);
+          await syncGoogleTokens();
+          sessionFound = true;
+          break;
+        }
+        if (sessionError) console.warn(`Tentativa ${i + 1}: Erro ao buscar sessão inicial:`, sessionError.message);
+        if (i < 3) await new Promise(resolve => setTimeout(resolve, 800)); // Wait a bit between retries
+      }
       
-      if (session?.user) {
-        console.log('Sessão inicial encontrada para:', session.user.email);
-        await handleUserRole(session.user);
-        await syncGoogleTokens();
-      } else {
-        if (sessionError) console.warn('Erro ao buscar sessão inicial:', sessionError.message);
-        
-        console.log('Nenhuma sessão inicial encontrada. Aguardando processamento do hash ou onAuthStateChange...');
+      if (!sessionFound) {
+        console.log('Nenhuma sessão inicial encontrada após retries. Aguardando processamento do hash ou onAuthStateChange...');
         
         // Fallback: If we have a hash but no session, maybe Supabase is stuck.
         // We wait for onAuthStateChange to fire SIGNED_IN.
         
         timeoutId = setTimeout(async () => {
           if (!mounted) return;
-          console.log('Tentando buscar sessão novamente após timeout...');
+          console.log('Tentando buscar sessão novamente após timeout estendido...');
           const { data: { session: retrySession } } = await supabase.auth.getSession();
           
           if (!retrySession) {
@@ -216,20 +256,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             // If still nothing and we have a hash, maybe we should try to refresh the page?
             if (hasHash) {
               console.warn('Hash detectado mas nenhuma sessão encontrada. Tentando recarregar a página...');
-              // window.location.reload(); // This might cause a loop, let's be careful.
-              // Instead, let's show a manual button.
               setLoading(false); // Stop loading to show the manual button
               return;
             }
 
             console.log('Nenhuma sessão encontrada após timeout estendido, redirecionando para login.');
-            router.push('/login');
+            // Only redirect if we are absolutely sure there's no session
+            // and we haven't received a SIGNED_IN event in the meantime
+            if (mounted && !userRef.current) {
+              router.push('/login');
+            }
           } else {
             console.log('Sessão encontrada após retry para:', retrySession.user.email);
             await handleUserRole(retrySession.user);
             await syncGoogleTokens();
           }
-        }, hasHash ? 12000 : 6000); // Wait even longer if we have a hash/code
+        }, hasHash ? 20000 : 12000); // Wait even longer if we have a hash/code
       }
     };
 
