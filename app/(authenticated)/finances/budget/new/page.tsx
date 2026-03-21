@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ChevronUp, 
   ChevronDown,
@@ -39,6 +39,7 @@ export default function NewBudgetPage() {
   
   // Inline Expansion State
   const [expandedItems, setExpandedItems] = useState<Set<number>>(new Set());
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { query, setQuery, suggestions, loading: searchLoading, clearSuggestions } = useTCPOSearch({ limit: 8 });
   const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, applyCorrectionFactor, totals, setItems } = useOrcamento();
@@ -323,6 +324,7 @@ export default function NewBudgetPage() {
             <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-4 flex items-center gap-4 shadow-lg">
               <Search className="text-slate-500" size={20} />
               <input 
+                ref={searchInputRef}
                 type="text" 
                 placeholder="Comece a digitar para buscar serviços TCPO (ex: concreto, alvenaria...)"
                 value={query}
@@ -341,6 +343,7 @@ export default function NewBudgetPage() {
                       await addItem(item);
                       setQuery('');
                       clearSuggestions();
+                      searchInputRef.current?.focus();
                     }}
                     className="w-full p-4 flex items-center justify-between hover:bg-[#2a2a2a] transition-colors text-left border-b border-slate-800/50 last:border-none"
                   >
@@ -365,7 +368,7 @@ export default function NewBudgetPage() {
                 <thead>
                   <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                     <th 
-                      className="px-4 py-4 w-20 cursor-pointer hover:text-white transition-colors"
+                      className="px-4 py-2 w-20 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('tcpo_id')}
                     >
                       <div className="flex items-center">
@@ -374,7 +377,7 @@ export default function NewBudgetPage() {
                       </div>
                     </th>
                     <th 
-                      className="px-4 py-4 cursor-pointer hover:text-white transition-colors"
+                      className="px-4 py-2 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('descricao_personalizada')}
                     >
                       <div className="flex items-center">
@@ -382,32 +385,32 @@ export default function NewBudgetPage() {
                         {getSortIcon('descricao_personalizada')}
                       </div>
                     </th>
-                    <th className="px-2 py-4 w-16 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                    <th className="px-2 py-2 w-16 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
                       <div className="flex items-center justify-center">
                         Unid. {getSortIcon('unidade')}
                       </div>
                     </th>
-                    <th className="px-2 py-4 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
+                    <th className="px-2 py-2 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
                       <div className="flex items-center justify-center">
                         Quant. {getSortIcon('quantidade')}
                       </div>
                     </th>
-                    <th className="px-2 py-4 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
+                    <th className="px-2 py-2 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
                       <div className="flex items-center justify-center">
                         BDI (%) {getSortIcon('bdi')}
                       </div>
                     </th>
-                    <th className="px-2 py-4 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit')}>
+                    <th className="px-2 py-2 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit')}>
                       <div className="flex items-center justify-end">
                         Preço Unit. {getSortIcon('preco_unit')}
                       </div>
                     </th>
-                    <th className="px-2 py-4 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('subtotal')}>
+                    <th className="px-2 py-2 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('subtotal')}>
                       <div className="flex items-center justify-end">
                         Subtotal {getSortIcon('subtotal')}
                       </div>
                     </th>
-                    <th className="px-4 py-4 w-16"></th>
+                    <th className="px-4 py-2 w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -433,10 +436,10 @@ export default function NewBudgetPage() {
                             className={`hover:bg-[#0a0a0a] transition-colors group cursor-pointer ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
                             onClick={() => toggleExpand(idx)}
                           >
-                            <td className="px-4 py-4">
+                            <td className="px-4 py-2">
                               <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
                             </td>
-                            <td className="px-4 py-4 min-w-[200px]">
+                            <td className="px-4 py-2 min-w-[200px]">
                               <input 
                                 type="text" 
                                 value={item.descricao_personalizada}
@@ -445,10 +448,10 @@ export default function NewBudgetPage() {
                                 className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
                               />
                             </td>
-                            <td className="px-2 py-4 text-center">
+                            <td className="px-2 py-2 text-center">
                               <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
                             </td>
-                            <td className="px-2 py-4">
+                            <td className="px-2 py-2">
                               <input 
                                 type="number" 
                                 value={item.quantidade}
@@ -457,7 +460,7 @@ export default function NewBudgetPage() {
                                 className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                               />
                             </td>
-                            <td className="px-2 py-4">
+                            <td className="px-2 py-2">
                               <input 
                                 type="number" 
                                 value={item.bdi}
@@ -466,13 +469,13 @@ export default function NewBudgetPage() {
                                 className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                               />
                             </td>
-                            <td className="px-2 py-4 text-right">
+                            <td className="px-2 py-2 text-right">
                               <p className="text-xs font-bold text-white">{formatCurrency(unitTotal * (1 + (item.bdi || 0) / 100))}</p>
                             </td>
-                            <td className="px-2 py-4 text-right">
+                            <td className="px-2 py-2 text-right">
                               <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
                             </td>
-                            <td className="px-4 py-4 text-right">
+                            <td className="px-4 py-2 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button 
                                   onClick={(e) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TCPOItem, BudgetItem, CompositionItem } from '@/lib/types';
 import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
@@ -13,53 +13,58 @@ export function useTCPOSearch(options: SearchOptions = {}) {
   const [suggestions, setSuggestions] = useState<TCPOItem[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const search = useCallback(async (searchQuery: string) => {
-    if (!searchQuery || searchQuery.length < 2) {
-      setSuggestions([]);
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Se a busca parecer um código (começa com número) ou for muito curta, usamos ilike
-      // Caso contrário, usamos o textSearch que é mais potente para descrições longas
-      const isCode = /^\d/.test(searchQuery);
-      
-      let q = supabase.from('tcpo_itens').select('*');
-
-      if (isCode || searchQuery.length < 4) {
-        // Busca por ID (código) ou parte da descrição
-        q = q.or(`id.ilike.%${searchQuery}%,descricao.ilike.%${searchQuery}%`);
-      } else {
-        // Busca textual avançada
-        q = q.textSearch('descricao', searchQuery, { 
-          config: 'portuguese', 
-          type: 'websearch' 
-        });
-      }
-
-      if (options.categoria) {
-        q = q.eq('categoria', options.categoria);
-      }
-
-      const { data, error } = await q.limit(options.limit || 10);
-
-      if (error) throw error;
-      setSuggestions(data || []);
-    } catch (error) {
-      console.error('Error searching TCPO:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [options.categoria, options.limit]);
-
   useEffect(() => {
-    const timer = setTimeout(() => {
-      search(query);
-    }, 300);
+    let active = true;
 
-    return () => clearTimeout(timer);
-  }, [query, search]);
+    const fetchSuggestions = async () => {
+      if (!query || query.trim().length < 2) {
+        setSuggestions([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const isCode = /^\d/.test(query);
+        let q = supabase.from('tcpo_itens').select('*');
+
+        // Usamos ilike para garantir que a busca funcione caractere por caractere (partial matching)
+        // Isso evita o comportamento errático do textSearch em buscas curtas/incompletas
+        if (isCode) {
+          q = q.ilike('id', `%${query}%`);
+        } else {
+          // Busca por descrição ou ID
+          q = q.or(`id.ilike.%${query}%,descricao.ilike.%${query}%`);
+        }
+
+        if (options.categoria) {
+          q = q.eq('categoria', options.categoria);
+        }
+
+        const { data, error } = await q.limit(options.limit || 10);
+
+        if (error) throw error;
+        
+        if (active) {
+          setSuggestions(data || []);
+        }
+      } catch (error) {
+        if (active) {
+          console.error('Error searching TCPO:', error);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 300);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [query, options.categoria, options.limit]);
 
   return {
     query,
