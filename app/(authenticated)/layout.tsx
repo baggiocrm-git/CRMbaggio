@@ -17,13 +17,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user]);
 
   useEffect(() => {
-    console.log('DashboardLayout: supabase object:', supabase);
-    console.log('DashboardLayout: supabase.auth:', supabase?.auth);
-    
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
 
-    const handleUserRole = async (userData: User) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleUserRole = async (userData: any) => {
       if (!mounted) return;
       
       try {
@@ -38,10 +36,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         ).toLowerCase().trim();
 
         console.log('DashboardLayout: Processando papel do usuário:', userEmail, userData.user_metadata);
-        setUser(userData);
-
-        // Auto-fix role for the main admin email if missing in metadata
+        
+        // Force Administrator role for the main admin email in local state immediately
         if (userEmail === 'lucabaggio28@gmail.com') {
+          const forcedUser = { 
+            ...userData, 
+            user_metadata: { 
+              ...(userData.user_metadata || {}), 
+              role: 'Administrador' 
+            } 
+          };
+          setUser(forcedUser);
+          
+          // Auto-fix role for the main admin email if missing in metadata (sync with Supabase)
           if (userData.user_metadata?.role !== 'Administrador') {
             console.log('Auto-atribuindo papel de Administrador para:', userEmail);
             const { error: updateError } = await supabase.auth.updateUser({
@@ -49,38 +56,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             });
             if (!updateError) {
               console.log('Papel de Administrador sincronizado com o perfil!');
-              // Force session refresh to update JWT for RLS
               await supabase.auth.refreshSession();
-              // Refresh local state
-              const { data: { user: refreshedUser } } = await supabase.auth.getUser();
-              if (refreshedUser && mounted) setUser(refreshedUser);
             }
           }
           setLoading(false);
-        } else if (userData.user_metadata?.role === 'Cliente') {
-          const { data: projectData, error: projectError } = await supabase
-            .from('projetos')
-            .select('id')
-            .eq('cliente_id', userData.id)
-            .limit(1)
-            .single();
-          
-          if (projectData) {
-            router.push(`/client/rdo/${projectData.id}`);
-            setLoading(false);
-          } else {
-            console.warn('Cliente sem projeto vinculado:', userData.id, projectError);
-            // Don't sign out automatically if it might be a temporary error
-            // But if we are sure, then sign out
-            if (projectError && projectError.code === 'PGRST116') { // No rows found
-              await supabase.auth.signOut();
-              router.push('/login');
-            } else {
-              setLoading(false); // Just show the dashboard (RLS will handle access)
-            }
-          }
         } else {
-          setLoading(false);
+          setUser(userData);
+          if (userData.user_metadata?.role === 'Cliente') {
+            const { data: projectData, error: projectError } = await supabase
+              .from('projetos')
+              .select('id')
+              .eq('cliente_id', userData.id)
+              .limit(1)
+              .single();
+            
+            if (projectData) {
+              router.push(`/client/rdo/${projectData.id}`);
+              setLoading(false);
+            } else {
+              console.warn('Cliente sem projeto vinculado:', userData.id, projectError);
+              if (projectError && projectError.code === 'PGRST116') {
+                await supabase.auth.signOut();
+                router.push('/login');
+              } else {
+                setLoading(false);
+              }
+            }
+          } else {
+            setLoading(false);
+          }
         }
       } catch (e) {
         console.error('Erro ao processar papel do usuário:', e);
@@ -284,9 +288,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [router]);
 
+  const banner = (
+    <div className="fixed top-0 left-0 right-0 z-[9999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-lg pointer-events-none">
+      VERSÃO: 20260321-0225 | REFRESH: F5 ESTÁVEL | STORAGE: V4
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] gap-6">
+        {banner}
         <Loader2 className="animate-spin text-[#d4ff3f]" size={32} />
         <div className="text-center">
           <p className="text-slate-400 text-sm font-medium">Verificando sua sessão...</p>
@@ -310,6 +321,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] gap-8 p-6">
+        {banner}
         <div className="text-center space-y-4">
           <div className={`${errorParam ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'} border rounded-full p-4 w-fit mx-auto`}>
             <AlertCircle className={errorParam ? 'text-red-500' : 'text-amber-500'} size={32} />
@@ -348,7 +360,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
       <Sidebar />
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden pt-6">
         {children}
       </main>
     </div>

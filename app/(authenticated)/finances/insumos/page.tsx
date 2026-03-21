@@ -141,7 +141,9 @@ export default function InsumosPage() {
             composicao: newComposicao,
             custo_mo: totalMO,
             custo_mat: totalMat,
-            custo_eq: totalEq
+            custo_eq: totalEq,
+            custo_sabado: (totalMO + totalMat + totalEq) * 1.5,
+            custo_domingo_feriado: (totalMO + totalMat + totalEq) * 2
           };
           itemsMap.set(item.id, updatedItems[i]);
         }
@@ -154,6 +156,8 @@ export default function InsumosPage() {
           custo_mo: item.custo_mo,
           custo_mat: item.custo_mat,
           custo_eq: item.custo_eq,
+          custo_sabado: item.custo_sabado,
+          custo_domingo_feriado: item.custo_domingo_feriado,
           composicao: item.composicao,
           updated_at: new Date().toISOString()
         }).eq('id', item.id);

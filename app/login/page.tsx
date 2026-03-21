@@ -14,6 +14,12 @@ export default function LoginPage() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const router = useRouter();
 
+  const banner = (
+    <div className="fixed top-0 left-0 right-0 z-[99999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-2xl pointer-events-none">
+      VERSÃO: 20260321-0225 | REFRESH: F5 ESTÁVEL | STORAGE: V4
+    </div>
+  );
+
   useEffect(() => {
     // Check if localStorage is available
     try {
@@ -33,10 +39,13 @@ export default function LoginPage() {
     }
 
     const checkUser = async () => {
+      // Auto-redirect disabled to allow manual reset if needed
+      /*
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         router.push('/dashboard');
       }
+      */
     };
     checkUser();
   }, [router]);
@@ -139,6 +148,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
+      {banner}
       <div className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
         {/* Decorative background element */}
         <div className="absolute -top-24 -right-24 size-48 bg-[#d4ff3f]/5 blur-[100px] rounded-full" />
@@ -239,6 +249,24 @@ export default function LoginPage() {
                 )}
               </button>
 
+              <div className="pt-6 border-t border-slate-800/50 mt-6">
+                <button 
+                  type="button"
+                  onClick={() => {
+                    localStorage.clear();
+                    sessionStorage.clear();
+                    window.location.reload();
+                  }}
+                  className="w-full bg-rose-500/10 border border-rose-500/30 text-rose-500 font-black text-[10px] uppercase tracking-widest py-4 rounded-2xl hover:bg-rose-500/20 transition-all flex items-center justify-center gap-2"
+                >
+                  <AlertCircle size={14} />
+                  LIMPAR TUDO E RECARREGAR
+                </button>
+                <p className="text-slate-600 text-[8px] text-center mt-3 uppercase font-black tracking-widest opacity-50">
+                  Use este botão se o sistema estiver travado em uma versão antiga
+                </p>
+              </div>
+
               <div className="relative py-4">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-800/50"></div>
@@ -264,18 +292,25 @@ export default function LoginPage() {
                 Entrar com Google Account
               </button>
 
-              <div className="pt-4 flex justify-center">
+              <div className="pt-6 flex flex-col gap-4 items-center">
                 <button 
                   type="button"
                   onClick={() => {
                     localStorage.clear();
                     sessionStorage.clear();
-                    window.location.href = window.location.origin + window.location.pathname;
+                    // Clear all cookies
+                    document.cookie.split(";").forEach(function(c) { 
+                      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+                    });
+                    window.location.reload();
                   }}
-                  className="text-[9px] font-black text-slate-700 hover:text-slate-500 uppercase tracking-widest transition-colors"
+                  className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl transition-all border border-rose-500/20"
                 >
-                  Limpar Cache de Login
+                  LIMPAR TUDO E RECARREGAR (F5 FORÇADO)
                 </button>
+                <p className="text-slate-700 text-[8px] font-bold uppercase tracking-widest">
+                  Use este botão se o login falhar após F5
+                </p>
               </div>
             </>
           )}

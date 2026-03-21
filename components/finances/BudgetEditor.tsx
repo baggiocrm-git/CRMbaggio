@@ -270,7 +270,7 @@ export default function BudgetEditor({ budgetId }: BudgetEditorProps) {
               />
             </div>
             <div>
-              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Obra / Projeto</label>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">OBRA / PROJETO</label>
               <select 
                 value={budgetData.projeto_id}
                 onChange={(e) => setBudgetData({ ...budgetData, projeto_id: e.target.value })}

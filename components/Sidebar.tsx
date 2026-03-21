@@ -101,21 +101,15 @@ export default function Sidebar() {
 
     // Initial check
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('Sidebar: Initial user check:', !!user);
-      if (user) {
-        setUser(user);
-        const userEmail = (
-          user.email || 
-          user.user_metadata?.email || 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (user as any).app_metadata?.email ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (user as any).identities?.[0]?.identity_data?.email ||
-          ''
-        ).toLowerCase().trim();
-        const isAdm = userEmail === 'lucabaggio28@gmail.com' || user.user_metadata?.role === 'Administrador';
-        console.log('Sidebar: Initial user email:', userEmail, 'IsAdmin:', isAdm);
+      // Try a few times to get the user, as storage might be slow to load
+      for (let i = 0; i < 5; i++) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          console.log(`Sidebar: User found on attempt ${i + 1}:`, user.email);
+          setUser(user);
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     };
     checkUser();
@@ -261,7 +255,7 @@ export default function Sidebar() {
         {/* Debug info for admin troubleshooting */}
         <div className="mt-2 px-2 opacity-20 hover:opacity-100 transition-opacity flex flex-col gap-1">
           <p className="text-[6px] text-slate-500 font-mono break-all">
-            E: {userEmail} | R: {userRole} | ID: {user?.id?.substring(0, 5)}
+            V: 20260321-0145 | E: {userEmail} | R: {userRole}
           </p>
           <button 
             onClick={() => {

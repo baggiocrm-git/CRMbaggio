@@ -11,7 +11,7 @@ import CustomCurrencyInput from '@/components/CurrencyInput';
 interface ProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: () => void | Promise<void>;
   project?: Project | null; // If editing
 }
 

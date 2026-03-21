@@ -242,7 +242,6 @@ export function useOrcamento() {
     updateItemComposition,
     updateCompositionItem,
     applyCorrectionFactor,
-    setItems,
     totals
   };
 }

@@ -115,7 +115,9 @@ export default function ServicesPage() {
         'Custo MO (R$)': s.custo_mo,
         'Custo MAT (R$)': s.custo_mat,
         'Custo EQ (R$)': s.custo_eq,
-        'Total (R$)': s.custo_mo + s.custo_mat + s.custo_eq
+        'Total Normal (R$)': s.custo_mo + s.custo_mat + s.custo_eq,
+        'Total Sábado (R$)': s.custo_sabado || (s.custo_mo + s.custo_mat + s.custo_eq) * 1.5,
+        'Total Dom./Fer. (R$)': s.custo_domingo_feriado || (s.custo_mo + s.custo_mat + s.custo_eq) * 2
       }));
 
       const ws = XLSX.utils.json_to_sheet(dataToExport);
@@ -138,7 +140,9 @@ export default function ServicesPage() {
             new TableCell({ children: [new Paragraph({ text: 'Código', bold: true })] }),
             new TableCell({ children: [new Paragraph({ text: 'Descrição', bold: true })] }),
             new TableCell({ children: [new Paragraph({ text: 'Un', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Total (R$)', bold: true })] }),
+            new TableCell({ children: [new Paragraph({ text: 'Normal (R$)', bold: true })] }),
+            new TableCell({ children: [new Paragraph({ text: 'Sáb. (R$)', bold: true })] }),
+            new TableCell({ children: [new Paragraph({ text: 'Dom/Fer (R$)', bold: true })] }),
           ],
         }),
         ...filteredServices.map(s => new TableRow({
@@ -147,6 +151,8 @@ export default function ServicesPage() {
             new TableCell({ children: [new Paragraph(s.descricao)] }),
             new TableCell({ children: [new Paragraph(s.unidade)] }),
             new TableCell({ children: [new Paragraph((s.custo_mo + s.custo_mat + s.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph((s.custo_sabado || (s.custo_mo + s.custo_mat + s.custo_eq) * 1.5).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph((s.custo_domingo_feriado || (s.custo_mo + s.custo_mat + s.custo_eq) * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
           ],
         }))
       ];
@@ -242,7 +248,17 @@ export default function ServicesPage() {
                 </th>
                 <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
                   <div className="flex items-center justify-end">
-                    Custo Total {getSortIcon('total')}
+                    Total Normal {getSortIcon('total')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('custo_sabado')}>
+                  <div className="flex items-center justify-end">
+                    Total Sáb. {getSortIcon('custo_sabado')}
+                  </div>
+                </th>
+                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('custo_domingo_feriado')}>
+                  <div className="flex items-center justify-end">
+                    Total Dom./Fer. {getSortIcon('custo_domingo_feriado')}
                   </div>
                 </th>
               </tr>
@@ -290,6 +306,16 @@ export default function ServicesPage() {
                       <td className="px-6 py-2 text-right">
                         <span className="text-sm font-black text-[#d4ff3f]">
                           R$ {(service.custo_mo + service.custo_mat + service.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="px-6 py-2 text-right">
+                        <span className="text-sm font-black text-orange-400">
+                          R$ {(service.custo_sabado || (service.custo_mo + service.custo_mat + service.custo_eq) * 1.5).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </td>
+                      <td className="px-6 py-2 text-right">
+                        <span className="text-sm font-black text-rose-400">
+                          R$ {(service.custo_domingo_feriado || (service.custo_mo + service.custo_mat + service.custo_eq) * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
                     </tr>

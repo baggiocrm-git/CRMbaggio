@@ -12,13 +12,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    storageKey: 'cbsl-erp-auth-token', // Custom key to avoid collisions
-    debug: true, // Enable debug logs for auth
+    storageKey: 'cbsl-erp-auth-v4', // New key to force fresh state
   }
 });
 
 if (typeof window !== 'undefined') {
-  console.log('Supabase lib: Cliente inicializado no navegador.');
+  console.log('Supabase lib: Cliente inicializado (localStorage v4).');
   console.log('Supabase lib: URL atual:', window.location.href);
   console.log('Supabase lib: Auth Config:', {
     persistSession: true,

@@ -2,7 +2,9 @@ import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  distDir: '.next',
+  generateBuildId: async () => {
+    return 'cbsl-erp-v4-4-' + Date.now();
+  },
   reactStrictMode: true,
   typescript: {
     ignoreBuildErrors: true,

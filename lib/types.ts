@@ -8,6 +8,8 @@ export interface TCPOItem {
   custo_mo: number;
   custo_mat: number;
   custo_eq: number;
+  custo_sabado?: number;
+  custo_domingo_feriado?: number;
   bdi_padrao: number;
   composicao?: {
     insumo: string;

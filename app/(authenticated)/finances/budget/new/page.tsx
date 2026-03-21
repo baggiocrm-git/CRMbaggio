@@ -21,6 +21,7 @@ import { useTCPOSearch, useOrcamento } from '@/hooks/useTCPOSearch';
 import { Project } from '@/lib/types';
 import { GoogleGenAI } from "@google/genai";
 import CompositionModal from '@/components/CompositionModal';
+import ProjectModal from '@/components/projects/ProjectModal';
 
 export default function NewBudgetPage() {
   const router = useRouter();
@@ -30,6 +31,7 @@ export default function NewBudgetPage() {
   const [budgetDesc, setBudgetDesc] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   
   // Composition Modal State (Legacy, keeping for now but user wants inline)
   const [isCompModalOpen, setIsCompModalOpen] = useState(false);
@@ -97,11 +99,12 @@ export default function NewBudgetPage() {
     setExpandedItems(newExpanded);
   };
 
+  const fetchProjects = async () => {
+    const { data } = await supabase.from('projetos').select('*').order('nome');
+    setProjects(data || []);
+  };
+
   useEffect(() => {
-    const fetchProjects = async () => {
-      const { data } = await supabase.from('projetos').select('*').order('nome');
-      setProjects(data || []);
-    };
     fetchProjects();
   }, []);
 
@@ -244,20 +247,38 @@ export default function NewBudgetPage() {
 
         {/* Inline General Info */}
         <div className="flex flex-wrap items-center gap-4 bg-[#1a1a1a] p-3 rounded-2xl border border-slate-800/50 shadow-sm">
-          <div className="flex flex-col gap-1 min-w-[140px]">
+          <div className="flex flex-col gap-1 min-w-[160px]">
             <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1">
-              <Calculator size={8} className="text-[#d4ff3f]" /> Obra
+              <Calculator size={8} className="text-[#d4ff3f]" /> OBRA / PROJETO
             </label>
-            <select 
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
-            >
-              <option value="">Selecione...</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.nome}</option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select 
+                value={selectedProjectId}
+                onChange={(e) => {
+                  if (e.target.value === 'new') {
+                    setIsProjectModalOpen(true);
+                    return;
+                  }
+                  setSelectedProjectId(e.target.value);
+                }}
+                className={`flex-1 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] outline-none focus:ring-1 focus:ring-[#d4ff3f]/30 ${!selectedProjectId ? 'text-[#d4ff3f] font-black italic' : 'text-white'}`}
+              >
+                <option value="">{selectedProjectId ? 'Selecione...' : 'Cadastrar Obra'}</option>
+                <option value="new" className="text-[#d4ff3f] font-black">+ NOVA OBRA</option>
+                {projects.map(p => (
+                  <option key={p.id} value={p.id}>{p.nome}</option>
+                ))}
+              </select>
+              {selectedProjectId === '' && (
+                <button 
+                  onClick={() => setIsProjectModalOpen(true)}
+                  className="p-1 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f] hover:bg-[#d4ff3f]/20 transition-all"
+                  title="Cadastrar Nova Obra"
+                >
+                  <Plus size={12} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-1 min-w-[140px]">
@@ -614,6 +635,23 @@ export default function NewBudgetPage() {
           itemName={items[activeItemIndex]?.descricao_personalizada || ''}
         />
       )}
+      {/* Project Modal */}
+      <ProjectModal 
+        isOpen={isProjectModalOpen}
+        onClose={() => setIsProjectModalOpen(false)}
+        onSuccess={async () => {
+          await fetchProjects();
+          // After success, we might want to select the newest project
+          const { data } = await supabase
+            .from('projetos')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (data) setSelectedProjectId(data.id);
+          setIsProjectModalOpen(false);
+        }}
+      />
     </div>
   );
 }
