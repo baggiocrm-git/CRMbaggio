@@ -15,13 +15,27 @@ import {
   ChevronUp,
   ChevronsUpDown,
   Upload,
-  X
+  X,
+  FileDown
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Budget } from '@/lib/types';
+import { 
+  Document, 
+  Packer, 
+  Paragraph, 
+  TextRun, 
+  Table, 
+  TableRow, 
+  TableCell, 
+  WidthType, 
+  AlignmentType,
+  VerticalAlign
+} from 'docx';
+import { saveAs } from 'file-saver';
 
 interface AnalyticalItem {
   id: string;
@@ -139,7 +153,8 @@ export default function ViewBudgetPage() {
     paymentConditions: 'na conclusão dos serviços com fatura para 15d.d.;',
     executionTime: '05 (cinco) dias íteis trabalhados (das 07:30 às 17:30hs);',
     validity: '30 (trinta) dias, a contar desta data.',
-    techResponsible: 'Nome Engenheiro/Responsável Técnico'
+    techResponsible: 'Nome Engenheiro/Responsável Técnico',
+    farewell: 'Esperando ter correspondido à sua expectativa, aproveitamos o ensejo para cumprimentá-lo.'
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -159,6 +174,172 @@ export default function ViewBudgetPage() {
       window.print();
       setIsProposalMode(false);
     }, 500);
+  };
+
+  const exportToWord = async () => {
+    if (!budget) return;
+
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: [
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: "PROPOSTA COMERCIAL",
+                  bold: true,
+                  size: 32,
+                }),
+              ],
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "À", bold: true }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: printConfig.clientName || 'EMPRESA MUNICIPAL DE URBANIZAÇÃO - EMURB', bold: true }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: printConfig.clientAddress || 'Rua São Bento nº 405 - 16º andar - conj. 163' }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "São Paulo - SP" }),
+              ],
+              spacing: { after: 400 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "ASS.: ", bold: true }),
+                new TextRun({ text: `PROPOSTA COMERCIAL Nº ${printConfig.proposalNumber} - ${printConfig.serviceDescription}`, bold: true }),
+              ],
+              spacing: { after: 400 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Prezados Senhores," }),
+              ],
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Apresentamos a V. Sas. a nossa proposta comercial relativa à execução dos serviços em epígrafe, assumindo inteira responsabilidade por quaisquer erros ou omissões que tiverem sido cometidos quando da preparação da mesma:" }),
+              ],
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: `1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de ` }),
+                new TextRun({ text: formatCurrency(budget.total_geral), bold: true }),
+                new TextRun({ text: ` (${formatCurrencyToWords(budget.total_geral)}), de acordo com os preços constantes da Planilha de Serviços abaixo:` }),
+              ],
+              spacing: { after: 400 },
+            }),
+            // Table
+            new Table({
+              width: {
+                size: 100,
+                type: WidthType.PERCENTAGE,
+              },
+              rows: [
+                new TableRow({
+                  children: [
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "Quant.", bold: true })], alignment: AlignmentType.CENTER })],
+                      verticalAlign: VerticalAlign.CENTER,
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "SERVIÇOS", bold: true })], alignment: AlignmentType.CENTER })],
+                      verticalAlign: VerticalAlign.CENTER,
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "P. UNIT. R$", bold: true })], alignment: AlignmentType.CENTER })],
+                      verticalAlign: VerticalAlign.CENTER,
+                    }),
+                    new TableCell({ 
+                      children: [new Paragraph({ children: [new TextRun({ text: "P. TOTAL R$", bold: true })], alignment: AlignmentType.CENTER })],
+                      verticalAlign: VerticalAlign.CENTER,
+                    }),
+                  ],
+                }),
+                ...items.map(item => new TableRow({
+                  children: [
+                    new TableCell({ children: [new Paragraph({ text: item.quantidade.toString(), alignment: AlignmentType.CENTER })] }),
+                    new TableCell({ children: [new Paragraph({ text: item.descricao })] }),
+                    new TableCell({ children: [new Paragraph({ text: item.preco_unit_com_bdi.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), alignment: AlignmentType.RIGHT })] }),
+                    new TableCell({ children: [new Paragraph({ text: item.subtotal_preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), alignment: AlignmentType.RIGHT })] }),
+                  ],
+                })),
+                new TableRow({
+                  children: [
+                    new TableCell({ columnSpan: 3, children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL", bold: true })] })] }),
+                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(budget.total_geral), bold: true })], alignment: AlignmentType.RIGHT })] }),
+                  ],
+                }),
+              ],
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "" })],
+              spacing: { before: 400 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "CONDIÇÕES GERAIS:", bold: true })],
+              spacing: { after: 200 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Pagamento: ", bold: true }),
+                new TextRun({ text: printConfig.paymentConditions }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Prazo de Execução: ", bold: true }),
+                new TextRun({ text: printConfig.executionTime }),
+              ],
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Validade da Proposta: ", bold: true }),
+                new TextRun({ text: printConfig.validity }),
+              ],
+              spacing: { after: 400 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: printConfig.farewell })],
+              spacing: { after: 400 },
+            }),
+            new Paragraph({
+              children: [new TextRun({ text: "Atenciosamente," })],
+              spacing: { after: 800 },
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: printConfig.techResponsible, bold: true }),
+              ],
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({
+              children: [
+                new TextRun({ text: "Responsável Técnico" }),
+              ],
+              alignment: AlignmentType.CENTER,
+            }),
+          ],
+        },
+      ],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `Proposta_${budget.nome.replace(/\s+/g, '_')}.docx`);
   };
 
   const handleSort = (key: keyof AnalyticalItem | 'total') => {
@@ -311,120 +492,137 @@ export default function ViewBudgetPage() {
         <div className="flex items-center gap-3">
           <button 
             onClick={() => setIsPrintModalOpen(true)}
-            className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-black px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-[0_0_20px_rgba(212,255,63,0.2)]"
           >
-            <Printer size={18} /> Imprimir / PDF
+            <Printer size={18} /> Gerar Proposta
           </button>
         </div>
       </div>
 
       {/* Proposal Layout - Only visible on Print when in Proposal Mode */}
       {isProposalMode && (
-        <div className="hidden print:block bg-white text-black p-0 min-h-screen font-serif">
+        <div className="hidden print:block bg-white text-black p-0 min-h-screen font-serif text-[12px] leading-relaxed">
           {/* Letterhead */}
-          {printConfig.letterhead && (
+          {printConfig.letterhead ? (
             <div className="mb-8 text-center">
               <Image 
                 src={printConfig.letterhead} 
                 alt="Timbrado" 
                 width={800}
                 height={128}
-                className="max-w-full h-auto max-h-32 mx-auto" 
+                className="max-w-full h-auto max-h-40 mx-auto" 
                 unoptimized
                 referrerPolicy="no-referrer"
               />
             </div>
+          ) : (
+            <div className="h-32 mb-8" /> // Spacer for blank A4
           )}
 
-          {/* Client Info */}
-          <div className="mb-8 space-y-1">
-            <p className="font-bold uppercase">{printConfig.clientName}</p>
-            <p className="font-bold">Aos cuidados de: {printConfig.attentionTo}</p>
-            <p className="font-bold uppercase">NESTA</p>
-          </div>
+          <div className="px-12 py-8">
+            {/* Header Info */}
+            <div className="flex justify-between items-start mb-12">
+              <div className="space-y-1">
+                <p className="font-bold text-lg">EDITAL</p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold">ANEXO 2</p>
+              </div>
+            </div>
 
-          {/* Proposal Number */}
-          <div className="mb-8">
-            <p className="font-bold">Proposta Comercial nº: {printConfig.proposalNumber}</p>
-          </div>
+            <div className="text-center mb-12">
+              <p className="font-bold text-lg uppercase">MODELO DE CARTA PARA APRESENTAÇÃO DA PROPOSTA COMERCIAL</p>
+            </div>
 
-          {/* Budget Name */}
-          <div className="mb-8">
-            <p className="font-bold uppercase text-center">{budget.nome}</p>
-          </div>
+            {/* Client Info */}
+            <div className="mb-8 space-y-1">
+              <p className="font-bold uppercase">À</p>
+              <p className="font-bold uppercase">{printConfig.clientName || 'EMPRESA MUNICIPAL DE URBANIZAÇÃO - EMURB'}</p>
+              <p className="font-bold">{printConfig.clientAddress || 'Rua São Bento nº 405 - 16º andar - conj. 163'}</p>
+              <p className="font-bold">São Paulo - SP</p>
+            </div>
 
-          {/* Service Description */}
-          <div className="mb-8">
-            <p>{printConfig.serviceDescription}</p>
-          </div>
+            {/* Subject */}
+            <div className="mb-8 flex gap-4">
+              <p className="font-bold flex-shrink-0">ASS.:</p>
+              <p className="font-bold uppercase text-justify">
+                PROPOSTA COMERCIAL Nº {printConfig.proposalNumber} - {printConfig.serviceDescription}
+              </p>
+            </div>
 
-          <div className="mb-8">
-            <p>Prezados Senhores:</p>
-          </div>
+            <div className="mb-4">
+              <p>Prezados Senhores,</p>
+            </div>
 
-          <div className="mb-8">
-            <p>
-              Atendendo a sua solicitação, apresentamos proposta de preços com fornecimento de equipamentos e mão de obra especializada para a execução dos serviços acima, no {budget.projeto?.nome || 'Cliente/Obra'}, localizada à {printConfig.clientAddress} em Ponta Grossa - Pr., conforme condições abaixo discriminadas:
-            </p>
-          </div>
+            <div className="mb-8">
+              <p className="text-justify">
+                Apresentamos a V. Sas. a nossa proposta comercial relativa à execução dos serviços em epígrafe, assumindo inteira responsabilidade por quaisquer erros ou omissões que tiverem sido cometidos quando da preparação da mesma:
+              </p>
+            </div>
 
-          <div className="mb-4">
-            <p className="font-bold">1. Relação dos serviços a serem executados, conforme segue abaixo:</p>
-          </div>
+            <div className="mb-8">
+              <p className="text-justify">
+                1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de <span className="font-bold">{formatCurrency(budget.total_geral)}</span> ({formatCurrencyToWords(budget.total_geral)}), de acordo com os preços constantes da Planilha de Serviços abaixo:
+              </p>
+            </div>
 
-          {/* Budget Table for Proposal */}
-          <table className="w-full text-left border-collapse border border-black mb-8">
-            <thead>
-              <tr className="bg-gray-100 border-b border-black text-[10px] font-bold uppercase">
-                <th className="border-r border-black px-2 py-1 w-20">Código</th>
-                <th className="border-r border-black px-2 py-1">Discriminação</th>
-                <th className="border-r border-black px-1 py-1 w-10 text-center">Unid</th>
-                <th className="border-r border-black px-1 py-1 w-12 text-center">Quant</th>
-                <th className="border-r border-black px-1 py-1 w-12 text-center">BDI</th>
-                <th className="border-r border-black px-1 py-1 w-20 text-right">$ UNIT.</th>
-                <th className="px-2 py-1 w-24 text-right">Subtotal</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} className="border-b border-black text-[10px]">
-                  <td className="border-r border-black px-2 py-1">{item.tcpo_id}</td>
-                  <td className="border-r border-black px-2 py-1 font-bold">{item.descricao}</td>
-                  <td className="border-r border-black px-1 py-1 text-center">{item.unidade}</td>
-                  <td className="border-r border-black px-1 py-1 text-center">{item.quantidade}</td>
-                  <td className="border-r border-black px-1 py-1 text-center">{item.bdi}%</td>
-                  <td className="border-r border-black px-1 py-1 text-right">{formatCurrency(item.preco_unit_com_bdi)}</td>
-                  <td className="px-2 py-1 text-right font-bold">{formatCurrency(item.subtotal_preco)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* Budget Table for Proposal */}
+            <div className="mb-8">
+              <table className="w-full text-left border-collapse border-2 border-black">
+                <thead>
+                  <tr className="bg-gray-50 border-b-2 border-black text-[10px] font-bold uppercase">
+                    <th className="border-r-2 border-black px-2 py-2 text-center" colSpan={4}>PLANILHA DE SERVIÇOS E PREÇOS</th>
+                  </tr>
+                  <tr className="bg-gray-50 border-b-2 border-black text-[9px] font-bold uppercase">
+                    <th className="border-r-2 border-black px-1 py-2 w-16 text-center italic font-serif">Quantidade</th>
+                    <th className="border-r-2 border-black px-2 py-2 text-center">SERVIÇOS</th>
+                    <th className="border-r-2 border-black px-1 py-2 w-24 text-center">PREÇO UNITÁRIO R$</th>
+                    <th className="px-1 py-2 w-24 text-center">PREÇO TOTAL R$</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr key={item.id} className="border-b border-black text-[10px]">
+                      <td className="border-r-2 border-black px-1 py-2 text-center font-bold">{item.quantidade}</td>
+                      <td className="border-r-2 border-black px-2 py-2 text-justify leading-tight">{item.descricao}</td>
+                      <td className="border-r-2 border-black px-1 py-2 text-right">{item.preco_unit_com_bdi.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                      <td className="px-1 py-2 text-right font-bold">{item.subtotal_preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-black font-bold text-[11px]">
+                    <td className="border-r-2 border-black px-2 py-2 uppercase" colSpan={2}>VALOR TOTAL</td>
+                    <td className="border-r-2 border-black px-1 py-2"></td>
+                    <td className="px-1 py-2 text-right">{formatCurrency(budget.total_geral)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-          {/* Total Value in Words */}
-          <div className="mb-8 p-4 border border-black">
-            <p className="font-bold">
-              Valor Total dos Serviços:..............................................................{formatCurrency(budget.total_geral)} ({formatCurrencyToWords(budget.total_geral)})
-            </p>
-          </div>
+            {/* Conditions */}
+            <div className="mb-8 space-y-2">
+              <p className="font-bold">CONDIÇÕES GERAIS:</p>
+              <p><span className="font-bold">Pagamento:</span> {printConfig.paymentConditions}</p>
+              <p><span className="font-bold">Prazo de Execução:</span> {printConfig.executionTime}</p>
+              <p><span className="font-bold">Validade da Proposta:</span> {printConfig.validity}</p>
+            </div>
 
-          {/* Conditions */}
-          <div className="mb-8 space-y-2">
-            <p className="font-bold">2. Condições de Pagamento: <span className="font-normal">{printConfig.paymentConditions}</span></p>
-            <p className="font-bold">3. Prazo de Execução: <span className="font-normal">{printConfig.executionTime}</span></p>
-            <p className="font-bold">4. Prazo de validade da proposta: <span className="font-normal">{printConfig.validity}</span></p>
-          </div>
-
-          <div className="mb-12">
-            <p>Esperando ter correspondido à sua expectativa, aproveitamos o ensejo para cumprimentá-lo.</p>
-          </div>
-
-          {/* Signature */}
-          <div className="flex justify-end">
-            <div className="text-right space-y-1">
-              <p>Atenciosamente,</p>
-              <div className="mt-12 border-t border-black pt-2 w-64 ml-auto">
-                <p className="font-bold">{printConfig.techResponsible}</p>
-                <p className="text-xs">Engº Civil/Resp. Técnico</p>
+            {/* Footer Signature Area */}
+            <div className="mt-20">
+              <div className="flex justify-between items-end">
+                <div className="text-center">
+                  <div className="w-48 border-t border-black pt-1">
+                    <p className="text-[10px] font-bold uppercase">GLC</p>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <p className="font-bold uppercase mb-1">EDITAL DE TOMADA DE PREÇOS Nº {printConfig.proposalNumber}</p>
+                  <div className="w-full border-t-2 border-black pt-1" />
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase">PAG. 1/1</p>
+                </div>
               </div>
             </div>
           </div>
@@ -504,41 +702,41 @@ export default function ViewBudgetPage() {
 
       {/* Analytical Table */}
       <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm print:border-none print:shadow-none print:bg-transparent">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-hidden">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50 print:bg-gray-100 print:text-black print:border-black">
-                <th className="px-4 py-2 w-20 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tcpo_id')}>
+                <th className="px-2 py-2 w-[90px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tcpo_id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('tcpo_id')}
                   </div>
                 </th>
-                <th className="px-4 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
                   <div className="flex items-center">
                     Discriminação dos Serviços {getSortIcon('descricao')}
                   </div>
                 </th>
-                <th className="px-1 py-2 w-14 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                <th className="px-2 py-2 w-[60px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
                   <div className="flex items-center justify-center">
                     Unid. {getSortIcon('unidade')}
                   </div>
                 </th>
-                <th className="px-1 py-2 w-16 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
+                <th className="px-2 py-2 w-[70px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
                   <div className="flex items-center justify-center">
                     Quant. {getSortIcon('quantidade')}
                   </div>
                 </th>
-                <th className="px-1 py-2 w-20 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
+                <th className="px-2 py-2 w-[80px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
                   <div className="flex items-center justify-center">
                     BDI (%) {getSortIcon('bdi')}
                   </div>
                 </th>
-                <th className="px-1 py-2 w-28 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit_com_bdi')}>
+                <th className="px-2 py-2 w-[100px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit_com_bdi')}>
                   <div className="flex items-center justify-end">
                     $ UNIT. {getSortIcon('preco_unit_com_bdi')}
                   </div>
                 </th>
-                <th className="px-4 py-2 w-32 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
+                <th className="px-2 py-2 w-[110px] text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
                   <div className="flex items-center justify-end">
                     Subtotal {getSortIcon('total')}
                   </div>
@@ -552,24 +750,24 @@ export default function ViewBudgetPage() {
                     className="hover:bg-[#0a0a0a] transition-colors print:text-black cursor-pointer group"
                     onClick={() => toggleItem(item.id)}
                   >
-                    <td className="px-4 py-1.5">
-                      <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black">{item.tcpo_id}</p>
+                    <td className="px-2 py-1.5">
+                      <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black truncate">{item.tcpo_id}</p>
                     </td>
-                    <td className="px-4 py-1.5">
+                    <td className="px-2 py-1.5 overflow-hidden">
                       <div className="flex items-center gap-2">
-                        <div className="print:hidden">
+                        <div className="print:hidden flex-shrink-0">
                           {expandedItems.has(item.id) ? <ChevronDown size={14} className="text-[#d4ff3f]" /> : <ChevronRight size={14} className="text-slate-600 group-hover:text-white" />}
                         </div>
-                        <p className="text-sm font-bold text-white print:text-black leading-tight">{item.descricao}</p>
+                        <p className="text-sm font-bold text-white print:text-black leading-tight truncate" title={item.descricao}>{item.descricao}</p>
                       </div>
                     </td>
-                    <td className="px-1 py-1.5 text-center">
-                      <span className="text-xs font-bold text-slate-500 uppercase print:text-black">{item.unidade}</span>
+                    <td className="px-2 py-1.5 text-center">
+                      <span className="text-[10px] font-black text-slate-500 uppercase print:text-black">{item.unidade}</span>
                     </td>
-                    <td className="px-1 py-1.5 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       <p className="text-sm font-bold print:text-black">{item.quantidade}</p>
                     </td>
-                    <td className="px-1 py-1.5 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       <input 
                         type="number" 
                         value={item.bdi || ''}
@@ -596,38 +794,38 @@ export default function ViewBudgetPage() {
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-14 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-1 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30 print:hidden"
+                        className="w-14 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-1 py-1 text-[10px] font-black text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30 print:hidden"
                       />
                       <span className="hidden print:inline text-sm font-bold">{item.bdi}%</span>
                     </td>
-                    <td className="px-1 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-right">
                       <p className="text-sm font-bold print:text-black">{formatCurrency(item.preco_unit_com_bdi)}</p>
                     </td>
-                    <td className="px-4 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-right">
                       <p className="text-sm font-black text-[#d4ff3f] print:text-black">{formatCurrency(item.subtotal_preco)}</p>
                     </td>
                   </tr>
                   {/* Composition Details */}
                   {expandedItems.has(item.id) && item.composicao && item.composicao.length > 0 && (
                     <tr className="bg-[#050505] print:bg-white">
-                      <td colSpan={7} className="px-12 py-2">
-                        <div className="border-l-2 border-[#d4ff3f]/30 pl-6 py-1 space-y-2">
+                      <td colSpan={7} className="px-8 py-2">
+                        <div className="border-l-2 border-[#d4ff3f]/30 pl-4 py-1 space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Composição Analítica (Insumos)</p>
-                          <table className="w-full text-left border-collapse">
+                          <table className="w-full text-left border-collapse table-fixed">
                             <thead>
                               <tr className="text-[9px] font-black text-slate-600 uppercase tracking-widest border-b border-slate-800/30">
                                 <th className="pb-2">Insumo</th>
-                                <th className="pb-2 w-16">Tipo</th>
-                                <th className="pb-2 w-16">Un</th>
-                                <th className="pb-2 w-20">Coef.</th>
-                                <th className="pb-2 w-24">P. Unit</th>
-                                <th className="pb-2 w-24 text-right">P. Total</th>
+                                <th className="pb-2 w-[60px]">Tipo</th>
+                                <th className="pb-2 w-[40px]">Un</th>
+                                <th className="pb-2 w-[60px]">Coef.</th>
+                                <th className="pb-2 w-[80px]">P. Unit</th>
+                                <th className="pb-2 w-[90px] text-right">P. Total</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-800/10">
                               {item.composicao.map((insumo, iIdx) => (
-                                <tr key={iIdx} className="text-[11px]">
-                                  <td className="py-2 text-slate-300 print:text-black">{insumo.insumo}</td>
+                                <tr key={iIdx} className="text-[10px]">
+                                  <td className="py-2 text-slate-300 print:text-black truncate" title={insumo.insumo}>{insumo.insumo}</td>
                                   <td className="py-2">
                                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
                                       insumo.tipo === 'mo' ? 'bg-blue-500/10 text-blue-500' :
@@ -654,11 +852,11 @@ export default function ViewBudgetPage() {
             </tbody>
             <tfoot>
               <tr className="bg-[#0a0a0a] print:bg-gray-50">
-                <td colSpan={6} className="px-6 py-6 text-right">
+                <td colSpan={6} className="px-6 py-4 text-right">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Valor Total do Orçamento</p>
                 </td>
-                <td className="px-6 py-6 text-right">
-                  <p className="text-2xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
+                <td className="px-2 py-4 text-right">
+                  <p className="text-xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
                 </td>
               </tr>
             </tfoot>
@@ -815,20 +1013,37 @@ export default function ViewBudgetPage() {
                   className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                 />
               </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Despedida / Fechamento</label>
+                <textarea 
+                  value={printConfig.farewell}
+                  onChange={(e) => setPrintConfig(prev => ({ ...prev, farewell: e.target.value }))}
+                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2 text-sm text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30 min-h-[80px]"
+                />
+              </div>
             </div>
 
-            <div className="p-6 border-t border-slate-800 flex gap-3">
+            <div className="p-6 border-t border-slate-800 flex flex-col gap-3">
+              <div className="flex gap-3">
+                <button 
+                  onClick={handlePrint}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                >
+                  <Printer size={16} /> Gerar PDF / Imprimir
+                </button>
+                <button 
+                  onClick={exportToWord}
+                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                >
+                  <FileDown size={16} /> Gerar Word (.docx)
+                </button>
+              </div>
               <button 
                 onClick={() => setIsPrintModalOpen(false)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                className="w-full bg-slate-900 hover:bg-slate-800 text-slate-400 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
               >
                 Cancelar
-              </button>
-              <button 
-                onClick={handlePrint}
-                className="flex-1 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-black py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
-              >
-                Gerar PDF / Imprimir
               </button>
             </div>
           </div>
