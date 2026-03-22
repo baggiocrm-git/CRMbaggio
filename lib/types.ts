@@ -30,6 +30,7 @@ export interface Budget {
   total_mat: number;
   total_eq: number;
   total_geral: number;
+  variacao_anual?: number;
   created_at: string;
 }
 

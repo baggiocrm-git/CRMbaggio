@@ -13,7 +13,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Insumo, CompositionItem } from '@/lib/types';
-import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
+import { formatCurrency } from '@/lib/utils';
+import CurrencyInput from 'react-currency-input-field';
+import { handleFixedDecimalValueChange } from '@/lib/currency';
 
 interface CompositionModalProps {
   isOpen: boolean;
@@ -54,15 +56,15 @@ export default function CompositionModal({
     }
   }, [isOpen, initialComposition]);
 
-  const handleSearch = async () => {
-    if (!searchQuery) return;
+  const handleSearch = React.useCallback(async () => {
+    if (!searchQuery.trim()) return;
     setIsSearching(true);
     setIsRegistering(false);
     try {
       const { data, error } = await supabase
         .from('tcpo_insumos')
         .select('*')
-        .ilike('descricao', `%${searchQuery}%`)
+        .or(`id.ilike.%${searchQuery}%,descricao.ilike.%${searchQuery}%`)
         .limit(10);
       
       if (error) throw error;
@@ -72,7 +74,19 @@ export default function CompositionModal({
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchQuery.trim().length >= 2) {
+        handleSearch();
+      } else {
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, handleSearch]);
 
   const handleRegisterInsumo = async () => {
     if (!newInsumo.descricao || !newInsumo.unidade || newInsumo.preco_unitario === undefined) {
@@ -193,15 +207,6 @@ export default function CompositionModal({
     }
   };
 
-  const applyCorrection = () => {
-    const newComp = composition.map(c => ({
-      ...c,
-      p_unit: c.p_unit * PRICE_CORRECTION_FACTOR_2026,
-      p_total: c.coef * c.p_unit * PRICE_CORRECTION_FACTOR_2026
-    }));
-    setComposition(newComp);
-  };
-
   const clearComposition = () => {
     if (confirm('Deseja realmente limpar toda a composição?')) {
       setComposition([]);
@@ -242,14 +247,6 @@ export default function CompositionModal({
             >
               <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} />
               Atualizar Preços
-            </button>
-            <button 
-              onClick={applyCorrection}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f] text-[9px] font-black uppercase tracking-widest hover:bg-[#d4ff3f]/20 transition-all border border-[#d4ff3f]/20"
-              title={`Aplicar fator de correção 2026 (${(PRICE_CORRECTION_FACTOR_2026 * 100).toFixed(2)}%)`}
-            >
-              <Calculator size={12} />
-              Fator 2026
             </button>
           </div>
           <button 
@@ -429,19 +426,20 @@ export default function CompositionModal({
                       </td>
                       <td className="py-0.5 px-2 border border-slate-800/50">
                         <div className="flex items-center justify-center gap-0.5">
-                          <span className="text-[8px] text-slate-600 font-bold">R$</span>
-                          <input 
-                            type="number" 
-                            step="0.01"
+                          <CurrencyInput 
                             value={item.p_unit}
-                            onChange={(e) => updatePrice(idx, Number(e.target.value))}
+                            onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => updatePrice(idx, Number(v || 0)))}
+                            prefix="R$ "
+                            decimalSeparator=","
+                            groupSeparator="."
+                            decimalsLimit={2}
                             className="w-full bg-transparent border-none p-0 text-[10px] text-white outline-none focus:ring-0 font-bold"
                           />
                         </div>
                       </td>
                       <td className="py-0.5 px-2 border border-slate-800/50 text-right">
                         <p className="text-[10px] font-black text-[#d4ff3f]">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.p_total)}
+                          {formatCurrency(item.p_total)}
                         </p>
                       </td>
                       <td className="py-0.5 px-2 border border-slate-800/50 text-center">

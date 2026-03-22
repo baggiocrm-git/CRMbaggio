@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 // import * as XLSX from 'xlsx';
 import CurrencyInput from 'react-currency-input-field';
+import { handleFixedDecimalValueChange } from '@/lib/currency';
 
 interface Receivable {
   id: string;
@@ -758,7 +759,7 @@ export default function ReceivablesPage() {
                       decimalSeparator=","
                       groupSeparator="."
                       value={formData.valor}
-                      onValueChange={(_, __, values) => setFormData({...formData, valor: values?.float || 0})}
+                      onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
@@ -770,7 +771,7 @@ export default function ReceivablesPage() {
                       decimalSeparator=","
                       groupSeparator="."
                       value={formData.valor_recebido}
-                      onValueChange={(_, __, values) => setFormData({...formData, valor_recebido: values?.float || 0})}
+                      onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor_recebido: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />

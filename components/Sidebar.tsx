@@ -66,50 +66,35 @@ const navItems: NavGroup[] = [
   { group: 'OUTROS', items: [] },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  user?: User | null;
+}
+
+export default function Sidebar({ user: propUser }: SidebarProps) {
   const pathname = usePathname();
-  const [user, setUser] = React.useState<User | null>(null);
+  const [internalUser, setInternalUser] = React.useState<User | null>(null);
+
+  // Use prop user if available, otherwise use internal state
+  const user = propUser !== undefined ? propUser : internalUser;
 
   React.useEffect(() => {
+    if (propUser !== undefined) return; // Skip if controlled by prop
+
     // Listen for auth state changes to catch the user as soon as they log in
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Sidebar: Auth state changed:', event, !!session);
       if (session?.user) {
-        setUser(session.user);
-        const userEmail = (
-          session.user.email || 
-          session.user.user_metadata?.email || 
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (session.user as any).app_metadata?.email ||
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (session.user as any).identities?.[0]?.identity_data?.email ||
-          ''
-        ).toLowerCase().trim();
-        
-        const isAdm = userEmail === 'lucabaggio28@gmail.com' || session.user.user_metadata?.role === 'Administrador';
-        console.log('Sidebar: User detected:', userEmail, 'IsAdmin:', isAdm);
-        
-        // If it's the admin but role is missing, we might want to refresh session
-        if (userEmail === 'lucabaggio28@gmail.com' && session.user.user_metadata?.role !== 'Administrador') {
-          console.log('Sidebar: Admin email detected but role missing in metadata. Refreshing session...');
-          // The DashboardLayout should handle the update, but we can trigger a refresh here too
-        }
+        setInternalUser(session.user);
       } else {
-        setUser(null);
+        setInternalUser(null);
       }
     });
 
     // Initial check
     const checkUser = async () => {
-      // Try a few times to get the user, as storage might be slow to load
-      for (let i = 0; i < 5; i++) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          console.log(`Sidebar: User found on attempt ${i + 1}:`, user.email);
-          setUser(user);
-          break;
-        }
-        await new Promise(resolve => setTimeout(resolve, 500));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setInternalUser(user);
       }
     };
     checkUser();
@@ -117,7 +102,7 @@ export default function Sidebar() {
     return () => {
       subscription.unsubscribe();
     };
-  }, []);
+  }, [propUser]);
 
   const handleLogout = () => {
     // Force immediate cleanup and redirect

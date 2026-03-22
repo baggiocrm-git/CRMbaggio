@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storageBlocked, setStorageBlocked] = useState(false);
@@ -48,6 +49,13 @@ export default function LoginPage() {
       */
     };
     checkUser();
+
+    // Load remembered email
+    const rememberedEmail = localStorage.getItem('remembered_email');
+    if (rememberedEmail) {
+      setEmail(rememberedEmail);
+      setRememberMe(true);
+    }
   }, [router]);
 
 
@@ -80,6 +88,13 @@ export default function LoginPage() {
 
       console.log('Login Supabase bem-sucedido:', data.user?.id);
       
+      // Handle Remember Me
+      if (rememberMe) {
+        localStorage.setItem('remembered_email', email);
+      } else {
+        localStorage.removeItem('remembered_email');
+      }
+
       const userRole = data.user?.user_metadata?.role;
       if (userRole === 'Cliente') {
         // Fetch the project linked to this client
@@ -111,9 +126,7 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      console.log('Iniciando Google Login Completo...');
-      // Clear any stale session data before starting
-      await supabase.auth.signOut();
+      console.log('Iniciando Google Login...');
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -228,7 +241,12 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest px-1">
                 <label className="flex items-center gap-2 text-slate-500 cursor-pointer hover:text-slate-300 transition-colors">
-                  <input type="checkbox" className="rounded border-slate-800 bg-[#0a0a0a] text-[#d4ff3f] focus:ring-0 focus:ring-offset-0" />
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="rounded border-slate-800 bg-[#0a0a0a] text-[#d4ff3f] focus:ring-0 focus:ring-offset-0" 
+                  />
                   Lembrar
                 </label>
                 <a href="#" className="text-slate-500 hover:text-[#d4ff3f] transition-colors">Recuperar Senha</a>

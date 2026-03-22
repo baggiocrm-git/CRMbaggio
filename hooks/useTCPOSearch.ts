@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TCPOItem, BudgetItem, CompositionItem } from '@/lib/types';
-import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
+// import { PRICE_CORRECTION_FACTOR_2026 } from '@/lib/constants';
 
 interface SearchOptions {
   categoria?: string;
@@ -77,6 +77,7 @@ export function useTCPOSearch(options: SearchOptions = {}) {
 
 export function useOrcamento() {
   const [items, setItems] = useState<Partial<BudgetItem>[]>([]);
+  const [variacaoAnual, setVariacaoAnual] = useState<number>(0);
 
   const addItem = async (tcpoItem: TCPOItem) => {
     // Busca os preços atualizados dos insumos da composição
@@ -120,8 +121,8 @@ export function useOrcamento() {
       custo_unit_mo: totals.mo || tcpoItem.custo_mo,
       custo_unit_mat: totals.mat || tcpoItem.custo_mat,
       custo_unit_eq: totals.eq || tcpoItem.custo_eq,
-      // BDI padrão já vem em porcentagem (ex: 25)
-      bdi: tcpoItem.bdi_padrao || 0,
+      // BDI padrão removido (solicitação do usuário para entrar manualmente)
+      bdi: 0,
       ordem: items.length,
       composicao: updatedComposition
     };
@@ -192,38 +193,11 @@ export function useOrcamento() {
     }
   };
 
-  const applyCorrectionFactor = (itemIndex: number) => {
-    const newItems = [...items];
-    const item = newItems[itemIndex];
-    if (!item.composicao) return;
-
-    const newComposition = item.composicao.map(c => ({
-      ...c,
-      p_unit: (c.p_unit || 0) * PRICE_CORRECTION_FACTOR_2026,
-      p_total: (c.coef || 0) * (c.p_unit || 0) * PRICE_CORRECTION_FACTOR_2026
-    }));
-
-    const newTotals = newComposition.reduce((acc, comp) => {
-      if (comp.tipo === 'mo') acc.mo += comp.p_total;
-      else if (comp.tipo === 'mat') acc.mat += comp.p_total;
-      else if (comp.tipo === 'eq') acc.eq += comp.p_total;
-      return acc;
-    }, { mo: 0, mat: 0, eq: 0 });
-
-    newItems[itemIndex] = {
-      ...item,
-      composicao: newComposition,
-      custo_unit_mo: newTotals.mo,
-      custo_unit_mat: newTotals.mat,
-      custo_unit_eq: newTotals.eq
-    };
-
-    setItems(newItems);
-  };
-
   const totals = items.reduce((acc, item) => {
-    const mo = (item.custo_unit_mo || 0) * (item.quantidade || 0);
-    const mat = (item.custo_unit_mat || 0) * (item.quantidade || 0);
+    const factor = 1 + (variacaoAnual / 100);
+    // Aplicamos a variação apenas em MO e MAT, conforme lógica de negócio
+    const mo = (item.custo_unit_mo || 0) * (item.quantidade || 0) * factor;
+    const mat = (item.custo_unit_mat || 0) * (item.quantidade || 0) * factor;
     const eq = (item.custo_unit_eq || 0) * (item.quantidade || 0);
     const subtotal = mo + mat + eq;
     // BDI é tratado como porcentagem (ex: 30)
@@ -238,15 +212,28 @@ export function useOrcamento() {
     };
   }, { mo: 0, mat: 0, eq: 0, subtotal: 0, total: 0 });
 
+  // Retornamos os itens com os preços já ajustados pela variação para facilitar a exibição
+  const adjustedItems = items.map(item => {
+    const factor = 1 + (variacaoAnual / 100);
+    return {
+      ...item,
+      custo_unit_mo_adj: (item.custo_unit_mo || 0) * factor,
+      custo_unit_mat_adj: (item.custo_unit_mat || 0) * factor,
+      custo_unit_eq_adj: item.custo_unit_eq || 0,
+    };
+  });
+
   return {
     items,
+    adjustedItems,
     setItems,
+    variacaoAnual,
+    setVariacaoAnual,
     addItem,
     removeItem,
     updateItem,
     updateItemComposition,
     updateCompositionItem,
-    applyCorrectionFactor,
     totals
   };
 }

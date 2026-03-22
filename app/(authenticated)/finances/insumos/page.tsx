@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Insumo } from '@/lib/types';
-import CurrencyInput from 'react-currency-input-field';
 
 export default function InsumosPage() {
   const [insumos, setInsumos] = useState<Insumo[]>([]);
@@ -30,6 +29,7 @@ export default function InsumosPage() {
     key: 'descricao',
     direction: 'asc'
   });
+  const updateTimeouts = React.useRef<Record<string, NodeJS.Timeout>>({});
 
   const handleSort = (key: keyof Insumo) => {
     let direction: 'asc' | 'desc' | null = 'asc';
@@ -72,20 +72,46 @@ export default function InsumosPage() {
     fetchInsumos();
   }, []);
 
-  const handleUpdatePrice = async (id: string, field: 'preco_unitario' | 'preco_sabado' | 'preco_domingo_feriado', newPrice: number) => {
-    try {
-      const { error } = await supabase
-        .from('tcpo_insumos')
-        .update({ [field]: newPrice })
-        .eq('id', id);
-      
-      if (error) throw error;
-      
-      setInsumos(prev => prev.map(i => i.id === id ? { ...i, [field]: newPrice } : i));
-    } catch (err) {
-      console.error(`Error updating ${field}:`, err);
-      setMessage({ text: 'Erro ao atualizar preço.', type: 'error' });
+  const handleUpdatePrice = (id: string, field: 'preco_unitario' | 'preco_sabado' | 'preco_domingo_feriado', newPrice: number) => {
+    // Update local state immediately for responsive UI
+    setInsumos(prev => prev.map(i => {
+      if (i.id === id) {
+        const updated = { ...i, [field]: newPrice };
+        // Apply formulas: Saturday = Normal + 50%, Sunday = Normal + 100%
+        if (field === 'preco_unitario') {
+          updated.preco_sabado = newPrice * 1.5;
+          updated.preco_domingo_feriado = newPrice * 2.0;
+        }
+        return updated;
+      }
+      return i;
+    }));
+
+    // Debounce Supabase update to avoid "locking" the input during typing
+    const timeoutKey = `${id}-${field}`;
+    if (updateTimeouts.current[timeoutKey]) {
+      clearTimeout(updateTimeouts.current[timeoutKey]);
     }
+
+    updateTimeouts.current[timeoutKey] = setTimeout(async () => {
+      try {
+        const updates: Partial<Insumo> = { [field]: newPrice };
+        if (field === 'preco_unitario') {
+          updates.preco_sabado = newPrice * 1.5;
+          updates.preco_domingo_feriado = newPrice * 2.0;
+        }
+        
+        const { error } = await supabase
+          .from('tcpo_insumos')
+          .update(updates)
+          .eq('id', id);
+        
+        if (error) throw error;
+      } catch (err) {
+        console.error(`Error updating ${field}:`, err);
+        setMessage({ text: 'Erro ao salvar preço no banco de dados.', type: 'error' });
+      }
+    }, 1000);
   };
 
   const handleRecalculate = async () => {
@@ -345,43 +371,53 @@ export default function InsumosPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Normal</label>
-                  <CurrencyInput
-                    prefix="R$ "
-                    decimalSeparator=","
-                    groupSeparator="."
-                    value={newInsumo.preco_unitario}
-                    onValueChange={(_, __, values) => {
-                      const val = values?.float || 0;
+                  <input
+                    type="text"
+                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_unitario || 0)}`}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      const cents = parseInt(val || "0", 10);
+                      const amount = cents / 100;
                       setNewInsumo({
                         ...newInsumo, 
-                        preco_unitario: val,
-                        preco_sabado: val * 1.5,
-                        preco_domingo_feriado: val * 2
+                        preco_unitario: amount,
+                        preco_sabado: amount * 1.5,
+                        preco_domingo_feriado: amount * 2
                       });
                     }}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Sábado</label>
-                  <CurrencyInput
-                    prefix="R$ "
-                    decimalSeparator=","
-                    groupSeparator="."
-                    value={newInsumo.preco_sabado}
-                    onValueChange={(_, __, values) => setNewInsumo({...newInsumo, preco_sabado: values?.float || 0})}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                  <input
+                    type="text"
+                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_sabado || 0)}`}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      const cents = parseInt(val || "0", 10);
+                      setNewInsumo({...newInsumo, preco_sabado: cents / 100});
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Dom/Fer</label>
-                  <CurrencyInput
-                    prefix="R$ "
-                    decimalSeparator=","
-                    groupSeparator="."
-                    value={newInsumo.preco_domingo_feriado}
-                    onValueChange={(_, __, values) => setNewInsumo({...newInsumo, preco_domingo_feriado: values?.float || 0})}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                  <input
+                    type="text"
+                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_domingo_feriado || 0)}`}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, "");
+                      const cents = parseInt(val || "0", 10);
+                      setNewInsumo({...newInsumo, preco_domingo_feriado: cents / 100});
+                    }}
+                    onFocus={(e) => e.target.select()}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
+                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-2xl px-4 py-3 text-sm font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                   />
                 </div>
               </div>
@@ -464,116 +500,136 @@ export default function InsumosPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-hidden">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('id')}>
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[90px]" onClick={() => handleSort('id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('id')}
                   </div>
                 </th>
-                <th className="px-6 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
                   <div className="flex items-center">
                     Descrição do Insumo {getSortIcon('descricao')}
                   </div>
                 </th>
-                <th className="px-6 py-2 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                <th className="px-2 py-2 text-center cursor-pointer hover:text-white transition-colors w-[60px]" onClick={() => handleSort('unidade')}>
                   <div className="flex items-center justify-center">
                     Unid. {getSortIcon('unidade')}
                   </div>
                 </th>
-                <th className="px-6 py-2 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tipo')}>
+                <th className="px-2 py-2 text-center cursor-pointer hover:text-white transition-colors w-[110px]" onClick={() => handleSort('tipo')}>
                   <div className="flex items-center justify-center">
                     Tipo {getSortIcon('tipo')}
                   </div>
                 </th>
-                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unitario')}>
+                <th className="px-2 py-2 text-center text-slate-500 text-[10px] font-black uppercase tracking-widest w-[60px]">
+                  Norm
+                </th>
+                <th className="px-2 py-2 text-right cursor-pointer hover:text-white transition-colors w-[100px]" onClick={() => handleSort('preco_unitario')}>
                   <div className="flex items-center justify-end">
                     Normal {getSortIcon('preco_unitario')}
                   </div>
                 </th>
-                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_sabado')}>
+                <th className="px-2 py-2 text-right cursor-pointer hover:text-white transition-colors w-[100px]" onClick={() => handleSort('preco_sabado')}>
                   <div className="flex items-center justify-end">
                     Sábado {getSortIcon('preco_sabado')}
                   </div>
                 </th>
-                <th className="px-6 py-2 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_domingo_feriado')}>
+                <th className="px-2 py-2 text-right cursor-pointer hover:text-white transition-colors w-[100px]" onClick={() => handleSort('preco_domingo_feriado')}>
                   <div className="flex items-center justify-end">
                     Dom/Fer {getSortIcon('preco_domingo_feriado')}
                   </div>
                 </th>
-                <th className="px-6 py-2"></th>
+                <th className="px-2 py-2 w-[40px]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
+                  <td colSpan={9} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando insumos...</p>
                   </td>
                 </tr>
               ) : filteredInsumos.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
                     Nenhum insumo encontrado.
                   </td>
                 </tr>
               ) : (
                 filteredInsumos.map((insumo) => (
                   <tr key={insumo.id} className="hover:bg-[#0a0a0a] transition-colors group">
-                    <td className="px-6 py-1.5">
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{insumo.id}</p>
+                    <td className="px-2 py-1.5">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate">{insumo.id}</p>
                     </td>
-                    <td className="px-6 py-1.5">
-                      <p className="text-sm font-bold text-white">{insumo.descricao}</p>
+                    <td className="px-2 py-1.5 overflow-hidden">
+                      <p className="text-sm font-bold text-white truncate" title={insumo.descricao}>{insumo.descricao}</p>
                     </td>
-                    <td className="px-6 py-1.5 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{insumo.unidade}</span>
                     </td>
-                    <td className="px-6 py-1.5 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${getTypeColor(insumo.tipo)}`}>
                         {getTypeName(insumo.tipo)}
                       </span>
                     </td>
-                    <td className="px-6 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-center">
+                      <div className="bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] inline-block min-w-[40px]">
+                        {Math.floor(insumo.preco_unitario || 0)}
+                      </div>
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
                       <div className="flex justify-end">
-                        <CurrencyInput
-                          prefix="R$ "
-                          decimalSeparator=","
-                          groupSeparator="."
-                          value={insumo.preco_unitario}
-                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_unitario', values?.float || 0)}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        <input
+                          type="text"
+                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_unitario || 0)}`}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            const cents = parseInt(val || "0", 10);
+                            handleUpdatePrice(insumo.id, 'preco_unitario', cents / 100);
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-right">
                       <div className="flex justify-end">
-                        <CurrencyInput
-                          prefix="R$ "
-                          decimalSeparator=","
-                          groupSeparator="."
-                          value={insumo.preco_sabado}
-                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_sabado', values?.float || 0)}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        <input
+                          type="text"
+                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_sabado || 0)}`}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            const cents = parseInt(val || "0", 10);
+                            handleUpdatePrice(insumo.id, 'preco_sabado', cents / 100);
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-right">
                       <div className="flex justify-end">
-                        <CurrencyInput
-                          prefix="R$ "
-                          decimalSeparator=","
-                          groupSeparator="."
-                          value={insumo.preco_domingo_feriado}
-                          onValueChange={(_, __, values) => handleUpdatePrice(insumo.id, 'preco_domingo_feriado', values?.float || 0)}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        <input
+                          type="text"
+                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_domingo_feriado || 0)}`}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\D/g, "");
+                            const cents = parseInt(val || "0", 10);
+                            handleUpdatePrice(insumo.id, 'preco_domingo_feriado', cents / 100);
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
-                    <td className="px-6 py-1.5 text-right">
+                    <td className="px-2 py-1.5 text-right">
                       <button 
                         onClick={() => handleDeleteInsumo(insumo.id)}
                         className="p-1 text-slate-500 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"

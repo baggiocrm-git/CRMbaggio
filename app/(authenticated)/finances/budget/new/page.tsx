@@ -22,6 +22,9 @@ import { Project } from '@/lib/types';
 import { GoogleGenAI } from "@google/genai";
 import CompositionModal from '@/components/CompositionModal';
 import ProjectModal from '@/components/projects/ProjectModal';
+import { formatCurrency } from '@/lib/utils';
+import CurrencyInput from 'react-currency-input-field';
+import { handleFixedDecimalValueChange } from '@/lib/currency';
 
 export default function NewBudgetPage() {
   const router = useRouter();
@@ -42,7 +45,7 @@ export default function NewBudgetPage() {
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { query, setQuery, suggestions, loading: searchLoading, clearSuggestions } = useTCPOSearch({ limit: 8 });
-  const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, applyCorrectionFactor, totals, setItems } = useOrcamento();
+  const { items, addItem, removeItem, updateItem, updateItemComposition, updateCompositionItem, totals, setItems, variacaoAnual, setVariacaoAnual } = useOrcamento();
 
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' | null }>({ key: 'tcpo_id', direction: null });
 
@@ -127,7 +130,8 @@ export default function NewBudgetPage() {
           total_mo: totals.mo,
           total_mat: totals.mat,
           total_eq: totals.eq,
-          total_geral: totals.total
+          total_geral: totals.total,
+          variacao_anual: variacaoAnual
         })
         .select()
         .single();
@@ -229,10 +233,6 @@ export default function NewBudgetPage() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
-
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -289,6 +289,17 @@ export default function NewBudgetPage() {
               placeholder="Nome do orçamento"
               value={budgetName}
               onChange={(e) => setBudgetName(e.target.value)}
+              className="bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1 min-w-[80px]">
+            <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Variação Anual (%)</label>
+            <input 
+              type="number" 
+              placeholder="0"
+              value={variacaoAnual || ''}
+              onChange={(e) => setVariacaoAnual(Number(e.target.value))}
               className="bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-[10px] text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
             />
           </div>
@@ -368,7 +379,7 @@ export default function NewBudgetPage() {
                 <thead>
                   <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                     <th 
-                      className="px-4 py-2 w-20 cursor-pointer hover:text-white transition-colors"
+                      className="px-4 py-1.5 w-20 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('tcpo_id')}
                     >
                       <div className="flex items-center">
@@ -377,7 +388,7 @@ export default function NewBudgetPage() {
                       </div>
                     </th>
                     <th 
-                      className="px-4 py-2 cursor-pointer hover:text-white transition-colors"
+                      className="px-4 py-1.5 cursor-pointer hover:text-white transition-colors"
                       onClick={() => handleSort('descricao_personalizada')}
                     >
                       <div className="flex items-center">
@@ -385,32 +396,32 @@ export default function NewBudgetPage() {
                         {getSortIcon('descricao_personalizada')}
                       </div>
                     </th>
-                    <th className="px-2 py-2 w-16 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                    <th className="px-2 py-1.5 w-16 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
                       <div className="flex items-center justify-center">
                         Unid. {getSortIcon('unidade')}
                       </div>
                     </th>
-                    <th className="px-2 py-2 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
+                    <th className="px-2 py-1.5 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('quantidade')}>
                       <div className="flex items-center justify-center">
                         Quant. {getSortIcon('quantidade')}
                       </div>
                     </th>
-                    <th className="px-2 py-2 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
+                    <th className="px-2 py-1.5 w-20 text-center cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('bdi')}>
                       <div className="flex items-center justify-center">
                         BDI (%) {getSortIcon('bdi')}
                       </div>
                     </th>
-                    <th className="px-2 py-2 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit')}>
+                    <th className="px-2 py-1.5 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('preco_unit')}>
                       <div className="flex items-center justify-end">
                         Preço Unit. {getSortIcon('preco_unit')}
                       </div>
                     </th>
-                    <th className="px-2 py-2 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('subtotal')}>
+                    <th className="px-2 py-1.5 w-28 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('subtotal')}>
                       <div className="flex items-center justify-end">
                         Subtotal {getSortIcon('subtotal')}
                       </div>
                     </th>
-                    <th className="px-4 py-2 w-16"></th>
+                    <th className="px-4 py-1.5 w-16"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/50">
@@ -426,8 +437,10 @@ export default function NewBudgetPage() {
                     </tr>
                   ) : (
                     items.map((item, idx) => {
-                      const unitTotal = (item.custo_unit_mo || 0) + (item.custo_unit_mat || 0) + (item.custo_unit_eq || 0);
-                      const subtotal = (unitTotal * (item.quantidade || 0)) * (1 + (item.bdi || 0) / 100);
+                      const factor = 1 + (variacaoAnual / 100);
+                      const unitTotalAdj = ((item.custo_unit_mo || 0) * factor) + ((item.custo_unit_mat || 0) * factor) + (item.custo_unit_eq || 0);
+                      
+                      const subtotal = (unitTotalAdj * (item.quantidade || 0)) * (1 + (item.bdi || 0) / 100);
                       const isExpanded = expandedItems.has(idx);
                       
                       return (
@@ -436,10 +449,10 @@ export default function NewBudgetPage() {
                             className={`hover:bg-[#0a0a0a] transition-colors group cursor-pointer ${isExpanded ? 'bg-[#0a0a0a]' : ''}`}
                             onClick={() => toggleExpand(idx)}
                           >
-                            <td className="px-4 py-2">
+                            <td className="px-4 py-1.5">
                               <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">{item.tcpo_id}</p>
                             </td>
-                            <td className="px-4 py-2 min-w-[200px]">
+                            <td className="px-4 py-1.5 min-w-[200px]">
                               <input 
                                 type="text" 
                                 value={item.descricao_personalizada}
@@ -448,45 +461,35 @@ export default function NewBudgetPage() {
                                 className="bg-transparent border-none p-0 text-sm font-bold text-white w-full focus:ring-0"
                               />
                             </td>
-                            <td className="px-2 py-2 text-center">
+                            <td className="px-2 py-1.5 text-center">
                               <span className="text-xs font-bold text-slate-500 uppercase">{item.unidade}</span>
                             </td>
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-1.5">
                               <input 
                                 type="number" 
-                                value={item.quantidade}
+                                value={item.quantidade || ''}
                                 onChange={(e) => updateItem(idx, { quantidade: Number(e.target.value) })}
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                               />
                             </td>
-                            <td className="px-2 py-2">
+                            <td className="px-2 py-1.5">
                               <input 
                                 type="number" 
-                                value={item.bdi}
+                                value={item.bdi || ''}
                                 onChange={(e) => updateItem(idx, { bdi: Number(e.target.value) })}
                                 onClick={(e) => e.stopPropagation()}
                                 className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-2 py-1 text-sm text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                               />
                             </td>
-                            <td className="px-2 py-2 text-right">
-                              <p className="text-xs font-bold text-white">{formatCurrency(unitTotal * (1 + (item.bdi || 0) / 100))}</p>
+                            <td className="px-2 py-1.5 text-right">
+                              <p className="text-xs font-bold text-white">{formatCurrency(unitTotalAdj * (1 + (item.bdi || 0) / 100))}</p>
                             </td>
-                            <td className="px-2 py-2 text-right">
+                            <td className="px-2 py-1.5 text-right">
                               <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(subtotal)}</p>
                             </td>
-                            <td className="px-4 py-2 text-right">
+                            <td className="px-4 py-1.5 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    applyCorrectionFactor(idx);
-                                  }}
-                                  className="p-2 rounded-lg bg-slate-800 text-slate-400 hover:text-[#d4ff3f] transition-all"
-                                  title="Aplicar Fator de Correção 2026"
-                                >
-                                  <Calculator size={14} className="text-[#d4ff3f]" />
-                                </button>
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -552,12 +555,13 @@ export default function NewBudgetPage() {
                                           </td>
                                           <td className="py-0.5 px-2 border border-slate-800/50">
                                             <div className="flex items-center justify-center gap-0.5">
-                                              <span className="text-[8px] text-slate-600 font-bold">R$</span>
-                                              <input 
-                                                type="number" 
-                                                step="0.01"
+                                              <CurrencyInput 
                                                 value={comp.p_unit}
-                                                onChange={(e) => updateCompositionItem(idx, cIdx, { p_unit: Number(e.target.value) })}
+                                                onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => updateCompositionItem(idx, cIdx, { p_unit: Number(v || 0) }))}
+                                                prefix="R$ "
+                                                decimalSeparator=","
+                                                groupSeparator="."
+                                                decimalsLimit={2}
                                                 className="w-full bg-transparent border-none p-0 text-[10px] text-white outline-none focus:ring-0 font-bold"
                                               />
                                             </div>
