@@ -104,6 +104,24 @@ export default function ServicesPage() {
     setExpandedItems(newExpanded);
   };
 
+  const handleUpdateService = async (id: string, field: keyof TCPOItem, value: number) => {
+    // Optimistic update
+    setServices(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+
+    try {
+      const { error } = await supabase
+        .from('tcpo_itens')
+        .update({ [field]: value })
+        .eq('id', id);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error updating service:', error);
+      // Revert on error
+      fetchServices();
+    }
+  };
+
   const exportToExcel = () => {
     setExporting(true);
     try {
@@ -226,37 +244,37 @@ export default function ServicesPage() {
       </div>
 
       <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+        <div className="overflow-hidden">
+          <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4 w-10"></th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('id')}>
+                <th className="px-2 py-4 w-[40px]"></th>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-[90px]" onClick={() => handleSort('id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('id')}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('descricao')}>
                   <div className="flex items-center">
                     Descrição {getSortIcon('descricao')}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('unidade')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-[50px]" onClick={() => handleSort('unidade')}>
                   <div className="flex items-center">
                     Un {getSortIcon('unidade')}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total')}>
+                <th className="px-2 py-4 text-right cursor-pointer hover:text-white transition-colors w-[110px]" onClick={() => handleSort('total')}>
                   <div className="flex items-center justify-end">
                     Total Normal {getSortIcon('total')}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('custo_sabado')}>
+                <th className="px-2 py-4 text-right cursor-pointer hover:text-white transition-colors w-[125px]" onClick={() => handleSort('custo_sabado')}>
                   <div className="flex items-center justify-end">
                     Total Sáb. {getSortIcon('custo_sabado')}
                   </div>
                 </th>
-                <th className="px-6 py-4 text-right cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('custo_domingo_feriado')}>
+                <th className="px-2 py-4 text-right cursor-pointer hover:text-white transition-colors w-[125px]" onClick={() => handleSort('custo_domingo_feriado')}>
                   <div className="flex items-center justify-end">
                     Total Dom./Fer. {getSortIcon('custo_domingo_feriado')}
                   </div>
@@ -266,7 +284,7 @@ export default function ServicesPage() {
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center">
+                  <td colSpan={7} className="p-8 text-center">
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
                       <p className="text-slate-400">Carregando serviços...</p>
@@ -275,7 +293,7 @@ export default function ServicesPage() {
                 </tr>
               ) : filteredServices.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-500">
+                  <td colSpan={7} className="p-8 text-center text-slate-500">
                     Nenhum serviço encontrado.
                   </td>
                 </tr>
@@ -286,37 +304,59 @@ export default function ServicesPage() {
                       className="hover:bg-[#0a0a0a] transition-colors cursor-pointer group"
                       onClick={() => toggleExpand(service.id)}
                     >
-                      <td className="px-6 py-2">
+                      <td className="px-2 py-2">
                         {expandedItems.has(service.id) ? (
                           <ChevronDown className="w-4 h-4 text-slate-500" />
                         ) : (
                           <ChevronRight className="w-4 h-4 text-slate-500" />
                         )}
                       </td>
-                      <td className="px-6 py-2">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{service.id}</p>
+                      <td className="px-2 py-2">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate">{service.id}</p>
                       </td>
-                      <td className="px-6 py-2">
-                        <div className="text-sm font-bold text-white">{service.descricao}</div>
-                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5">{service.categoria}</div>
+                      <td className="px-2 py-2 overflow-hidden">
+                        <div className="text-sm font-bold text-white truncate" title={service.descricao}>{service.descricao}</div>
+                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5 truncate">{service.categoria}</div>
                       </td>
-                      <td className="px-6 py-2">
+                      <td className="px-2 py-2">
                         <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.unidade}</span>
                       </td>
-                      <td className="px-6 py-2 text-right">
+                      <td className="px-2 py-2 text-right">
                         <span className="text-sm font-black text-[#d4ff3f]">
                           R$ {(service.custo_mo + service.custo_mat + service.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
-                      <td className="px-6 py-2 text-right">
-                        <span className="text-sm font-black text-orange-400">
-                          R$ {(service.custo_sabado || (service.custo_mo + service.custo_mat + service.custo_eq) * 1.5).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                      <td className="px-2 py-2 text-right">
+                        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_sabado || (service.custo_mo + service.custo_mat + service.custo_eq) * 1.5)}`}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              const cents = parseInt(val || "0", 10);
+                              handleUpdateService(service.id, 'custo_sabado', cents / 100);
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-orange-400 text-right outline-none focus:ring-2 focus:ring-orange-400/30 transition-all"
+                          />
+                        </div>
                       </td>
-                      <td className="px-6 py-2 text-right">
-                        <span className="text-sm font-black text-rose-400">
-                          R$ {(service.custo_domingo_feriado || (service.custo_mo + service.custo_mat + service.custo_eq) * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </span>
+                      <td className="px-2 py-2 text-right">
+                        <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_domingo_feriado || (service.custo_mo + service.custo_mat + service.custo_eq) * 2)}`}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/\D/g, "");
+                              const cents = parseInt(val || "0", 10);
+                              handleUpdateService(service.id, 'custo_domingo_feriado', cents / 100);
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            onClick={(e) => (e.target as HTMLInputElement).select()}
+                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-rose-400 text-right outline-none focus:ring-2 focus:ring-rose-400/30 transition-all"
+                          />
+                        </div>
                       </td>
                     </tr>
                     <AnimatePresence>
@@ -327,19 +367,52 @@ export default function ServicesPage() {
                           exit={{ opacity: 0, height: 0 }}
                           className="bg-[#0a0a0a]/50"
                         >
-                          <td colSpan={5} className="px-6 py-4">
+                          <td colSpan={7} className="px-2 py-4">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/50">
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Mão de Obra</div>
-                                <div className="text-sm font-black text-blue-500">R$ {service.custo_mo.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <input
+                                  type="text"
+                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_mo || 0)}`}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, "");
+                                    const cents = parseInt(val || "0", 10);
+                                    handleUpdateService(service.id, 'custo_mo', cents / 100);
+                                  }}
+                                  onFocus={(e) => e.target.select()}
+                                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-blue-500 text-left outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+                                />
                               </div>
                               <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/50">
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Material</div>
-                                <div className="text-sm font-black text-orange-500">R$ {service.custo_mat.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <input
+                                  type="text"
+                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_mat || 0)}`}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, "");
+                                    const cents = parseInt(val || "0", 10);
+                                    handleUpdateService(service.id, 'custo_mat', cents / 100);
+                                  }}
+                                  onFocus={(e) => e.target.select()}
+                                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-orange-500 text-left outline-none focus:ring-2 focus:ring-orange-500/30 transition-all"
+                                />
                               </div>
                               <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/50">
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Equipamento</div>
-                                <div className="text-sm font-black text-purple-500">R$ {service.custo_eq.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+                                <input
+                                  type="text"
+                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_eq || 0)}`}
+                                  onChange={(e) => {
+                                    const val = e.target.value.replace(/\D/g, "");
+                                    const cents = parseInt(val || "0", 10);
+                                    handleUpdateService(service.id, 'custo_eq', cents / 100);
+                                  }}
+                                  onFocus={(e) => e.target.select()}
+                                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-purple-500 text-left outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
+                                />
                               </div>
                             </div>
                           </td>
