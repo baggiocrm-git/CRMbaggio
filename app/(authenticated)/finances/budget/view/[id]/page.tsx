@@ -19,10 +19,11 @@ import {
   FileDown
 } from 'lucide-react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { Budget } from '@/lib/types';
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 import { 
   Document, 
   Packer, 
@@ -32,8 +33,7 @@ import {
   TableRow, 
   TableCell, 
   WidthType, 
-  AlignmentType,
-  VerticalAlign
+  AlignmentType
 } from 'docx';
 import { saveAs } from 'file-saver';
 
@@ -142,9 +142,9 @@ export default function ViewBudgetPage() {
     direction: 'asc'
   });
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [isProposalMode, setIsProposalMode] = useState(false);
+  const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  const [hasTemplate, setHasTemplate] = useState(false);
   const [printConfig, setPrintConfig] = useState({
-    letterhead: '',
     clientName: '',
     attentionTo: '',
     proposalNumber: `${new Date().getFullYear()}/001`,
@@ -157,189 +157,232 @@ export default function ViewBudgetPage() {
     farewell: 'Esperando ter correspondido à sua expectativa, aproveitamos o ensejo para cumprimentá-lo.'
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPrintConfig(prev => ({ ...prev, letterhead: reader.result as string }));
-      };
-      reader.readAsDataURL(file);
+      if (!file.name.endsWith('.dotx') && !file.name.endsWith('.docx')) {
+        alert('Por favor, selecione um arquivo de modelo do Word (.dotx ou .docx)');
+        return;
+      }
+
+      setIsUploadingTemplate(true);
+      try {
+        // Ensure bucket exists (this might fail if not admin, but we try)
+        try {
+          await supabase.storage.createBucket('budget-templates', { public: true });
+        } catch {
+          // Ignore error if bucket already exists
+        }
+
+        const { error } = await supabase.storage
+          .from('budget-templates')
+          .upload('proposal_template.dotx', file, {
+            upsert: true
+          });
+
+        if (error) throw error;
+        
+        setHasTemplate(true);
+        alert('Modelo (.dotx) carregado com sucesso!');
+      } catch (error) {
+        console.error('Error uploading template:', error);
+        alert('Erro ao carregar modelo para o Supabase.');
+      } finally {
+        setIsUploadingTemplate(false);
+      }
     }
   };
 
-  const handlePrint = () => {
-    setIsProposalMode(true);
-    setTimeout(() => {
-      window.print();
-      setIsProposalMode(false);
-    }, 500);
+  const cleanString = (str: string | number | null | undefined): string => {
+    if (str === null || str === undefined) return "";
+    const s = String(str);
+    // Remove control characters that break XML (except \n, \r, \t)
+    return s.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
+  };
+
+  const downloadBaseTemplate = async () => {
+    // This creates a .docx with the tags already placed, 
+    // which the user can then customize with their letterhead.
+    const doc = new Document({
+      sections: [{
+        properties: {},
+        children: [
+          new Paragraph({
+            children: [new TextRun({ text: "PROPOSTA COMERCIAL", bold: true, size: 32 })],
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+          }),
+          new Paragraph({ children: [new TextRun({ text: "À", bold: true })] }),
+          new Paragraph({ children: [new TextRun({ text: "{clientName}", bold: true })] }),
+          new Paragraph({ children: [new TextRun({ text: "A/C: {attentionTo}" })] }),
+          new Paragraph({ children: [new TextRun({ text: "{clientAddress}" })] }),
+          new Paragraph({ children: [new TextRun({ text: "São Paulo - SP" })], spacing: { after: 400 } }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ text: "ASS.: ", bold: true }),
+              new TextRun({ text: "PROPOSTA COMERCIAL Nº {proposalNumber} - {serviceDescription}", bold: true }),
+            ],
+            spacing: { after: 400 },
+          }),
+          
+          new Paragraph({ children: [new TextRun({ text: "Prezados Senhores," })], spacing: { after: 200 } }),
+          
+          new Paragraph({
+            children: [new TextRun({ text: "Apresentamos a V. Sas. a nossa proposta comercial relativa à execução dos serviços em epígrafe, assumindo inteira responsabilidade por quaisquer erros ou omissões que tiverem sido cometidos quando da preparação da mesma:" })],
+            spacing: { after: 200 },
+          }),
+          
+          new Paragraph({
+            children: [
+              new TextRun({ text: "1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de " }),
+              new TextRun({ text: "{totalGeral}", bold: true }),
+              new TextRun({ text: " ({totalGeralWords}), de acordo com os preços constantes da Planilha de Serviços abaixo:" }),
+            ],
+            spacing: { after: 400 },
+          }),
+
+          // Table with tags - Simplified for maximum compatibility
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Quant.", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "SERVIÇOS", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "UNID.", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "P. UNIT. R$", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "P. TOTAL R$", bold: true })], alignment: AlignmentType.CENTER })] }),
+                ],
+              }),
+              // Loop tags for docxtemplater - Single paragraph per cell is safer
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph({ text: "{#items}{quantidade}", alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: "{descricao}" })] }),
+                  new TableCell({ children: [new Paragraph({ text: "{unidade}", alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ text: "{preco_unit}", alignment: AlignmentType.RIGHT })] }),
+                  new TableCell({ children: [new Paragraph({ text: "{subtotal}{/items}", alignment: AlignmentType.RIGHT })] }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ columnSpan: 4, children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL", bold: true })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{totalGeral}", bold: true })], alignment: AlignmentType.RIGHT })] }),
+                ],
+              }),
+            ],
+          }),
+
+          new Paragraph({ children: [new TextRun({ text: "" })], spacing: { before: 400 } }),
+          new Paragraph({ children: [new TextRun({ text: "CONDIÇÕES GERAIS:", bold: true })], spacing: { after: 200 } }),
+          new Paragraph({ children: [new TextRun({ text: "Pagamento: ", bold: true }), new TextRun({ text: "{paymentConditions}" })] }),
+          new Paragraph({ children: [new TextRun({ text: "Prazo de Execução: ", bold: true }), new TextRun({ text: "{executionTime}" })] }),
+          new Paragraph({ children: [new TextRun({ text: "Validade da Proposta: ", bold: true }), new TextRun({ text: "{validity}" })], spacing: { after: 400 } }),
+          
+          new Paragraph({ children: [new TextRun({ text: "{farewell}" })], spacing: { after: 400 } }),
+          new Paragraph({ children: [new TextRun({ text: "Atenciosamente," })], spacing: { after: 800 } }),
+          
+          new Paragraph({ children: [new TextRun({ text: "{techResponsible}", bold: true })], alignment: AlignmentType.CENTER }),
+          new Paragraph({ children: [new TextRun({ text: "Responsável Técnico" })], alignment: AlignmentType.CENTER }),
+        ],
+      }],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, "Modelo_Base_Proposta.docx");
   };
 
   const exportToWord = async () => {
     if (!budget) return;
 
-    const doc = new Document({
-      sections: [
-        {
-          properties: {},
-          children: [
-            new Paragraph({
-              children: [
-                new TextRun({
-                  text: "PROPOSTA COMERCIAL",
-                  bold: true,
-                  size: 32,
-                }),
-              ],
-              alignment: AlignmentType.CENTER,
-              spacing: { after: 400 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "À", bold: true }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: printConfig.clientName || 'EMPRESA MUNICIPAL DE URBANIZAÇÃO - EMURB', bold: true }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: printConfig.clientAddress || 'Rua São Bento nº 405 - 16º andar - conj. 163' }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "São Paulo - SP" }),
-              ],
-              spacing: { after: 400 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "ASS.: ", bold: true }),
-                new TextRun({ text: `PROPOSTA COMERCIAL Nº ${printConfig.proposalNumber} - ${printConfig.serviceDescription}`, bold: true }),
-              ],
-              spacing: { after: 400 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Prezados Senhores," }),
-              ],
-              spacing: { after: 200 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Apresentamos a V. Sas. a nossa proposta comercial relativa à execução dos serviços em epígrafe, assumindo inteira responsabilidade por quaisquer erros ou omissões que tiverem sido cometidos quando da preparação da mesma:" }),
-              ],
-              spacing: { after: 200 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: `1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de ` }),
-                new TextRun({ text: formatCurrency(budget.total_geral), bold: true }),
-                new TextRun({ text: ` (${formatCurrencyToWords(budget.total_geral)}), de acordo com os preços constantes da Planilha de Serviços abaixo:` }),
-              ],
-              spacing: { after: 400 },
-            }),
-            // Table
-            new Table({
-              width: {
-                size: 100,
-                type: WidthType.PERCENTAGE,
-              },
-              rows: [
-                new TableRow({
-                  children: [
-                    new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "Quant.", bold: true })], alignment: AlignmentType.CENTER })],
-                      verticalAlign: VerticalAlign.CENTER,
-                    }),
-                    new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "SERVIÇOS", bold: true })], alignment: AlignmentType.CENTER })],
-                      verticalAlign: VerticalAlign.CENTER,
-                    }),
-                    new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "P. UNIT. R$", bold: true })], alignment: AlignmentType.CENTER })],
-                      verticalAlign: VerticalAlign.CENTER,
-                    }),
-                    new TableCell({ 
-                      children: [new Paragraph({ children: [new TextRun({ text: "P. TOTAL R$", bold: true })], alignment: AlignmentType.CENTER })],
-                      verticalAlign: VerticalAlign.CENTER,
-                    }),
-                  ],
-                }),
-                ...items.map(item => new TableRow({
-                  children: [
-                    new TableCell({ children: [new Paragraph({ text: item.quantidade.toString(), alignment: AlignmentType.CENTER })] }),
-                    new TableCell({ children: [new Paragraph({ text: item.descricao })] }),
-                    new TableCell({ children: [new Paragraph({ text: item.preco_unit_com_bdi.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), alignment: AlignmentType.RIGHT })] }),
-                    new TableCell({ children: [new Paragraph({ text: item.subtotal_preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), alignment: AlignmentType.RIGHT })] }),
-                  ],
-                })),
-                new TableRow({
-                  children: [
-                    new TableCell({ columnSpan: 3, children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL", bold: true })] })] }),
-                    new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: formatCurrency(budget.total_geral), bold: true })], alignment: AlignmentType.RIGHT })] }),
-                  ],
-                }),
-              ],
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: "" })],
-              spacing: { before: 400 },
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: "CONDIÇÕES GERAIS:", bold: true })],
-              spacing: { after: 200 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Pagamento: ", bold: true }),
-                new TextRun({ text: printConfig.paymentConditions }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Prazo de Execução: ", bold: true }),
-                new TextRun({ text: printConfig.executionTime }),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Validade da Proposta: ", bold: true }),
-                new TextRun({ text: printConfig.validity }),
-              ],
-              spacing: { after: 400 },
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: printConfig.farewell })],
-              spacing: { after: 400 },
-            }),
-            new Paragraph({
-              children: [new TextRun({ text: "Atenciosamente," })],
-              spacing: { after: 800 },
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: printConfig.techResponsible, bold: true }),
-              ],
-              alignment: AlignmentType.CENTER,
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Responsável Técnico" }),
-              ],
-              alignment: AlignmentType.CENTER,
-            }),
-          ],
-        },
-      ],
-    });
+    try {
+      // 1. Fetch the template from Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('budget-templates')
+        .download('proposal_template.dotx');
 
-    const blob = await Packer.toBlob(doc);
-    saveAs(blob, `Proposta_${budget.nome.replace(/\s+/g, '_')}.docx`);
+      if (error) {
+        throw new Error('Modelo (.dotx) não encontrado no Supabase. Por favor, faça o upload do seu arquivo timbrado primeiro.');
+      }
+
+      // Use Uint8Array for better compatibility with PizZip
+      const arrayBuffer = await data.arrayBuffer();
+      const content = new Uint8Array(arrayBuffer);
+      const zip = new PizZip(content);
+
+      // Fix for .dotx templates being saved as .docx
+      // Word 2019+ is strict about the internal content type matching the extension
+      try {
+        const contentTypesXml = zip.file("[Content_Types].xml");
+        if (contentTypesXml) {
+          let contentTypes = contentTypesXml.asText();
+          if (contentTypes.includes("wordprocessingml.template.main+xml")) {
+            contentTypes = contentTypes.replace(
+              "wordprocessingml.template.main+xml",
+              "wordprocessingml.document.main+xml"
+            );
+            zip.file("[Content_Types].xml", contentTypes);
+          }
+        }
+      } catch (patchError) {
+        console.warn("Could not patch [Content_Types].xml:", patchError);
+      }
+      
+      const doc = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        nullGetter() { return ""; }
+      });
+
+      // 2. Prepare data for the template - Ensure all values are cleaned strings
+      const templateData = {
+        clientName: cleanString(printConfig.clientName),
+        clientAddress: cleanString(printConfig.clientAddress),
+        attentionTo: cleanString(printConfig.attentionTo),
+        proposalNumber: cleanString(printConfig.proposalNumber),
+        serviceDescription: cleanString(printConfig.serviceDescription),
+        totalGeral: cleanString(formatCurrency(budget.total_geral)),
+        totalGeralWords: cleanString(formatCurrencyToWords(budget.total_geral)),
+        paymentConditions: cleanString(printConfig.paymentConditions),
+        executionTime: cleanString(printConfig.executionTime),
+        validity: cleanString(printConfig.validity),
+        techResponsible: cleanString(printConfig.techResponsible),
+        farewell: cleanString(printConfig.farewell),
+        items: sortedItems.map(item => ({
+          quantidade: cleanString(item.quantidade),
+          descricao: cleanString(item.descricao),
+          unidade: cleanString(item.unidade),
+          preco_unit: cleanString((item.preco_unit_com_bdi || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })),
+          subtotal: cleanString((item.subtotal_preco || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))
+        }))
+      };
+
+      // 3. Render the document
+      try {
+        doc.setData(templateData);
+        doc.render();
+      } catch (renderError: unknown) {
+        const err = renderError as { properties?: { errors?: unknown[] } };
+        console.error('Render Error Details:', err.properties?.errors);
+        throw new Error('Erro na estrutura das tags do modelo. Verifique se as tags estão escritas corretamente (ex: {#items} e {/items} devem estar em pares).');
+      }
+
+      // 4. Generate output - Using Uint8Array for maximum compatibility
+      const out = doc.getZip().generate({
+        type: "uint8array",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        compression: "DEFLATE"
+      });
+
+      const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      const safeName = budget.nome.replace(/[^a-z0-9]/gi, '_');
+      saveAs(blob, `Proposta_${safeName}.docx`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao gerar documento Word.';
+      console.error('Error generating Word document:', error);
+      alert(errorMessage);
+    }
   };
 
   const handleSort = (key: keyof AnalyticalItem | 'total') => {
@@ -375,6 +418,12 @@ export default function ViewBudgetPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Check if template exists
+        const { data: files } = await supabase.storage.from('budget-templates').list();
+        if (files && files.some(f => f.name === 'proposal_template.dotx')) {
+          setHasTemplate(true);
+        }
+
         // Fetch Budget Info
         const { data: budgetData } = await supabase
           .from('orcamentos')
@@ -477,9 +526,9 @@ export default function ViewBudgetPage() {
   }
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8 print:p-0 print:bg-white print:text-black">
-      {/* Header - Hidden on Print */}
-      <div className="flex items-center justify-between mb-8 print:hidden">
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
           <Link href="/finances/budget" className="p-2 rounded-xl bg-slate-800/50 text-slate-400 hover:text-white transition-colors">
             <ArrowLeft size={20} />
@@ -499,178 +548,48 @@ export default function ViewBudgetPage() {
         </div>
       </div>
 
-      {/* Proposal Layout - Only visible on Print when in Proposal Mode */}
-      {isProposalMode && (
-        <div className="hidden print:block bg-white text-black p-0 min-h-screen font-serif text-[12px] leading-relaxed">
-          {/* Letterhead */}
-          {printConfig.letterhead ? (
-            <div className="mb-8 text-center">
-              <Image 
-                src={printConfig.letterhead} 
-                alt="Timbrado" 
-                width={800}
-                height={128}
-                className="max-w-full h-auto max-h-40 mx-auto" 
-                unoptimized
-                referrerPolicy="no-referrer"
-              />
-            </div>
-          ) : (
-            <div className="h-32 mb-8" /> // Spacer for blank A4
-          )}
-
-          <div className="px-12 py-8">
-            {/* Header Info */}
-            <div className="flex justify-between items-start mb-12">
-              <div className="space-y-1">
-                <p className="font-bold text-lg">EDITAL</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold">ANEXO 2</p>
-              </div>
-            </div>
-
-            <div className="text-center mb-12">
-              <p className="font-bold text-lg uppercase">MODELO DE CARTA PARA APRESENTAÇÃO DA PROPOSTA COMERCIAL</p>
-            </div>
-
-            {/* Client Info */}
-            <div className="mb-8 space-y-1">
-              <p className="font-bold uppercase">À</p>
-              <p className="font-bold uppercase">{printConfig.clientName || 'EMPRESA MUNICIPAL DE URBANIZAÇÃO - EMURB'}</p>
-              <p className="font-bold">{printConfig.clientAddress || 'Rua São Bento nº 405 - 16º andar - conj. 163'}</p>
-              <p className="font-bold">São Paulo - SP</p>
-            </div>
-
-            {/* Subject */}
-            <div className="mb-8 flex gap-4">
-              <p className="font-bold flex-shrink-0">ASS.:</p>
-              <p className="font-bold uppercase text-justify">
-                PROPOSTA COMERCIAL Nº {printConfig.proposalNumber} - {printConfig.serviceDescription}
-              </p>
-            </div>
-
-            <div className="mb-4">
-              <p>Prezados Senhores,</p>
-            </div>
-
-            <div className="mb-8">
-              <p className="text-justify">
-                Apresentamos a V. Sas. a nossa proposta comercial relativa à execução dos serviços em epígrafe, assumindo inteira responsabilidade por quaisquer erros ou omissões que tiverem sido cometidos quando da preparação da mesma:
-              </p>
-            </div>
-
-            <div className="mb-8">
-              <p className="text-justify">
-                1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de <span className="font-bold">{formatCurrency(budget.total_geral)}</span> ({formatCurrencyToWords(budget.total_geral)}), de acordo com os preços constantes da Planilha de Serviços abaixo:
-              </p>
-            </div>
-
-            {/* Budget Table for Proposal */}
-            <div className="mb-8">
-              <table className="w-full text-left border-collapse border-2 border-black">
-                <thead>
-                  <tr className="bg-gray-50 border-b-2 border-black text-[10px] font-bold uppercase">
-                    <th className="border-r-2 border-black px-2 py-2 text-center" colSpan={4}>PLANILHA DE SERVIÇOS E PREÇOS</th>
-                  </tr>
-                  <tr className="bg-gray-50 border-b-2 border-black text-[9px] font-bold uppercase">
-                    <th className="border-r-2 border-black px-1 py-2 w-16 text-center italic font-serif">Quantidade</th>
-                    <th className="border-r-2 border-black px-2 py-2 text-center">SERVIÇOS</th>
-                    <th className="border-r-2 border-black px-1 py-2 w-24 text-center">PREÇO UNITÁRIO R$</th>
-                    <th className="px-1 py-2 w-24 text-center">PREÇO TOTAL R$</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b border-black text-[10px]">
-                      <td className="border-r-2 border-black px-1 py-2 text-center font-bold">{item.quantidade}</td>
-                      <td className="border-r-2 border-black px-2 py-2 text-justify leading-tight">{item.descricao}</td>
-                      <td className="border-r-2 border-black px-1 py-2 text-right">{item.preco_unit_com_bdi.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                      <td className="px-1 py-2 text-right font-bold">{item.subtotal_preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-black font-bold text-[11px]">
-                    <td className="border-r-2 border-black px-2 py-2 uppercase" colSpan={2}>VALOR TOTAL</td>
-                    <td className="border-r-2 border-black px-1 py-2"></td>
-                    <td className="px-1 py-2 text-right">{formatCurrency(budget.total_geral)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* Conditions */}
-            <div className="mb-8 space-y-2">
-              <p className="font-bold">CONDIÇÕES GERAIS:</p>
-              <p><span className="font-bold">Pagamento:</span> {printConfig.paymentConditions}</p>
-              <p><span className="font-bold">Prazo de Execução:</span> {printConfig.executionTime}</p>
-              <p><span className="font-bold">Validade da Proposta:</span> {printConfig.validity}</p>
-            </div>
-
-            {/* Footer Signature Area */}
-            <div className="mt-20">
-              <div className="flex justify-between items-end">
-                <div className="text-center">
-                  <div className="w-48 border-t border-black pt-1">
-                    <p className="text-[10px] font-bold uppercase">GLC</p>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <p className="font-bold uppercase mb-1">EDITAL DE TOMADA DE PREÇOS Nº {printConfig.proposalNumber}</p>
-                  <div className="w-full border-t-2 border-black pt-1" />
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] font-bold uppercase">PAG. 1/1</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Original Report Header - Hidden on Proposal Mode Print */}
-      <div className={`${isProposalMode ? 'print:hidden' : ''}`}>
-        <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 mb-8 shadow-sm print:border-none print:shadow-none print:bg-transparent">
+      {/* Original Report Header */}
+      <div>
+        <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-8 mb-8 shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           <div className="space-y-1">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Orçamento</p>
-            <p className="text-lg font-black text-white print:text-black">{budget.nome}</p>
+            <p className="text-lg font-black text-white">{budget.nome}</p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Obra / Projeto</p>
-            <div className="flex items-center gap-2 text-white print:text-black">
-              <Building2 size={16} className="text-[#d4ff3f] print:text-black" />
+            <div className="flex items-center gap-2 text-white">
+              <Building2 size={16} className="text-[#d4ff3f]" />
               <p className="font-bold">{(budget as Budget & { projeto?: { nome: string } }).projeto?.nome || 'N/A'}</p>
             </div>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Data de Emissão</p>
-            <div className="flex items-center gap-2 text-white print:text-black">
-              <Calendar size={16} className="text-[#d4ff3f] print:text-black" />
+            <div className="flex items-center gap-2 text-white">
+              <Calendar size={16} className="text-[#d4ff3f]" />
               <p className="font-bold">{new Date(budget.created_at).toLocaleDateString('pt-BR')}</p>
             </div>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Variação Anual</p>
-            <p className="text-lg font-black text-white print:text-black">{budget.variacao_anual || 0}%</p>
+            <p className="text-lg font-black text-white">{budget.variacao_anual || 0}%</p>
           </div>
           <div className="space-y-1">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Geral</p>
-            <p className="text-2xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
+            <p className="text-2xl font-black text-[#d4ff3f]">{formatCurrency(budget.total_geral)}</p>
           </div>
         </div>
         
         {budget.descricao && (
-          <div className="mt-8 pt-6 border-t border-slate-800/50 print:border-black/10">
+          <div className="mt-8 pt-6 border-t border-slate-800/50">
             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Descrição / Escopo</p>
-            <p className="text-sm text-slate-400 print:text-black leading-relaxed">{budget.descricao}</p>
+            <p className="text-sm text-slate-400 leading-relaxed">{budget.descricao}</p>
           </div>
         )}
       </div>
 
-      {/* Summary Cards - Hidden on Print */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print:hidden">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-[#1a1a1a] border border-slate-800/50 p-6 rounded-3xl flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-500">
             <PieChart size={24} />
@@ -701,11 +620,11 @@ export default function ViewBudgetPage() {
       </div>
 
       {/* Analytical Table */}
-      <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm print:border-none print:shadow-none print:bg-transparent">
+      <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
         <div className="overflow-hidden">
           <table className="w-full text-left border-collapse table-fixed">
             <thead>
-              <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50 print:bg-gray-100 print:text-black print:border-black">
+              <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-2 w-[90px] cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('tcpo_id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('tcpo_id')}
@@ -751,21 +670,21 @@ export default function ViewBudgetPage() {
                     onClick={() => toggleItem(item.id)}
                   >
                     <td className="px-2 py-1.5">
-                      <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest print:text-black truncate">{item.tcpo_id}</p>
+                      <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest truncate">{item.tcpo_id}</p>
                     </td>
                     <td className="px-2 py-1.5 overflow-hidden">
                       <div className="flex items-center gap-2">
-                        <div className="print:hidden flex-shrink-0">
+                        <div className="flex-shrink-0">
                           {expandedItems.has(item.id) ? <ChevronDown size={14} className="text-[#d4ff3f]" /> : <ChevronRight size={14} className="text-slate-600 group-hover:text-white" />}
                         </div>
-                        <p className="text-sm font-bold text-white print:text-black leading-tight truncate" title={item.descricao}>{item.descricao}</p>
+                        <p className="text-sm font-bold text-white leading-tight truncate" title={item.descricao}>{item.descricao}</p>
                       </div>
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <span className="text-[10px] font-black text-slate-500 uppercase print:text-black">{item.unidade}</span>
+                      <span className="text-[10px] font-black text-slate-500 uppercase">{item.unidade}</span>
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <p className="text-sm font-bold print:text-black">{item.quantidade}</p>
+                      <p className="text-sm font-bold">{item.quantidade}</p>
                     </td>
                     <td className="px-2 py-1.5 text-center">
                       <input 
@@ -794,20 +713,19 @@ export default function ViewBudgetPage() {
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-14 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-1 py-1 text-[10px] font-black text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30 print:hidden"
+                        className="w-14 bg-[#0a0a0a] border border-slate-800/50 rounded-lg px-1 py-1 text-[10px] font-black text-white text-center outline-none focus:ring-1 focus:ring-[#d4ff3f]/30"
                       />
-                      <span className="hidden print:inline text-sm font-bold">{item.bdi}%</span>
                     </td>
                     <td className="px-2 py-1.5 text-right">
-                      <p className="text-sm font-bold print:text-black">{formatCurrency(item.preco_unit_com_bdi)}</p>
+                      <p className="text-sm font-bold">{formatCurrency(item.preco_unit_com_bdi)}</p>
                     </td>
                     <td className="px-2 py-1.5 text-right">
-                      <p className="text-sm font-black text-[#d4ff3f] print:text-black">{formatCurrency(item.subtotal_preco)}</p>
+                      <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(item.subtotal_preco)}</p>
                     </td>
                   </tr>
                   {/* Composition Details */}
                   {expandedItems.has(item.id) && item.composicao && item.composicao.length > 0 && (
-                    <tr className="bg-[#050505] print:bg-white">
+                    <tr className="bg-[#050505]">
                       <td colSpan={7} className="px-8 py-2">
                         <div className="border-l-2 border-[#d4ff3f]/30 pl-4 py-1 space-y-2">
                           <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">Composição Analítica (Insumos)</p>
@@ -825,7 +743,7 @@ export default function ViewBudgetPage() {
                             <tbody className="divide-y divide-slate-800/10">
                               {item.composicao.map((insumo, iIdx) => (
                                 <tr key={iIdx} className="text-[10px]">
-                                  <td className="py-2 text-slate-300 print:text-black truncate" title={insumo.insumo}>{insumo.insumo}</td>
+                                  <td className="py-2 text-slate-300 truncate" title={insumo.insumo}>{insumo.insumo}</td>
                                   <td className="py-2">
                                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
                                       insumo.tipo === 'mo' ? 'bg-blue-500/10 text-blue-500' :
@@ -835,10 +753,10 @@ export default function ViewBudgetPage() {
                                       {insumo.tipo}
                                     </span>
                                   </td>
-                                  <td className="py-2 text-slate-500 print:text-black uppercase">{insumo.un}</td>
-                                  <td className="py-2 text-slate-300 print:text-black">{insumo.coef}</td>
-                                  <td className="py-2 text-slate-500 print:text-black">{formatCurrency(insumo.p_unit)}</td>
-                                  <td className="py-2 text-slate-300 print:text-black text-right">{formatCurrency(insumo.p_total)}</td>
+                                  <td className="py-2 text-slate-500 uppercase">{insumo.un}</td>
+                                  <td className="py-2 text-slate-300">{insumo.coef}</td>
+                                  <td className="py-2 text-slate-500">{formatCurrency(insumo.p_unit)}</td>
+                                  <td className="py-2 text-slate-300 text-right">{formatCurrency(insumo.p_total)}</td>
                                 </tr>
                               ))}
                             </tbody>
@@ -851,31 +769,18 @@ export default function ViewBudgetPage() {
               ))}
             </tbody>
             <tfoot>
-              <tr className="bg-[#0a0a0a] print:bg-gray-50">
+              <tr className="bg-[#0a0a0a]">
                 <td colSpan={6} className="px-6 py-4 text-right">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Valor Total do Orçamento</p>
                 </td>
                 <td className="px-2 py-4 text-right">
-                  <p className="text-xl font-black text-[#d4ff3f] print:text-black">{formatCurrency(budget.total_geral)}</p>
+                  <p className="text-xl font-black text-[#d4ff3f]">{formatCurrency(budget.total_geral)}</p>
                 </td>
               </tr>
             </tfoot>
           </table>
         </div>
       </div>
-      </div>
-
-      {/* Footer - Only on Print - Hidden on Proposal Mode */}
-      <div className={`hidden print:block mt-20 pt-10 border-t border-black/20 text-center ${isProposalMode ? 'print:hidden' : ''}`}>
-        <div className="flex justify-around">
-          <div className="w-64 border-t border-black pt-2">
-            <p className="text-xs font-bold uppercase">Responsável Técnico</p>
-          </div>
-          <div className="w-64 border-t border-black pt-2">
-            <p className="text-xs font-bold uppercase">Cliente / Aprovação</p>
-          </div>
-        </div>
-        <p className="text-[8px] text-gray-500 mt-10 italic">Gerado por CBSL Gestão de Engenharia em {new Date().toLocaleString('pt-BR')}</p>
       </div>
 
       {/* Print Modal */}
@@ -893,28 +798,71 @@ export default function ViewBudgetPage() {
             </div>
             
             <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto custom-scrollbar">
-              {/* Letterhead Upload */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Folha de Rosto / Timbrado</label>
-                <div className="flex items-center gap-4">
-                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-2xl p-4 hover:border-[#d4ff3f]/50 transition-colors cursor-pointer">
-                    <Upload size={24} className="text-slate-500 mb-2" />
-                    <span className="text-xs font-bold text-slate-400">Clique para fazer upload</span>
-                    <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} />
-                  </label>
-                  {printConfig.letterhead && (
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden border border-slate-800 bg-white p-2">
-                      <Image 
-                        src={printConfig.letterhead} 
-                        alt="Preview" 
-                        width={96}
-                        height={96}
-                        className="w-full h-full object-contain" 
-                        unoptimized
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
+              {/* Template Upload */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Modelo de Proposta (.dotx)</label>
+                  {hasTemplate && (
+                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                      Modelo Carregado
+                    </span>
                   )}
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <label className="flex-1 flex flex-col items-center justify-center border-2 border-dashed border-slate-800 rounded-2xl p-6 hover:border-[#d4ff3f]/50 transition-colors cursor-pointer bg-slate-900/30">
+                    {isUploadingTemplate ? (
+                      <Loader2 size={24} className="text-[#d4ff3f] animate-spin mb-2" />
+                    ) : (
+                      <Upload size={24} className="text-slate-500 mb-2" />
+                    )}
+                    <span className="text-xs font-bold text-slate-400">
+                      {hasTemplate ? 'Substituir Modelo (.dotx)' : 'Fazer Upload do Modelo (.dotx)'}
+                    </span>
+                    <p className="text-[8px] text-slate-600 mt-2 uppercase font-black tracking-widest">O arquivo deve conter as tags de substituição</p>
+                    <input type="file" className="hidden" accept=".dotx,.docx" onChange={handleFileChange} disabled={isUploadingTemplate} />
+                  </label>
+                </div>
+
+                <div className="bg-slate-900/50 rounded-2xl p-4 border border-slate-800/50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex flex-col">
+                      <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Tags disponíveis no seu modelo:</p>
+                      <p className="text-[7px] text-slate-600 uppercase font-bold">Use o botão ao lado para baixar o modelo base</p>
+                    </div>
+                    <button 
+                      onClick={downloadBaseTemplate}
+                      className="bg-[#d4ff3f]/10 hover:bg-[#d4ff3f]/20 text-[#d4ff3f] px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 border border-[#d4ff3f]/20"
+                    >
+                      <Download size={12} /> Baixar Modelo com Tags
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-2">
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{clientName}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{attentionTo}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{clientAddress}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{proposalNumber}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{serviceDescription}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{totalGeral}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{totalGeralWords}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{paymentConditions}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{executionTime}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{validity}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{techResponsible}"}</code>
+                    <code className="text-[9px] text-[#d4ff3f] font-mono">{"{farewell}"}</code>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-slate-800/50">
+                    <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Tabela de Itens (Loop):</p>
+                    <div className="flex flex-wrap gap-2">
+                      <code className="text-[9px] text-blue-400 font-mono">{"{#items}"}</code>
+                      <code className="text-[9px] text-slate-400 font-mono">{"{quantidade}"}</code>
+                      <code className="text-[9px] text-slate-400 font-mono">{"{descricao}"}</code>
+                      <code className="text-[9px] text-slate-400 font-mono">{"{unidade}"}</code>
+                      <code className="text-[9px] text-slate-400 font-mono">{"{preco_unit}"}</code>
+                      <code className="text-[9px] text-slate-400 font-mono">{"{subtotal}"}</code>
+                      <code className="text-[9px] text-blue-400 font-mono">{"{/items}"}</code>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1025,20 +973,12 @@ export default function ViewBudgetPage() {
             </div>
 
             <div className="p-6 border-t border-slate-800 flex flex-col gap-3">
-              <div className="flex gap-3">
-                <button 
-                  onClick={handlePrint}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                >
-                  <Printer size={16} /> Gerar PDF / Imprimir
-                </button>
-                <button 
-                  onClick={exportToWord}
-                  className="flex-1 bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
-                >
-                  <FileDown size={16} /> Gerar Word (.docx)
-                </button>
-              </div>
+              <button 
+                onClick={exportToWord}
+                className="w-full bg-[#d4ff3f] hover:bg-[#c4ef2f] text-black py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(212,255,63,0.2)]"
+              >
+                <FileDown size={20} /> Gerar Proposta em Word (.docx)
+              </button>
               <button 
                 onClick={() => setIsPrintModalOpen(false)}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-slate-400 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
