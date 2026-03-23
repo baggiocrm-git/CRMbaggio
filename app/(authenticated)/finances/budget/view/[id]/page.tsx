@@ -204,6 +204,16 @@ export default function ViewBudgetPage() {
     // This creates a .docx with the tags already placed, 
     // which the user can then customize with their letterhead.
     const doc = new Document({
+      styles: {
+        default: {
+          document: {
+            run: {
+              font: "Times New Roman",
+              size: 24, // 12pt
+            },
+          },
+        },
+      },
       sections: [{
         properties: {},
         children: [
@@ -212,16 +222,15 @@ export default function ViewBudgetPage() {
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
-          new Paragraph({ children: [new TextRun({ text: "À", bold: true })] }),
+          new Paragraph({ children: [new TextRun({ text: "À" })], spacing: { after: 100 } }),
           new Paragraph({ children: [new TextRun({ text: "{clientName}", bold: true })] }),
-          new Paragraph({ children: [new TextRun({ text: "A/C: {attentionTo}" })] }),
           new Paragraph({ children: [new TextRun({ text: "{clientAddress}" })] }),
           new Paragraph({ children: [new TextRun({ text: "São Paulo - SP" })], spacing: { after: 400 } }),
           
           new Paragraph({
             children: [
               new TextRun({ text: "ASS.: ", bold: true }),
-              new TextRun({ text: "PROPOSTA COMERCIAL Nº {proposalNumber} - {serviceDescription}", bold: true }),
+              new TextRun({ text: "PROPOSTA COMERCIAL Nº {proposalNumber} - {serviceDescription}, conforme segue abaixo.", bold: true }),
             ],
             spacing: { after: 400 },
           }),
@@ -237,38 +246,54 @@ export default function ViewBudgetPage() {
             children: [
               new TextRun({ text: "1. Preço global de nossa proposta para a prestação dos serviços objeto desta licitação é de " }),
               new TextRun({ text: "{totalGeral}", bold: true }),
-              new TextRun({ text: " ({totalGeralWords}), de acordo com os preços constantes da Planilha de Serviços abaixo:" }),
+              new TextRun({ text: " ({totalGeralWords})", bold: true }),
+              new TextRun({ text: ", de acordo com os preços constantes da Planilha de Serviços abaixo:" }),
             ],
             spacing: { after: 400 },
           }),
 
-          // Table with tags - Simplified for maximum compatibility
+          // Table with tags - Optimized for space and clarity
           new Table({
             width: { size: 100, type: WidthType.PERCENTAGE },
             rows: [
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Quant.", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "SERVIÇOS", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "UNID.", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "P. UNIT. R$", bold: true })], alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "P. TOTAL R$", bold: true })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ 
+                    width: { size: 10, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: "Quant.", bold: true, size: 22 })], alignment: AlignmentType.CENTER })] 
+                  }),
+                  new TableCell({ 
+                    width: { size: 60, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: "SERVIÇOS", bold: true, size: 22 })], alignment: AlignmentType.CENTER })] 
+                  }),
+                  new TableCell({ 
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: "P. UNIT. R$", bold: true, size: 22 })], alignment: AlignmentType.CENTER })] 
+                  }),
+                  new TableCell({ 
+                    width: { size: 15, type: WidthType.PERCENTAGE },
+                    children: [new Paragraph({ children: [new TextRun({ text: "P. TOTAL R$", bold: true, size: 22 })], alignment: AlignmentType.CENTER })] 
+                  }),
                 ],
               }),
-              // Loop tags for docxtemplater - Single paragraph per cell is safer
+              // Loop tags for docxtemplater
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph({ text: "{#items}{quantidade}", alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: "{descricao}" })] }),
-                  new TableCell({ children: [new Paragraph({ text: "{unidade}", alignment: AlignmentType.CENTER })] }),
-                  new TableCell({ children: [new Paragraph({ text: "{preco_unit}", alignment: AlignmentType.RIGHT })] }),
-                  new TableCell({ children: [new Paragraph({ text: "{subtotal}{/items}", alignment: AlignmentType.RIGHT })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{#items}{quantidade}", size: 20 })], alignment: AlignmentType.CENTER })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{descricao}", size: 20 })] })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{preco_unit}", size: 20 })], alignment: AlignmentType.RIGHT })] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{subtotal}{/items}", size: 20 })], alignment: AlignmentType.RIGHT })] }),
                 ],
               }),
               new TableRow({
                 children: [
-                  new TableCell({ columnSpan: 4, children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL", bold: true })] })] }),
-                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "{totalGeral}", bold: true })], alignment: AlignmentType.RIGHT })] }),
+                  new TableCell({ 
+                    columnSpan: 3, 
+                    children: [new Paragraph({ children: [new TextRun({ text: "VALOR TOTAL", bold: true, size: 22 })], alignment: AlignmentType.RIGHT })] 
+                  }),
+                  new TableCell({ 
+                    children: [new Paragraph({ children: [new TextRun({ text: "{totalGeral}", bold: true, size: 22 })], alignment: AlignmentType.RIGHT })] 
+                  }),
                 ],
               }),
             ],
@@ -349,7 +374,7 @@ export default function ViewBudgetPage() {
         validity: cleanString(printConfig.validity),
         techResponsible: cleanString(printConfig.techResponsible),
         farewell: cleanString(printConfig.farewell),
-        items: sortedItems.map(item => ({
+        items: items.map(item => ({
           quantidade: cleanString(item.quantidade),
           descricao: cleanString(item.descricao),
           unidade: cleanString(item.unidade),
