@@ -50,6 +50,9 @@ interface Document {
   tamanho_arquivo: string;
   file_path: string;
   pasta_id?: string | null;
+  drive_file_id?: string | null;
+  webViewLink?: string | null;
+  caminho_local?: string | null;
 }
 
 interface Folder {
@@ -83,6 +86,8 @@ export default function DocumentManagementPage() {
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>('Todos');
   const [selectedFolderId, setSelectedFolderId] = useState<string | 'root'>('root');
+  const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
+  const [isServiceAccount, setIsServiceAccount] = useState(false);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Document | 'folder';
     direction: 'asc' | 'desc';
@@ -134,6 +139,7 @@ export default function DocumentManagementPage() {
     name: '',
     category: 'Administrativos' as DocumentCategory,
     pasta_id: 'root' as string | 'root',
+    caminho_local: '',
     file: null as File | null
   });
 
@@ -164,15 +170,45 @@ export default function DocumentManagementPage() {
   const fetchDocuments = useCallback(async () => {
     setIsLoading(true);
     try {
+      // 1. Fetch local documents from Supabase
       const url = new URL('/api/documents', window.location.origin);
-      if (selectedFolderId) {
+      if (selectedFolderId && selectedFolderId !== 'root') {
         url.searchParams.append('pasta_id', selectedFolderId);
       }
       
       const response = await fetch(url.toString());
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      setDocuments(data || []);
+      const localData = await response.json();
+      if (localData.error) throw new Error(localData.error);
+      
+      let allDocs = localData || [];
+
+      // 2. Fetch Google Drive documents if connected
+      try {
+        const driveResponse = await fetch('/api/google/drive/list');
+        if (driveResponse.ok) {
+          const driveData = await driveResponse.json();
+          if (!driveData.error && Array.isArray(driveData)) {
+            // Merge drive docs, avoiding duplicates if they already exist in local DB
+            const driveFileIds = new Set(allDocs.filter((d: any) => d.drive_file_id).map((d: any) => d.drive_file_id));
+            const newDriveDocs = driveData.filter((d: any) => !driveFileIds.has(d.drive_file_id));
+            allDocs = [...allDocs, ...newDriveDocs];
+          } else if (driveData.error) {
+            console.error("Drive API returned error in body:", driveData.error);
+            showNotification(`Erro no Drive: ${driveData.error}`, 'error');
+          }
+        } else {
+          const text = await driveResponse.text();
+          console.error("Drive API failed with status:", driveResponse.status, text);
+          if (driveResponse.status !== 401) { // 401 just means not connected
+            showNotification(`Erro ao buscar arquivos do Drive (${driveResponse.status})`, 'error');
+          }
+        }
+      } catch (driveErr) {
+        console.error('Error fetching drive documents:', driveErr);
+        showNotification('Erro de conexão ao buscar arquivos do Drive', 'error');
+      }
+
+      setDocuments(allDocs);
     } catch (error) {
       console.error('Error fetching documents:', error);
     } finally {
@@ -180,13 +216,45 @@ export default function DocumentManagementPage() {
     }
   }, [selectedFolderId]);
 
-  useEffect(() => {
-    fetchFolders();
+  const fetchAuthStatus = useCallback(async () => {
+    try {
+      const response = await fetch('/api/auth/google/status');
+      const data = await response.json();
+      if (data.connected) {
+        setConnectedAccount(data.email);
+        setIsServiceAccount(data.isServiceAccount || false);
+      } else {
+        setConnectedAccount(null);
+        setIsServiceAccount(false);
+      }
+    } catch (error) {
+      console.error('Error fetching auth status:', error);
+    }
   }, []);
 
   useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
+        showNotification('Google Drive conectado com sucesso!', 'success');
+        fetchAuthStatus();
+        fetchDocuments();
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        showNotification(`Erro ao conectar: ${event.data.message}`, 'error');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [fetchAuthStatus, fetchDocuments]);
+
+  useEffect(() => {
+    fetchFolders();
+    fetchAuthStatus();
+  }, [fetchAuthStatus]);
+
+  useEffect(() => {
     fetchDocuments();
-  }, [selectedFolderId, fetchDocuments]);
+  }, [fetchDocuments, selectedFolderId]);
 
   const folderTreeData = useMemo(() => {
     const buildTree = (parentId: string | null): FileSystemItem[] => {
@@ -247,22 +315,28 @@ export default function DocumentManagementPage() {
   };
 
   const getFileExtension = (doc: Document) => {
-    const nameParts = doc.nome.split('.');
-    if (nameParts.length > 1) {
-      return `.${nameParts.pop()?.toLowerCase()}`;
+    if (doc.nome) {
+      const nameParts = doc.nome.split('.');
+      if (nameParts.length > 1) {
+        return `.${nameParts.pop()?.toLowerCase()}`;
+      }
     }
     
-    const pathParts = doc.file_path.split('.');
-    if (pathParts.length > 1) {
-      return `.${pathParts.pop()?.toLowerCase()}`;
+    if (doc.file_path) {
+      const pathParts = doc.file_path.split('.');
+      if (pathParts.length > 1) {
+        return `.${pathParts.pop()?.toLowerCase()}`;
+      }
     }
 
-    if (doc.tipo_arquivo.includes('pdf')) return '.pdf';
-    if (doc.tipo_arquivo.includes('word') || doc.tipo_arquivo.includes('officedocument.wordprocessingml')) return '.docx';
-    if (doc.tipo_arquivo.includes('excel') || doc.tipo_arquivo.includes('officedocument.spreadsheetml')) return '.xlsx';
-    if (doc.tipo_arquivo.includes('image/jpeg')) return '.jpg';
-    if (doc.tipo_arquivo.includes('image/png')) return '.png';
-    if (doc.tipo_arquivo.includes('text/plain')) return '.txt';
+    if (doc.tipo_arquivo) {
+      if (doc.tipo_arquivo.includes('pdf')) return '.pdf';
+      if (doc.tipo_arquivo.includes('word') || doc.tipo_arquivo.includes('officedocument.wordprocessingml')) return '.docx';
+      if (doc.tipo_arquivo.includes('excel') || doc.tipo_arquivo.includes('officedocument.spreadsheetml')) return '.xlsx';
+      if (doc.tipo_arquivo.includes('image/jpeg')) return '.jpg';
+      if (doc.tipo_arquivo.includes('image/png')) return '.png';
+      if (doc.tipo_arquivo.includes('text/plain')) return '.txt';
+    }
     
     return '';
   };
@@ -279,6 +353,7 @@ export default function DocumentManagementPage() {
       formData.append('file', newDoc.file);
       formData.append('name', newDoc.name);
       formData.append('category', newDoc.category);
+      formData.append('caminho_local', newDoc.caminho_local);
       if (newDoc.pasta_id !== 'root') {
         formData.append('pasta_id', newDoc.pasta_id);
       }
@@ -305,6 +380,7 @@ export default function DocumentManagementPage() {
         name: '',
         category: 'Administrativos',
         pasta_id: selectedFolderId,
+        caminho_local: '',
         file: null
       });
 
@@ -434,11 +510,36 @@ export default function DocumentManagementPage() {
   };
 
   const handleViewDocument = (doc: Document) => {
-    const url = getFileUrl(doc.file_path);
-    window.open(url, '_blank');
+    if (doc.webViewLink) {
+      window.open(doc.webViewLink, '_blank');
+    } else {
+      const url = getFileUrl(doc.file_path);
+      window.open(url, '_blank');
+    }
   };
 
-  const getFileUrl = (path: string) => {
+  const handleOpenLocal = (doc: Document) => {
+    if (doc.caminho_local) {
+      navigator.clipboard.writeText(doc.caminho_local);
+      showNotification('Caminho local copiado para a área de transferência');
+      
+      // Try to open via Office URI scheme if it's an office file
+      const ext = getFileExtension(doc);
+      if (['.docx', '.xlsx', '.pptx'].includes(ext)) {
+        const protocol = ext === '.docx' ? 'ms-word' : ext === '.xlsx' ? 'ms-excel' : 'ms-powerpoint';
+        // This only works if we have a public URL, but we can try with the Supabase URL
+        const url = getFileUrl(doc.file_path);
+        if (url !== '#') {
+          window.location.href = `${protocol}:ofe|u|${url}`;
+        }
+      }
+    } else {
+      showNotification('Caminho local não definido para este documento', 'error');
+    }
+  };
+
+  const getFileUrl = (path?: string) => {
+    if (!path) return '#';
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     return `${supabaseUrl}/storage/v1/object/public/documentos/${path}`;
   };
@@ -516,6 +617,18 @@ export default function DocumentManagementPage() {
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Caminho Local (PC)</label>
+                  <input 
+                    type="text" 
+                    value={newDoc.caminho_local}
+                    onChange={e => setNewDoc({...newDoc, caminho_local: e.target.value})}
+                    placeholder="Ex: G:\Meu Drive\Documentos\arquivo.docx"
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  />
+                  <p className="text-[9px] text-slate-600 ml-1 italic">Dica: Use o caminho do Google Drive for Desktop para sincronização automática.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -850,29 +963,6 @@ export default function DocumentManagementPage() {
             </div>
 
             <div className="pt-6 border-t border-slate-800/50">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Sincronização</h3>
-              <button 
-                onClick={async () => {
-                  const res = await fetch('/api/auth/google/url');
-                  const { url } = await res.json();
-                  window.open(url, 'google_auth', 'width=600,height=700');
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white text-xs font-bold transition-all border border-slate-800/50"
-              >
-                <Image 
-                  src="https://www.google.com/favicon.ico" 
-                  alt="Google" 
-                  width={16} 
-                  height={16} 
-                  className="rounded-full"
-                  referrerPolicy="no-referrer"
-                />
-                Conectar Google Drive
-              </button>
-              <p className="text-[9px] text-slate-600 mt-2 text-center">Necessário para backup automático</p>
-            </div>
-
-            <div className="pt-6 border-t border-slate-800/50">
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Filtros Avançados</h3>
               
               <div className="space-y-4">
@@ -930,6 +1020,54 @@ export default function DocumentManagementPage() {
 
         {/* Document List Area */}
         <div className="lg:col-span-3 space-y-6">
+          {/* Google Drive Connection Status */}
+          <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "size-10 rounded-xl flex items-center justify-center transition-all",
+                connectedAccount ? "bg-emerald-500/10 text-emerald-500" : "bg-slate-800/50 text-slate-500"
+              )}>
+                <Image 
+                  src="https://www.google.com/favicon.ico" 
+                  alt="Google" 
+                  width={20} 
+                  height={20} 
+                  className={cn("rounded-full", !connectedAccount && "grayscale opacity-50")}
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div>
+                <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sincronização Google Drive</h4>
+                <p className="text-xs font-bold text-white">
+                  {connectedAccount ? connectedAccount : 'Não configurado'}
+                </p>
+              </div>
+            </div>
+            {!isServiceAccount && (
+              <button 
+                onClick={async () => {
+                  const res = await fetch('/api/auth/google/url');
+                  const { url } = await res.json();
+                  window.open(url, 'google_auth', 'width=600,height=700');
+                }}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border",
+                  connectedAccount 
+                    ? "bg-white/5 border-slate-800/50 text-slate-400 hover:text-white hover:bg-white/10" 
+                    : "bg-[#d4ff3f] border-[#d4ff3f] text-[#0a0a0a] hover:bg-[#c4ef2f]"
+                )}
+              >
+                {connectedAccount ? 'Alterar Conta' : 'Conectar Agora'}
+              </button>
+            )}
+            {isServiceAccount && (
+              <div className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2">
+                <div className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Sincronização Automática Ativa</span>
+              </div>
+            )}
+          </div>
+
           {/* Search and View Options */}
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
@@ -1073,20 +1211,51 @@ export default function DocumentManagementPage() {
                             <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenLocal(doc);
+                                  }}
+                                  className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-[#d4ff3f] transition-all" 
+                                  title="Abrir no PC (Copia Caminho)"
+                                >
+                                  <Move size={16} />
+                                </button>
+                                {doc.webViewLink && (
+                                  <a 
+                                    href={doc.webViewLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-[#d4ff3f] transition-all" 
+                                    title="Ver no Google Drive"
+                                  >
+                                    <Image 
+                                      src="https://www.google.com/favicon.ico" 
+                                      alt="Drive" 
+                                      width={16} 
+                                      height={16} 
+                                      className="rounded-full opacity-50 group-hover:opacity-100"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </a>
+                                )}
+                                <button 
                                   onClick={() => handleViewDocument(doc)}
                                   className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
                                   title="Visualizar"
                                 >
                                   <Eye size={16} />
                                 </button>
-                                <a 
-                                  href={getFileUrl(doc.file_path)}
-                                  download={doc.nome}
-                                  className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
-                                  title="Download"
-                                >
-                                  <Download size={16} />
-                                </a>
+                                {!doc.is_drive_only && (
+                                  <a 
+                                    href={getFileUrl(doc.file_path)}
+                                    download={doc.nome}
+                                    className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all" 
+                                    title="Download"
+                                  >
+                                    <Download size={16} />
+                                  </a>
+                                )}
                                 
                                 <div className="relative">
                                   <button 
@@ -1102,20 +1271,26 @@ export default function DocumentManagementPage() {
 
                                   <AnimatePresence>
                                     {activeDocMenu === doc.id && (
-                                      <>
-                                        <div 
-                                          className="fixed inset-0 z-10" 
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            setActiveDocMenu(null);
-                                          }} 
-                                        />
-                                        <motion.div
-                                          initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                                          exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                          className="absolute right-0 top-full mt-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
-                                        >
+                                      <motion.div 
+                                        key="backdrop"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        className="fixed inset-0 z-10" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActiveDocMenu(null);
+                                        }} 
+                                      />
+                                    )}
+                                    {activeDocMenu === doc.id && (
+                                      <motion.div
+                                        key="menu"
+                                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                        className="absolute right-0 top-full mt-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
+                                      >
                                           <button
                                             onClick={(e) => {
                                               e.stopPropagation();
@@ -1153,8 +1328,7 @@ export default function DocumentManagementPage() {
                                             <Trash2 size={12} />
                                             Excluir
                                           </button>
-                                        </motion.div>
-                                      </>
+                                          </motion.div>
                                     )}
                                   </AnimatePresence>
                                 </div>
@@ -1249,20 +1423,51 @@ export default function DocumentManagementPage() {
                         </div>
                         <div className="flex items-center gap-1">
                           <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenLocal(doc);
+                            }}
+                            className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-[#d4ff3f] transition-all" 
+                            title="Abrir no PC (Copia Caminho)"
+                          >
+                            <Move size={16} />
+                          </button>
+                          {doc.webViewLink && (
+                            <a 
+                              href={doc.webViewLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-[#d4ff3f] transition-all" 
+                              title="Ver no Google Drive"
+                            >
+                              <Image 
+                                src="https://www.google.com/favicon.ico" 
+                                alt="Drive" 
+                                width={16} 
+                                height={16} 
+                                className="rounded-full opacity-50 group-hover:opacity-100"
+                                referrerPolicy="no-referrer"
+                              />
+                            </a>
+                          )}
+                          <button 
                             onClick={() => handleViewDocument(doc)}
                             className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
                             title="Visualizar"
                           >
                             <Eye size={16} />
                           </button>
-                          <a 
-                            href={getFileUrl(doc.file_path)}
-                            download={doc.nome}
-                            className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
-                            title="Download"
-                          >
-                            <Download size={16} />
-                          </a>
+                          {!doc.is_drive_only && (
+                            <a 
+                              href={getFileUrl(doc.file_path)}
+                              download={doc.nome}
+                              className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all"
+                              title="Download"
+                            >
+                              <Download size={16} />
+                            </a>
+                          )}
 
                           <div className="relative">
                             <button 
@@ -1278,20 +1483,26 @@ export default function DocumentManagementPage() {
 
                             <AnimatePresence>
                               {activeDocMenu === doc.id && (
-                                <>
-                                  <div 
-                                    className="fixed inset-0 z-10" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setActiveDocMenu(null);
-                                    }} 
-                                  />
-                                  <motion.div
-                                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                                    className="absolute right-0 bottom-full mb-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
-                                  >
+                                <motion.div 
+                                  key="backdrop"
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  exit={{ opacity: 0 }}
+                                  className="fixed inset-0 z-10" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDocMenu(null);
+                                  }} 
+                                />
+                              )}
+                              {activeDocMenu === doc.id && (
+                                <motion.div
+                                  key="menu"
+                                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                                  className="absolute right-0 bottom-full mb-1 z-50 w-48 bg-[#1a1a1a] border border-slate-800 rounded-2xl shadow-2xl p-1"
+                                >
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
@@ -1329,8 +1540,7 @@ export default function DocumentManagementPage() {
                                       <Trash2 size={12} />
                                       Excluir
                                     </button>
-                                  </motion.div>
-                                </>
+                                    </motion.div>
                               )}
                             </AnimatePresence>
                           </div>

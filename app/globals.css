@@ -1,54 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f7f8;
-  --foreground: #101822;
-  --base-font-size: 16px;
-}
-
-.dark {
-  --background: #0a0a0a;
-  --foreground: #f6f7f8;
-}
-
-html {
-  font-size: var(--base-font-size);
+  --bg: #f5f5f4;
+  --ink: #0a0a0a;
+  --line: rgba(10, 10, 10, 0.1);
 }
 
 body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: "Inter", sans-serif;
-}
-
-.font-small { --base-font-size: 14px; }
-.font-medium { --base-font-size: 16px; }
-.font-large { --base-font-size: 18px; }
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #1a1a1a;
-  border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #2a2a2a;
-}
-
-/* Remove spin buttons from number inputs */
-input::-webkit-outer-spin-button,
-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-input[type=number] {
-  -moz-appearance: textfield;
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
 }

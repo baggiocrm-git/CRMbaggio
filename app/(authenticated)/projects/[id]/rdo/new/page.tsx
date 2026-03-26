@@ -18,7 +18,8 @@ import {
   Wind,
   CloudLightning,
   FileText,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Project } from '@/lib/types';
@@ -38,6 +39,7 @@ export default function NewRDOPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -188,7 +190,8 @@ export default function NewRDOPage() {
       }
     } catch (error) {
       console.error('Error uploading photos:', error);
-      alert(error instanceof Error ? error.message : 'Erro ao fazer upload de fotos.');
+      setError(error instanceof Error ? error.message : 'Erro ao fazer upload de fotos.');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -216,7 +219,8 @@ export default function NewRDOPage() {
       router.push(`/projects/${id}/rdo`);
     } catch (error) {
       console.error('Error saving RDO:', error);
-      alert('Erro ao salvar RDO.');
+      setError('Erro ao salvar RDO.');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setSaving(false);
     }
@@ -269,27 +273,43 @@ export default function NewRDOPage() {
 
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Manhã</label>
-                <select 
-                  value={formData.clima_manha}
-                  onChange={(e) => setFormData({...formData, clima_manha: e.target.value})}
-                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none"
-                >
-                  {CLIMA_OPTIONS.map(opt => (
-                    <option key={opt.label} value={opt.label}>{opt.label}</option>
+                <div className="grid grid-cols-5 gap-2">
+                  {CLIMA_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setFormData({...formData, clima_manha: opt.label})}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
+                        formData.clima_manha === opt.label 
+                          ? 'bg-[#d4ff3f]/10 border-[#d4ff3f] text-[#d4ff3f]' 
+                          : 'bg-[#0a0a0a] border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                      title={opt.label}
+                    >
+                      <opt.icon size={16} />
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
               <div>
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clima Tarde</label>
-                <select 
-                  value={formData.clima_tarde}
-                  onChange={(e) => setFormData({...formData, clima_tarde: e.target.value})}
-                  className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none"
-                >
-                  {CLIMA_OPTIONS.map(opt => (
-                    <option key={opt.label} value={opt.label}>{opt.label}</option>
+                <div className="grid grid-cols-5 gap-2">
+                  {CLIMA_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.label}
+                      type="button"
+                      onClick={() => setFormData({...formData, clima_tarde: opt.label})}
+                      className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all ${
+                        formData.clima_tarde === opt.label 
+                          ? 'bg-[#d4ff3f]/10 border-[#d4ff3f] text-[#d4ff3f]' 
+                          : 'bg-[#0a0a0a] border-slate-800 text-slate-500 hover:border-slate-700'
+                      }`}
+                      title={opt.label}
+                    >
+                      <opt.icon size={16} />
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
           </section>
@@ -314,44 +334,48 @@ export default function NewRDOPage() {
               </div>
 
               <div className="space-y-3">
-                {formData.mao_de_obra.map((item, index) => (
-                  <div key={index} className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Função</label>
-                      <input 
-                        type="text"
-                        value={item.funcao}
-                        onChange={(e) => {
-                          const newList = [...formData.mao_de_obra];
-                          newList[index].funcao = e.target.value;
-                          setFormData({ ...formData, mao_de_obra: newList });
-                        }}
-                        placeholder="Ex: Pedreiro"
-                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                      />
+                {formData.mao_de_obra.length === 0 ? (
+                  <p className="text-[10px] text-slate-600 italic text-center py-4">Nenhuma mão de obra registrada.</p>
+                ) : (
+                  formData.mao_de_obra.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Função</label>
+                        <input 
+                          type="text"
+                          value={item.funcao}
+                          onChange={(e) => {
+                            const newList = [...formData.mao_de_obra];
+                            newList[index].funcao = e.target.value;
+                            setFormData({ ...formData, mao_de_obra: newList });
+                          }}
+                          placeholder="Ex: Pedreiro"
+                          className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        />
+                      </div>
+                      <div className="w-16">
+                        <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
+                        <input 
+                          type="number"
+                          value={item.quantidade}
+                          onChange={(e) => {
+                            const newList = [...formData.mao_de_obra];
+                            newList[index].quantidade = parseInt(e.target.value) || 0;
+                            setFormData({ ...formData, mao_de_obra: newList });
+                          }}
+                          className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        />
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveMaoDeObra(index)}
+                        className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <div className="w-16">
-                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
-                      <input 
-                        type="number"
-                        value={item.quantidade}
-                        onChange={(e) => {
-                          const newList = [...formData.mao_de_obra];
-                          newList[index].quantidade = parseInt(e.target.value) || 0;
-                          setFormData({ ...formData, mao_de_obra: newList });
-                        }}
-                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                      />
-                    </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleRemoveMaoDeObra(index)}
-                      className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </section>
 
@@ -374,60 +398,64 @@ export default function NewRDOPage() {
               </div>
 
               <div className="space-y-3">
-                {formData.equipamentos.map((item, index) => (
-                  <div key={index} className="flex gap-2 items-end">
-                    <div className="flex-1">
-                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Equipamento</label>
-                      <input 
-                        type="text"
-                        value={item.nome}
-                        onChange={(e) => {
-                          const newList = [...formData.equipamentos];
-                          newList[index].nome = e.target.value;
-                          setFormData({ ...formData, equipamentos: newList });
-                        }}
-                        placeholder="Ex: Betoneira"
-                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                      />
-                    </div>
-                    <div className="w-12">
-                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
-                      <input 
-                        type="number"
-                        value={item.quantidade}
-                        onChange={(e) => {
-                          const newList = [...formData.equipamentos];
-                          newList[index].quantidade = parseInt(e.target.value) || 0;
-                          setFormData({ ...formData, equipamentos: newList });
-                        }}
-                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                      />
-                    </div>
-                    <div className="w-20">
-                      <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Status</label>
-                      <select 
-                        value={item.status}
-                        onChange={(e) => {
-                          const newList = [...formData.equipamentos];
-                          newList[index].status = e.target.value;
-                          setFormData({ ...formData, equipamentos: newList });
-                        }}
-                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-1 py-2 text-[9px] text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none"
+                {formData.equipamentos.length === 0 ? (
+                  <p className="text-[10px] text-slate-600 italic text-center py-4">Nenhum equipamento registrado.</p>
+                ) : (
+                  formData.equipamentos.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-end">
+                      <div className="flex-1">
+                        <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Equipamento</label>
+                        <input 
+                          type="text"
+                          value={item.nome}
+                          onChange={(e) => {
+                            const newList = [...formData.equipamentos];
+                            newList[index].nome = e.target.value;
+                            setFormData({ ...formData, equipamentos: newList });
+                          }}
+                          placeholder="Ex: Betoneira"
+                          className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        />
+                      </div>
+                      <div className="w-12">
+                        <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Qtd</label>
+                        <input 
+                          type="number"
+                          value={item.quantidade}
+                          onChange={(e) => {
+                            const newList = [...formData.equipamentos];
+                            newList[index].quantidade = parseInt(e.target.value) || 0;
+                            setFormData({ ...formData, equipamentos: newList });
+                          }}
+                          className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        />
+                      </div>
+                      <div className="w-20">
+                        <label className="block text-[9px] font-black text-slate-600 uppercase tracking-widest mb-1">Status</label>
+                        <select 
+                          value={item.status}
+                          onChange={(e) => {
+                            const newList = [...formData.equipamentos];
+                            newList[index].status = e.target.value;
+                            setFormData({ ...formData, equipamentos: newList });
+                          }}
+                          className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-1 py-2 text-[9px] text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all appearance-none"
+                        >
+                          <option value="Operacional">Operacional</option>
+                          <option value="Manutenção">Manutenção</option>
+                          <option value="Parado">Parado</option>
+                        </select>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => handleRemoveEquipamento(index)}
+                        className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
                       >
-                        <option value="Operacional">Operacional</option>
-                        <option value="Manutenção">Manutenção</option>
-                        <option value="Parado">Parado</option>
-                      </select>
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <button 
-                      type="button"
-                      onClick={() => handleRemoveEquipamento(index)}
-                      className="p-2 text-slate-600 hover:text-rose-500 transition-colors mb-0.5"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </section>
           </div>
@@ -539,6 +567,27 @@ export default function NewRDOPage() {
             )}
           </section>
 
+          {/* Signature */}
+          <section className="bg-[#1a1a1a] rounded-3xl p-6 border border-slate-800/50 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 rounded-lg bg-[#d4ff3f]/10 text-[#d4ff3f]">
+                <Users size={16} />
+              </div>
+              <h2 className="text-xs font-black uppercase tracking-widest text-white">Assinatura do Responsável</h2>
+            </div>
+            
+            <div>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Nome do Responsável</label>
+              <input 
+                type="text"
+                value={formData.assinatura_responsavel}
+                onChange={(e) => setFormData({...formData, assinatura_responsavel: e.target.value})}
+                placeholder="Nome completo do engenheiro ou mestre de obras"
+                className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+              />
+            </div>
+          </section>
+
           <button 
             type="submit"
             disabled={saving || uploading}
@@ -547,6 +596,16 @@ export default function NewRDOPage() {
             {saving ? <Loader2 size={20} className="animate-spin" /> : <><Save size={20} /> Salvar Relatório</>}
           </button>
         </form>
+
+        {error && (
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 p-4 bg-rose-500 text-white rounded-2xl flex items-center gap-3 shadow-2xl">
+            <AlertCircle size={20} />
+            <p className="text-xs font-bold">{error}</p>
+            <button onClick={() => setError(null)} className="p-1 hover:bg-white/20 rounded-lg">
+              <X size={16} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -69,7 +69,9 @@ export async function GET(req: Request) {
 
         // Update the database
         await supabase.from('google_tokens').update({
-          access_token: accessToken
+          access_token: accessToken,
+          expiry_date: newTokens.expiry_date ? new Date(newTokens.expiry_date).toISOString() : null,
+          updated_at: new Date().toISOString()
         }).eq('id', 1);
 
         // Retry fetching events

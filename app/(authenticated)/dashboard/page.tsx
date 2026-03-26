@@ -11,7 +11,10 @@ import {
   DollarSign, 
   FileText,
   Loader2,
-  Calendar
+  Calendar,
+  Cloud,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -36,6 +39,7 @@ export default function DashboardPage() {
   const [chartData, setChartData] = useState<{name: string, value: number}[]>([]);
   const [priorityTasks, setPriorityTasks] = useState<{id: string, title: string, site: string, status: string, color: string}[]>([]);
   const [googleEvents, setGoogleEvents] = useState<{ id: string; summary: string; start: { dateTime?: string; date: string } }[]>([]);
+  const [driveStatus, setDriveStatus] = useState<{ isConnected: boolean; isServiceAccount: boolean }>({ isConnected: false, isServiceAccount: false });
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
@@ -44,11 +48,17 @@ export default function DashboardPage() {
       setIsLoading(true);
       
       // Check for session first
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('DashboardPage: Erro ao obter sessão:', sessionError);
+      }
       if (!session) {
         console.warn('DashboardPage: Nenhuma sessão encontrada no fetchData');
+      } else {
+        console.log('DashboardPage: Sessão ativa para:', session.user.email);
       }
 
+      console.log('DashboardPage: Executando queries no Supabase...');
       const [projectsRes, staffRes, receivablesRes, payablesRes, rdosRes, delayedProjectsRes] = await Promise.all([
         supabase.from('projetos').select('id', { count: 'exact' }).neq('status', 'Concluído'),
         supabase.from('equipe').select('id', { count: 'exact' }).eq('status', 'Ativo'),
@@ -61,7 +71,9 @@ export default function DashboardPage() {
       console.log('DashboardPage: Resultados das queries:', { 
         projects: projectsRes.count, 
         staff: staffRes.count,
-        rdos: rdosRes.data?.length 
+        rdos: rdosRes.data?.length,
+        projectsError: projectsRes.error,
+        rdosError: rdosRes.error
       });
 
       const receivable = (receivablesRes.data || [])
@@ -128,13 +140,22 @@ export default function DashboardPage() {
 
       // Fetch Google Events if connected
       try {
-        const googleRes = await fetch('/api/google/calendar/events');
+        const [googleRes, driveStatusRes] = await Promise.all([
+          fetch('/api/google/calendar/events'),
+          fetch('/api/auth/google/status')
+        ]);
+
         if (googleRes.ok) {
           const events = await googleRes.json();
           setGoogleEvents(events.slice(0, 3));
         }
+
+        if (driveStatusRes.ok) {
+          const status = await driveStatusRes.json();
+          setDriveStatus(status);
+        }
       } catch (e) {
-        console.warn('DashboardPage: Erro ao buscar eventos do Google:', e);
+        console.warn('DashboardPage: Erro ao buscar dados do Google:', e);
       }
 
     } catch (error) {
@@ -270,8 +291,8 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
+              <div className="h-64 w-full min-w-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={performanceData}>
                     <XAxis 
                       dataKey="name" 
@@ -335,6 +356,70 @@ export default function DashboardPage() {
 
           {/* Sidebar Column */}
           <div className="space-y-8">
+            {/* Google Drive Integration Card */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.55 }}
+              className="p-6 rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm"
+            >
+              <div className="flex items-center gap-4 mb-6">
+                <div className={`size-12 rounded-2xl flex items-center justify-center ${driveStatus.isConnected || driveStatus.isServiceAccount ? 'bg-blue-500/10 text-blue-500' : 'bg-slate-800/50 text-slate-500'}`}>
+                  <Cloud size={24} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black tracking-tight">Google Drive</h3>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Gestão de Documentos</p>
+                </div>
+              </div>
+
+              {driveStatus.isServiceAccount ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <CheckCircle2 size={16} className="text-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Sincronização Automática Ativa</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    O sistema está configurado para sincronizar documentos automaticamente com o Drive da empresa.
+                  </p>
+                </div>
+              ) : driveStatus.isConnected ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                    <CheckCircle2 size={16} className="text-blue-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Conta Conectada</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Sua conta pessoal do Google está conectada para gestão de documentos.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20">
+                    <AlertCircle size={16} className="text-rose-500" />
+                    <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">Não Conectado</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed mb-4">
+                    Conecte uma conta do Google para habilitar a sincronização de documentos.
+                  </p>
+                  <button 
+                    onClick={async () => {
+                      try {
+                        const response = await fetch('/api/auth/google/url');
+                        const { url } = await response.json();
+                        window.open(url, 'google_auth', 'width=600,height=700');
+                      } catch (error) {
+                        console.error('Erro ao conectar Google Drive:', error);
+                      }
+                    }}
+                    className="w-full py-3 bg-[#d4ff3f] text-black text-[10px] font-black uppercase tracking-widest rounded-xl hover:opacity-90 transition-all"
+                  >
+                    Conectar Agora
+                  </button>
+                </div>
+              )}
+            </motion.div>
+
             {/* Google Calendar Events */}
             {googleEvents.length > 0 && (
               <motion.div 

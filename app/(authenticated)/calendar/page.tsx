@@ -252,10 +252,12 @@ export default function CalendarPage() {
     checkConnection();
 
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
+      if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' || event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         setIsGoogleConnected(true);
         fetchGoogleCalendars();
         fetchGoogleEvents();
+      } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
+        setError(`Erro na autenticação: ${event.data.message}`);
       }
     };
     window.addEventListener('message', handleMessage);

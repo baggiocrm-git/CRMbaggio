@@ -1,46 +1,37 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-console.log('Supabase lib: Inicializando cliente...', { url: supabaseUrl });
+console.log('Supabase: Inicializando com URL:', supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : 'Vazia');
 
-// Client-side client for standard operations with RLS
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-    storageKey: 'cbsl-erp-auth-v4', // New key to force fresh state
-  }
-});
-
-if (typeof window !== 'undefined') {
-  console.log('Supabase lib: Cliente inicializado (localStorage v4).');
-  console.log('Supabase lib: URL atual:', window.location.href);
-  console.log('Supabase lib: Auth Config:', {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  });
-  // Debug storage
-  try {
-    const testKey = 'sb-test-storage';
-    localStorage.setItem(testKey, 'ok');
-    const val = localStorage.getItem(testKey);
-    console.log('Supabase lib: LocalStorage funcional:', val === 'ok' ? 'SIM' : 'NÃO');
-    localStorage.removeItem(testKey);
-  } catch (e) {
-    console.error('Supabase lib: LocalStorage BLOQUEADO ou INDISPONÍVEL:', e);
-  }
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase URL or Anon Key is missing. Check your environment variables.');
 }
-export const getSupabaseServer = () => {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  
-  if (!serviceRoleKey || !url) {
-    throw new Error('Supabase server-side configuration missing');
-  }
-  return createClient(url, serviceRoleKey);
-};
+
+let supabaseInstance: any;
+try {
+  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+} catch (e) {
+  console.error('Erro ao inicializar Supabase:', e);
+  // Fallback to a dummy object with auth to prevent crashes
+  supabaseInstance = {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithPassword: async () => ({ data: { user: null, session: null }, error: new Error('Supabase não inicializado') }),
+      signInWithOAuth: async () => ({ data: { url: null }, error: new Error('Supabase não inicializado') }),
+    },
+    from: () => ({
+      select: () => ({
+        eq: () => ({ single: async () => ({ data: null, error: null }) }),
+        order: () => ({ limit: async () => ({ data: [], error: null }) }),
+        neq: () => ({ count: 'exact' }),
+      }),
+      upsert: async () => ({ data: null, error: null }),
+    }),
+  } as any;
+}
+
+export const supabase = supabaseInstance;

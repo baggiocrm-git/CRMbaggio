@@ -4,10 +4,6 @@ import { createClient } from '@supabase/supabase-js';
 export async function POST(req: NextRequest) {
   console.log('POST /api/documents/upload - Request received');
   try {
-    // Dynamic imports for heavy libraries
-    const { drive: googleDrive } = await import('@googleapis/drive');
-    const { OAuth2Client } = await import('google-auth-library');
-
     let formData: FormData;
     try {
       formData = await req.formData();
@@ -20,9 +16,10 @@ export async function POST(req: NextRequest) {
     const name = formData.get('name') as string;
     const category = formData.get('category') as string;
     const pastaId = formData.get('pasta_id') as string;
+    const caminhoLocal = formData.get('caminho_local') as string;
     const date = new Date().toISOString().split('T')[0]; // Automatic date
 
-    console.log('Upload details:', { name, category, date, pastaId, fileSize: file?.size, fileType: file?.type });
+    console.log('Upload details:', { name, category, date, pastaId, caminhoLocal, fileSize: file?.size, fileType: file?.type });
 
     if (!file || !name || !category) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
@@ -100,6 +97,7 @@ export async function POST(req: NextRequest) {
         data: date,
         pasta_id: pastaId || null,
         file_path: storageData.path,
+        caminho_local: caminhoLocal || null,
         tamanho_arquivo: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         tipo_arquivo: file.type,
         status: 'Vigente',
@@ -119,51 +117,55 @@ export async function POST(req: NextRequest) {
 
     // 4. Sync to Google Drive
     try {
-      console.log('Checking for Google Drive tokens...');
-      // Get tokens - using the most recent token
-      const { data: tokenData, error: tokenError } = await supabase
-        .from('google_tokens')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      console.log('Starting Google Drive sync...');
+      const { getDriveService } = await import('@/lib/google-drive');
+      
+      // Try Service Account first for automatic access
+      let drive;
+      try {
+        drive = await getDriveService();
+        console.log('Using Service Account for Drive sync');
+      } catch (err) {
+        console.warn('Service Account not available, trying user tokens:', err);
+        // Fallback to user tokens if Service Account fails
+        const { data: tokenData } = await supabase
+          .from('google_tokens')
+          .select('*')
+          .eq('id', 2)
+          .single();
 
-      if (tokenError) {
-        console.warn('Error fetching google_tokens (table might not exist yet):', tokenError);
-      } else if (tokenData && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-        console.log('Found Google tokens, starting Drive sync...');
-        const oauth2Client = new OAuth2Client(
-          process.env.GOOGLE_CLIENT_ID,
-          process.env.GOOGLE_CLIENT_SECRET,
-          `${process.env.APP_URL}/api/auth/google/callback`
-        );
-
-        oauth2Client.setCredentials({
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          expiry_date: tokenData.expiry_date ? new Date(tokenData.expiry_date).getTime() : undefined
-        });
-
-        const drive = googleDrive({ version: 'v3', auth: oauth2Client });
-
-        // Find or create root folder
-        let rootFolderId = '';
-        const rootSearch = await drive.files.list({
-          q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-          fields: 'files(id)',
-        });
-
-        if (rootSearch.data.files && rootSearch.data.files.length > 0) {
-          rootFolderId = rootSearch.data.files[0].id!;
-        } else {
-          const rootFolder = await drive.files.create({
-            requestBody: {
-              name: 'CBSL ERP Documents',
-              mimeType: 'application/vnd.google-apps.folder',
-            },
-            fields: 'id',
+        if (tokenData && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+          drive = await getDriveService({
+            access_token: tokenData.access_token,
+            refresh_token: tokenData.refresh_token,
+            expiry_date: tokenData.expiry_date ? Number(tokenData.expiry_date) : undefined
           });
-          rootFolderId = rootFolder.data.id!;
+        }
+      }
+
+      if (drive) {
+        // Use specific folder ID if provided, otherwise default to 'CBSL ERP Documents'
+        let rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
+        
+        if (!rootFolderId) {
+          console.log('GOOGLE_DRIVE_ROOT_FOLDER_ID not set, searching for "CBSL ERP Documents"');
+          const rootSearch = await drive.files.list({
+            q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+            fields: 'files(id)',
+          });
+
+          if (rootSearch.data.files && rootSearch.data.files.length > 0) {
+            rootFolderId = rootSearch.data.files[0].id!;
+          } else {
+            const rootFolder = await drive.files.create({
+              requestBody: {
+                name: 'CBSL ERP Documents',
+                mimeType: 'application/vnd.google-apps.folder',
+              },
+              fields: 'id',
+            });
+            rootFolderId = rootFolder.data.id!;
+          }
         }
 
         // Find or create category folder
@@ -180,7 +182,7 @@ export async function POST(req: NextRequest) {
             requestBody: {
               name: category,
               mimeType: 'application/vnd.google-apps.folder',
-              parents: [rootFolderId],
+              parents: [rootFolderId!],
             },
             fields: 'id',
           });
@@ -197,13 +199,19 @@ export async function POST(req: NextRequest) {
             mimeType: file.type,
             body: Buffer.from(fileBuffer),
           },
+          fields: 'id, webViewLink',
         });
 
-        // Update DB with Drive ID
+        // Update DB with Drive ID and Link
         await supabase
           .from('documentos')
-          .update({ Google_Drive_id: driveFile.data.id })
+          .update({ 
+            drive_file_id: driveFile.data.id,
+            webViewLink: driveFile.data.webViewLink
+          })
           .eq('id', dbData.id);
+        
+        console.log('Google Drive sync successful:', driveFile.data.id);
       }
     } catch (driveErr) {
       console.error('Google Drive Sync Error:', driveErr);

@@ -1,5 +1,5 @@
 {
-  "name": "CBSL ERP v4.4",
-  "description": "ERP para empresas de Engenharia e Construção - Versão 4.4 (Cache Buster)",
+  "name": "ERP CBSL",
+  "description": "Sistema ERP de Engenharia com CRM, Gestão de Projetos e integração com Google Drive.",
   "requestFramePermissions": []
 }

@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   const banner = (
     <div className="fixed top-0 left-0 right-0 z-[99999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-2xl pointer-events-none">
-      VERSÃO: 20260321-0225 | REFRESH: F5 ESTÁVEL | STORAGE: V4
+      VERSÃO: 20260325-1127 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
     </div>
   );
 
@@ -40,33 +40,85 @@ export default function LoginPage() {
     }
 
     const checkUser = async () => {
-      // Auto-redirect disabled to allow manual reset if needed
-      /*
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        router.push('/dashboard');
+      console.log('LoginPage: Verificando sessão inicial...');
+      
+      if (!supabase || !supabase.auth) {
+        console.error('LoginPage: Supabase ou Supabase.auth não disponível');
+        return;
       }
-      */
+
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('LoginPage: Resultado getSession:', { hasSession: !!session, error });
+        
+        if (error) {
+          console.error('LoginPage: Erro ao verificar sessão:', error);
+          setError(`Erro de conexão com Supabase: ${error.message}`);
+        }
+        
+        if (session?.user) {
+          console.log('LoginPage: Usuário já logado:', session.user.email);
+          router.push('/dashboard');
+        }
+      } catch (err) {
+        console.error('LoginPage: Exceção em checkUser:', err);
+        setError('Falha crítica ao conectar com o servidor de autenticação.');
+      }
     };
     checkUser();
 
-    // Load remembered email
-    const rememberedEmail = localStorage.getItem('remembered_email');
-    if (rememberedEmail) {
-      setEmail(rememberedEmail);
-      setRememberMe(true);
+    // Listener para mensagens do popup de login
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
+        console.log('LoginPage: Mensagem SUPABASE_AUTH_SUCCESS recebida do popup');
+        router.push('/dashboard');
+      }
+    };
+    window.addEventListener('message', handleMessage);
+
+    let subscription: any;
+    if (supabase && supabase.auth) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          console.log('LoginPage: Login detectado via onAuthStateChange, redirecionando...');
+          router.push('/dashboard');
+        }
+      });
+      subscription = data.subscription;
     }
+
+    // Load remembered email
+    try {
+      const rememberedEmail = localStorage.getItem('remembered_email');
+      if (rememberedEmail) {
+        setEmail(rememberedEmail);
+        setRememberMe(true);
+      }
+    } catch (e) {
+      console.warn('Could not load remembered email:', e);
+    }
+
+    return () => {
+      if (subscription) subscription.unsubscribe();
+      window.removeEventListener('message', handleMessage);
+    };
   }, [router]);
 
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('LoginPage: handleLogin disparado');
     setLoading(true);
     setError(null);
 
     try {
-      console.log('Tentativa de login iniciada:', { email });
+      console.log('LoginPage: Tentativa de login iniciada:', { email });
       
+      if (!supabase || !supabase.auth) {
+        console.error('LoginPage: Supabase não disponível no handleLogin');
+        throw new Error('Supabase não está configurado. Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      }
+
       // 1. Check for hardcoded Admin (Only if explicitly enabled via env, otherwise skip)
       if (email === 'admin@buildflow.com' && password === '123456') {
         setError('Por favor, use o login oficial do Google para acessar como Administrador.');
@@ -128,10 +180,18 @@ export default function LoginPage() {
     try {
       console.log('Iniciando Google Login...');
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      if (!supabase || !supabase.auth) {
+        throw new Error('Supabase não está configurado. Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      }
+
+      // Open popup immediately to avoid popup blocker
+      const popup = window.open('', 'oauth_popup', 'width=600,height=700');
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          skipBrowserRedirect: true,
+          redirectTo: `${window.location.origin}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -139,7 +199,20 @@ export default function LoginPage() {
           scopes: 'email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file'
         }
       });
-      if (error) throw error;
+
+      if (error) {
+        if (popup) popup.close();
+        throw error;
+      }
+
+      if (data?.url && popup) {
+        popup.location.href = data.url;
+      } else if (!popup) {
+        throw new Error('O navegador bloqueou a janela de login. Por favor, permita popups para este site.');
+      }
+      
+      // We don't set loading to false here because we're waiting for the popup to complete
+      // and trigger the onAuthStateChange listener
     } catch (err) {
       console.error('Erro Google Login:', err);
       let message = 'Erro ao conectar com Google';
@@ -159,10 +232,39 @@ export default function LoginPage() {
     }
   };
 
+  const isSupabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const maskedUrl = supabaseUrl ? `${supabaseUrl.substring(0, 15)}...` : 'Não configurado';
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
       {banner}
       <div className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
+        
+        {!isSupabaseConfigured && (
+          <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
+            <AlertCircle size={48} className="text-rose-500 mb-4" />
+            <h2 className="text-white text-xl font-black uppercase tracking-tighter mb-2">Configuração Pendente</h2>
+            <p className="text-slate-400 text-sm mb-6">
+              As variáveis de ambiente do Supabase não foram detectadas no cliente. <br />
+              Certifique-se de que configurou <strong>NEXT_PUBLIC_SUPABASE_URL</strong> e <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> no menu de Configurações (ícone de engrenagem) e <strong>REINICIOU O SERVIDOR</strong>.
+            </p>
+            <div className="bg-slate-900 p-4 rounded-xl text-left w-full overflow-x-auto mb-4">
+              <p className="text-[10px] text-slate-500 uppercase font-black mb-2">Estado Atual:</p>
+              <code className="text-[10px] text-emerald-500 font-mono">
+                URL: {maskedUrl}<br />
+                KEY: {process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'Configurada (Oculta)' : 'Não configurada'}
+              </code>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-[#d4ff3f] text-black px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
+            >
+              Recarregar Página
+            </button>
+          </div>
+        )}
+
         {/* Decorative background element */}
         <div className="absolute -top-24 -right-24 size-48 bg-[#d4ff3f]/5 blur-[100px] rounded-full" />
         

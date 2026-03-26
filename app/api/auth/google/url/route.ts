@@ -1,25 +1,25 @@
+import { google } from 'googleapis';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const appUrl = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
-  const redirectUri = `${appUrl}/api/auth/google/callback`;
-  
-  if (!clientId || !appUrl) {
-    console.error('Google Auth: Missing GOOGLE_CLIENT_ID or APP_URL');
-    return NextResponse.json({ error: 'Google Auth not configured' }, { status: 400 });
-  }
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI
+  );
 
-  const params = new URLSearchParams({
-    client_id: clientId,
-    redirect_uri: redirectUri,
-    response_type: 'code',
-    scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/drive.file',
+  const scopes = [
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile'
+  ];
+
+  const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+    scope: scopes,
+    prompt: 'consent'
   });
 
-  const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-
-  return NextResponse.json({ url: authUrl });
+  return NextResponse.json({ url });
 }
