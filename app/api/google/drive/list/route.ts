@@ -10,23 +10,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Supabase credentials missing' }, { status: 500 });
   }
   const supabase = createClient(supabaseUrl, supabaseKey);
+  const { searchParams } = new URL(req.url);
+  const folderIdParam = searchParams.get('folderId');
 
   try {
     let drive;
     
     try {
       // Try Service Account first
-      drive = await getDriveService();
+      console.log('Trying Service Account...');
+      const saDrive = await getDriveService();
+      // Test the service account with a simple call
+      await saDrive.files.list({ pageSize: 1 });
+      drive = saDrive;
+      console.log('Service Account success');
     } catch (err) {
+      console.log('Service Account failed or not available, trying user tokens...', err);
       // Fallback to user tokens
       const { data: tokenData, error: tokenError } = await supabase
         .from('google_tokens')
         .select('*')
-        .eq('id', 2)
+        .eq('id', 2) // Assuming ID 2 is the user's token
         .single();
 
       if (tokenError || !tokenData) {
-        return NextResponse.json({ error: 'Google Drive não conectado' }, { status: 401 });
+        return NextResponse.json({ error: 'Google Drive não conectado', details: tokenError }, { status: 401 });
       }
 
       if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
@@ -38,84 +46,114 @@ export async function GET(req: NextRequest) {
         refresh_token: tokenData.refresh_token,
         expiry_date: tokenData.expiry_date ? Number(tokenData.expiry_date) : undefined
       });
+      console.log('User tokens success');
     }
 
     if (!drive) {
       return NextResponse.json({ error: 'Falha ao inicializar o Google Drive' }, { status: 500 });
     }
 
-    // 2. Find the root folder "CBSL ERP Documents"
-    const rootSearch = await drive.files.list({
-      q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-      fields: 'files(id)',
-    });
+    const typeParam = searchParams.get('type');
 
-    let rootFolderId = null;
-    if (rootSearch.data.files && rootSearch.data.files.length > 0) {
-      rootFolderId = rootSearch.data.files[0].id!;
-    }
+    let targetFolderId = (folderIdParam === 'null' || folderIdParam === 'undefined') ? null : folderIdParam;
 
-    let driveFiles = [];
-    let subfolders = [];
-
-    if (rootFolderId) {
-      // 3. List all files in the selected root
-      const subfoldersSearch = await drive.files.list({
-        q: `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+    if (typeParam === 'folders_only') {
+      // Find the root folder "CBSL ERP Documents" first
+      const rootSearch = await drive.files.list({
+        q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
         fields: 'files(id, name)',
       });
-
-      subfolders = subfoldersSearch.data.files || [];
-      const folderIds = [rootFolderId, ...subfolders.map(f => f.id!)];
-
-      // Build query to find files in any of these folders (limit to first few folders to avoid too long query)
-      const limitedFolderIds = folderIds.slice(0, 10);
-      const folderQueries = limitedFolderIds.map(id => `'${id}' in parents`).join(' or ');
       
-      const filesSearch = await drive.files.list({
-        q: `(${folderQueries}) and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
-        fields: 'files(id, name, mimeType, size, createdTime, webViewLink, parents)',
-        pageSize: 50,
-        orderBy: 'modifiedTime desc'
+      const virtualRootId = rootSearch.data.files && rootSearch.data.files.length > 0 
+        ? rootSearch.data.files[0].id 
+        : null;
+
+      const allFoldersSearch = await drive.files.list({
+        q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+        fields: 'files(id, name, parents)',
+        pageSize: 1000,
       });
-      driveFiles = filesSearch.data.files || [];
-    } else {
-      // Fallback: Just list recent files if root folder not found
-      const filesSearch = await drive.files.list({
-        q: "mimeType != 'application/vnd.google-apps.folder' and trashed = false",
-        fields: 'files(id, name, mimeType, size, createdTime, webViewLink, parents)',
-        pageSize: 50,
-        orderBy: 'modifiedTime desc'
-      });
-      driveFiles = filesSearch.data.files || [];
+      
+      const folders = (allFoldersSearch.data.files || [])
+        .filter(f => f.id !== virtualRootId) // Hide the virtual root itself
+        .map(f => {
+          const parentId = f.parents ? f.parents[0] : 'root';
+          return {
+            id: f.id,
+            nome: f.name,
+            parent_id: parentId === virtualRootId ? 'root' : parentId,
+            type: 'folder'
+          };
+        });
+
+      return NextResponse.json({ folders });
     }
 
-    // 4. Map Drive files to our Document format
-    const mappedFiles = driveFiles.map(file => {
-      // Find which subfolder it belongs to for category
-      const parentId = file.parents?.[0];
-      const categoryFolder = subfolders.find(f => f.id === parentId);
-      const category = categoryFolder ? categoryFolder.name : 'Administrativos';
+    if (!targetFolderId || targetFolderId === 'root') {
+      // Find the root folder "CBSL ERP Documents"
+      console.log('Searching for root folder...');
+      const rootSearch = await drive.files.list({
+        q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+        fields: 'files(id, name)',
+      });
+      console.log('Root search result:', rootSearch.data.files);
 
-      return {
+      if (rootSearch.data.files && rootSearch.data.files.length > 0) {
+        targetFolderId = rootSearch.data.files[0].id!;
+      } else {
+        // If not found, use the actual Drive root
+        targetFolderId = 'root';
+      }
+    }
+
+    // List contents of targetFolderId
+    console.log('Listing contents of folder:', targetFolderId);
+    let items: any[] = [];
+    try {
+      const contentsSearch = await drive.files.list({
+        q: `'${targetFolderId}' in parents and trashed = false`,
+        fields: 'files(id, name, mimeType, size, createdTime, webViewLink, parents)',
+        pageSize: 1000,
+        orderBy: 'folder, name'
+      });
+      console.log('Contents search result:', contentsSearch.data.files?.length, 'items');
+
+      items = contentsSearch.data.files || [];
+    } catch (listErr: any) {
+      console.error('Error in drive.files.list:', listErr.message, listErr.response?.data);
+      throw listErr;
+    }
+
+    const folders = items
+      .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+      .map(f => ({
+        id: f.id,
+        nome: f.name,
+        parent_id: (targetFolderId === 'root' || folderIdParam === 'root' || !folderIdParam) ? 'root' : targetFolderId,
+        type: 'folder'
+      }));
+
+    const files = items
+      .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+      .map(file => ({
         id: `drive-${file.id}`,
         nome: file.name,
-        Categoria: category,
+        Categoria: 'Drive',
         data: file.createdTime ? new Date(file.createdTime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         tamanho_arquivo: file.size && !isNaN(parseInt(file.size)) ? `${(parseInt(file.size) / 1024 / 1024).toFixed(2)} MB` : '-',
         tipo_arquivo: file.mimeType,
         drive_file_id: file.id,
         webViewLink: file.webViewLink,
-        is_drive_only: true, // Flag to indicate it's only on Drive
+        is_drive_only: true,
         status: 'Vigente',
         Ano: file.createdTime ? new Date(file.createdTime).getFullYear().toString() : new Date().getFullYear().toString(),
         nome_icone: 'FileText',
         classe_cor: 'text-blue-400',
-        classe_fundo: 'bg-blue-500/10'
-      };
-    });
+        classe_fundo: 'bg-blue-500/10',
+        pasta_id: (targetFolderId === 'root' || folderIdParam === 'root' || !folderIdParam) ? 'root' : targetFolderId
+      }));
 
-    return NextResponse.json(mappedFiles);
+    return NextResponse.json({ folders, files });
   } catch (error: unknown) {
     const err = error as Error;
     console.error('Error listing Drive files:', err);

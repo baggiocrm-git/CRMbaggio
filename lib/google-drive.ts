@@ -46,15 +46,15 @@ export async function getTokens(code: string, redirectUri?: string) {
 import { drive_v3 } from 'googleapis';
 
 export async function getDriveService(tokens?: Parameters<OAuth2Client['setCredentials']>[0]) {
-  const serviceAuth = getServiceAccountAuth();
-  if (serviceAuth) {
-    return google.drive({ version: 'v3', auth: serviceAuth });
-  }
-
   if (tokens) {
     const client = getOAuth2Client();
     client.setCredentials(tokens);
     return google.drive({ version: 'v3', auth: client });
+  }
+
+  const serviceAuth = getServiceAccountAuth();
+  if (serviceAuth) {
+    return google.drive({ version: 'v3', auth: serviceAuth });
   }
 
   throw new Error('No authentication method available for Google Drive');

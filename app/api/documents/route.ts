@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
   try {
     let query = supabase.from('documentos').select('*');
     
-    if (pastaId && pastaId !== 'root') {
+    if (pastaId === 'root' || pastaId === 'null' || pastaId === 'undefined') {
+      query = query.is('pasta_id', null);
+    } else if (pastaId) {
       query = query.eq('pasta_id', pastaId);
     }
 

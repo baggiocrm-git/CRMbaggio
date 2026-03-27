@@ -240,7 +240,7 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
         {/* Debug info for admin troubleshooting */}
         <div className="mt-2 px-2 opacity-20 hover:opacity-100 transition-opacity flex flex-col gap-1">
           <p className="text-[6px] text-slate-500 font-mono break-all">
-            V: 20260321-0145 | E: {userEmail} | R: {userRole}
+            V: 20260326-2358 | E: {userEmail} | R: {userRole}
           </p>
           <button 
             onClick={() => {

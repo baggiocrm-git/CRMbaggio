@@ -209,7 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const banner = (
     <div className="fixed top-0 left-0 right-0 z-[9999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-lg pointer-events-none">
-      VERSÃO: 20260324-1149 | REFRESH: F5 OK | ATM: FINAL
+      VERSÃO: 20260326-2358 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
     </div>
   );
 
@@ -365,6 +365,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
+      {banner}
       <Sidebar user={user} />
       <main className="flex-1 flex flex-col overflow-hidden pt-6">
         {children}

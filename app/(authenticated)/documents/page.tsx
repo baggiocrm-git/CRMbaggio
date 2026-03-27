@@ -78,14 +78,15 @@ const YEARS = [2026, 2025, 2024, 2023];
 export default function DocumentManagementPage() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [allFolders, setAllFolders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<DocumentCategory | 'Todos'>('Todos');
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>('Todos');
-  const [selectedFolderId, setSelectedFolderId] = useState<string | 'root'>('root');
+  const [currentPath, setCurrentPath] = useState<{id: string, name: string}[]>([{id: 'root', name: 'Drive Root'}]);
+  const currentFolderId = currentPath[currentPath.length - 1].id;
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [isServiceAccount, setIsServiceAccount] = useState(false);
   const [sortConfig, setSortConfig] = useState<{
@@ -137,7 +138,6 @@ export default function DocumentManagementPage() {
   // Form State
   const [newDoc, setNewDoc] = useState({
     name: '',
-    category: 'Administrativos' as DocumentCategory,
     pasta_id: 'root' as string | 'root',
     caminho_local: '',
     file: null as File | null
@@ -152,69 +152,147 @@ export default function DocumentManagementPage() {
 
   useEffect(() => {
     if (newDoc.file && !newDoc.name) {
-      setNewDoc(prev => ({ ...prev, name: prev.file?.name.split('.')[0] || '' }));
+      setNewDoc(prev => ({ ...prev, name: prev.file?.name?.split('.')[0] || '' }));
     }
   }, [newDoc.file, newDoc.name]);
 
-  const fetchFolders = async () => {
-    try {
-      const response = await fetch('/api/folders');
-      const data = await response.json();
-      if (data.error) throw new Error(data.error);
-      setFolders(data || []);
-    } catch (error) {
-      console.error('Error fetching folders:', error);
-    }
-  };
-
   const fetchDocuments = useCallback(async () => {
+    console.log('fetchDocuments: Iniciando busca...', { currentFolderId });
     setIsLoading(true);
     try {
-      // 1. Fetch local documents from Supabase
-      const url = new URL('/api/documents', window.location.origin);
-      if (selectedFolderId && selectedFolderId !== 'root') {
-        url.searchParams.append('pasta_id', selectedFolderId);
-      }
+      let allDocs: any[] = [];
+      let driveFoldersData: any[] = [];
+      let supabaseFoldersData: any[] = [];
       
-      const response = await fetch(url.toString());
-      const localData = await response.json();
-      if (localData.error) throw new Error(localData.error);
-      
-      let allDocs = localData || [];
-
-      // 2. Fetch Google Drive documents if connected
+      // 1. Fetch ALL Folders for the Sidebar Tree (if not already fetched or periodically)
       try {
-        const driveResponse = await fetch('/api/google/drive/list');
+        const [driveFoldersRes, supabaseFoldersRes] = await Promise.all([
+          fetch('/api/google/drive/list?type=folders_only'),
+          fetch('/api/folders')
+        ]);
+
+        if (driveFoldersRes.ok && supabaseFoldersRes.ok) {
+          const driveData = await driveFoldersRes.json();
+          const supabaseData = await supabaseFoldersRes.json();
+          
+          const df = (driveData.folders || []).map((f: any) => ({ ...f, source: 'drive' }));
+          const sf = (supabaseData || []).map((f: any) => ({ ...f, source: 'supabase' }));
+          
+          setAllFolders([...df, ...sf]);
+        }
+      } catch (err) {
+        console.error('Error fetching all folders for tree:', err);
+      }
+
+      // 2. Fetch contents for the current view
+      try {
+        const driveUrl = currentFolderId && currentFolderId !== 'root' 
+          ? `/api/google/drive/list?folderId=${currentFolderId}` 
+          : '/api/google/drive/list';
+        
+        console.log('fetchDocuments: Buscando Drive em:', driveUrl);
+        const driveResponse = await fetch(driveUrl);
         if (driveResponse.ok) {
           const driveData = await driveResponse.json();
-          if (!driveData.error && Array.isArray(driveData)) {
-            // Merge drive docs, avoiding duplicates if they already exist in local DB
-            const driveFileIds = new Set(allDocs.filter((d: any) => d.drive_file_id).map((d: any) => d.drive_file_id));
-            const newDriveDocs = driveData.filter((d: any) => !driveFileIds.has(d.drive_file_id));
-            allDocs = [...allDocs, ...newDriveDocs];
-          } else if (driveData.error) {
-            console.error("Drive API returned error in body:", driveData.error);
-            showNotification(`Erro no Drive: ${driveData.error}`, 'error');
-          }
-        } else {
-          const text = await driveResponse.text();
-          console.error("Drive API failed with status:", driveResponse.status, text);
-          if (driveResponse.status !== 401) { // 401 just means not connected
-            showNotification(`Erro ao buscar arquivos do Drive (${driveResponse.status})`, 'error');
+          console.log('fetchDocuments: Resposta Drive:', driveData);
+          if (!driveData.error) {
+            driveFoldersData = (driveData.folders || []).map((f: any) => ({ ...f, source: 'drive' }));
+            allDocs = (driveData.files || []).map((f: any) => ({ ...f, source: 'drive' }));
           }
         }
       } catch (driveErr) {
         console.error('Error fetching drive documents:', driveErr);
-        showNotification('Erro de conexão ao buscar arquivos do Drive', 'error');
       }
 
+      // 3. Fetch Folders from Supabase for current view
+      try {
+        const foldersResponse = await fetch('/api/folders');
+        if (foldersResponse.ok) {
+          const foldersData = await foldersResponse.json();
+          if (Array.isArray(foldersData)) {
+            const currentSupabaseFolders = foldersData.filter((f: any) => {
+              if (currentFolderId === 'root') return !f.parent_id || f.parent_id === 'root';
+              return f.parent_id === currentFolderId;
+            });
+            supabaseFoldersData = currentSupabaseFolders.map((f: any) => ({ ...f, source: 'supabase' }));
+          }
+        }
+      } catch (foldersErr) {
+        console.error('Error fetching supabase folders:', foldersErr);
+      }
+
+      // 4. Fetch Documents from Supabase
+      try {
+        const localUrl = currentFolderId && currentFolderId !== 'root'
+          ? `/api/documents?pasta_id=${currentFolderId}` 
+          : '/api/documents?pasta_id=root';
+        
+        const localResponse = await fetch(localUrl);
+        if (localResponse.ok) {
+          const localData = await localResponse.json();
+          if (!localData.error && Array.isArray(localData)) {
+            const localDocsMap = new Map(localData.map((d: any) => [d.drive_file_id, d]));
+            
+            const mergedDriveDocs = allDocs.map((doc: any) => {
+              if (doc.drive_file_id && localDocsMap.has(doc.drive_file_id)) {
+                const localDoc = localDocsMap.get(doc.drive_file_id);
+                return { ...doc, ...localDoc, is_drive_only: false, source: 'merged' };
+              }
+              return doc;
+            });
+
+            const driveFileIds = new Set(allDocs.map(d => d.drive_file_id));
+            const localOnlyDocs = localData
+              .filter((d: any) => !d.drive_file_id || !driveFileIds.has(d.drive_file_id))
+              .map((d: any) => ({ ...d, source: 'supabase' }));
+
+            allDocs = [...mergedDriveDocs, ...localOnlyDocs];
+          }
+        }
+      } catch (localErr) {
+        console.error('Error fetching local documents:', localErr);
+      }
+
+      const mergedFolders = [...driveFoldersData];
+      supabaseFoldersData.forEach(sf => {
+        if (!mergedFolders.find(mf => mf.id === sf.id)) {
+          mergedFolders.push(sf);
+        }
+      });
+
+      setFolders(mergedFolders);
       setDocuments(allDocs);
     } catch (error) {
       console.error('Error fetching documents:', error);
+      showNotification('Erro ao carregar documentos', 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [selectedFolderId]);
+  }, [currentFolderId]);
+
+  const fetchFolders = useCallback(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  const folderTree = useMemo(() => {
+    const buildTree = (items: any[], parentId: string | null = null): any[] => {
+      return items
+        .filter(item => {
+          // If it's a drive folder, its parent might be the root folder ID
+          // We need to identify which folders are top-level in our view
+          if (parentId === null) {
+            return !item.parent_id || item.parent_id === 'root' || item.is_root_child;
+          }
+          return item.parent_id === parentId;
+        })
+        .map(item => ({
+          ...item,
+          type: 'folder',
+          children: buildTree(items, item.id)
+        }));
+    };
+    return buildTree(allFolders.length > 0 ? allFolders : folders, null);
+  }, [allFolders, folders]);
 
   const fetchAuthStatus = useCallback(async () => {
     try {
@@ -248,38 +326,25 @@ export default function DocumentManagementPage() {
   }, [fetchAuthStatus, fetchDocuments]);
 
   useEffect(() => {
-    fetchFolders();
     fetchAuthStatus();
   }, [fetchAuthStatus]);
 
   useEffect(() => {
     fetchDocuments();
-  }, [fetchDocuments, selectedFolderId]);
+  }, [fetchDocuments, currentFolderId]);
 
-  const folderTreeData = useMemo(() => {
-    const buildTree = (parentId: string | null): FileSystemItem[] => {
-      return folders
-        .filter(f => f.parent_id === parentId)
-        .map(f => ({
-          id: f.id,
-          nome: f.nome,
-          type: 'folder',
-          parent_id: f.parent_id,
-          children: buildTree(f.id)
-        }));
-    };
-    return buildTree(null);
+  const currentFolders = useMemo(() => {
+    return folders;
   }, [folders]);
 
   const filteredDocuments = useMemo(() => {
     const filtered = documents.filter(doc => {
       const matchesSearch = doc.nome.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'Todos' || doc.Categoria === selectedCategory;
       const matchesArea = selectedArea === 'Todas' || doc.area === selectedArea;
       const matchesStatus = selectedStatus === 'Todos' || doc.status === selectedStatus;
       const matchesYear = selectedYear === 'Todos' || Number(doc.Ano) === selectedYear;
       
-      return matchesSearch && matchesCategory && matchesArea && matchesStatus && matchesYear;
+      return matchesSearch && matchesArea && matchesStatus && matchesYear;
     });
 
     return [...filtered].sort((a, b) => {
@@ -300,7 +365,7 @@ export default function DocumentManagementPage() {
       if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
-  }, [documents, searchQuery, selectedCategory, selectedArea, selectedStatus, selectedYear, sortConfig, folders]);
+  }, [documents, searchQuery, selectedArea, selectedStatus, selectedYear, sortConfig, folders]);
 
   const toggleSort = (key: keyof Document | 'folder') => {
     setSortConfig(prev => ({
@@ -315,27 +380,28 @@ export default function DocumentManagementPage() {
   };
 
   const getFileExtension = (doc: Document) => {
-    if (doc.nome) {
-      const nameParts = doc.nome.split('.');
+    if (doc?.nome) {
+      const nameParts = String(doc.nome).split('.');
       if (nameParts.length > 1) {
         return `.${nameParts.pop()?.toLowerCase()}`;
       }
     }
     
-    if (doc.file_path) {
-      const pathParts = doc.file_path.split('.');
+    if (doc?.file_path) {
+      const pathParts = String(doc.file_path).split('.');
       if (pathParts.length > 1) {
         return `.${pathParts.pop()?.toLowerCase()}`;
       }
     }
 
-    if (doc.tipo_arquivo) {
-      if (doc.tipo_arquivo.includes('pdf')) return '.pdf';
-      if (doc.tipo_arquivo.includes('word') || doc.tipo_arquivo.includes('officedocument.wordprocessingml')) return '.docx';
-      if (doc.tipo_arquivo.includes('excel') || doc.tipo_arquivo.includes('officedocument.spreadsheetml')) return '.xlsx';
-      if (doc.tipo_arquivo.includes('image/jpeg')) return '.jpg';
-      if (doc.tipo_arquivo.includes('image/png')) return '.png';
-      if (doc.tipo_arquivo.includes('text/plain')) return '.txt';
+    if (doc?.tipo_arquivo) {
+      const tipo = String(doc.tipo_arquivo);
+      if (tipo.includes('pdf')) return '.pdf';
+      if (tipo.includes('word') || tipo.includes('officedocument.wordprocessingml')) return '.docx';
+      if (tipo.includes('excel') || tipo.includes('officedocument.spreadsheetml')) return '.xlsx';
+      if (tipo.includes('image/jpeg')) return '.jpg';
+      if (tipo.includes('image/png')) return '.png';
+      if (tipo.includes('text/plain')) return '.txt';
     }
     
     return '';
@@ -352,7 +418,6 @@ export default function DocumentManagementPage() {
       const formData = new FormData();
       formData.append('file', newDoc.file);
       formData.append('name', newDoc.name);
-      formData.append('category', newDoc.category);
       formData.append('caminho_local', newDoc.caminho_local);
       if (newDoc.pasta_id !== 'root') {
         formData.append('pasta_id', newDoc.pasta_id);
@@ -378,8 +443,7 @@ export default function DocumentManagementPage() {
 
       setNewDoc({
         name: '',
-        category: 'Administrativos',
-        pasta_id: selectedFolderId,
+        pasta_id: currentFolderId,
         caminho_local: '',
         file: null
       });
@@ -433,7 +497,7 @@ export default function DocumentManagementPage() {
           const response = await fetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error('Erro ao excluir pasta');
           fetchFolders();
-          if (selectedFolderId === folder.id) setSelectedFolderId('root');
+          if (currentFolderId === folder.id) setCurrentPath([{id: 'root', name: 'Drive Root'}]);
           showNotification('Pasta excluída com sucesso');
         } catch (error: unknown) {
           const message = error instanceof Error ? error.message : 'Erro desconhecido';
@@ -593,30 +657,18 @@ export default function DocumentManagementPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Categoria</label>
-                    <select 
-                      value={newDoc.category}
-                      onChange={e => setNewDoc({...newDoc, category: e.target.value as DocumentCategory})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
-                    >
-                      {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Pasta Destino</label>
-                    <select 
-                      value={newDoc.pasta_id}
-                      onChange={e => setNewDoc({...newDoc, pasta_id: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
-                    >
-                      <option value="root">Raiz (Sem Pasta)</option>
-                      {folders.map(folder => (
-                        <option key={folder.id} value={folder.id}>{folder.nome}</option>
-                      ))}
-                    </select>
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Pasta Destino</label>
+                  <select 
+                    value={newDoc.pasta_id}
+                    onChange={e => setNewDoc({...newDoc, pasta_id: e.target.value})}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-white font-bold text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  >
+                    <option value="root">Raiz (Sem Pasta)</option>
+                    {folders.map(folder => (
+                      <option key={folder.id} value={folder.id}>{folder.nome}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-2">
@@ -931,24 +983,23 @@ export default function DocumentManagementPage() {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-6 space-y-6">
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Explorador de Arquivos</h3>
-                <button 
-                  onClick={() => {
-                    setFolderForm({ id: '', nome: '', parent_id: null, mode: 'create' });
-                    setIsFolderModalOpen(true);
-                  }}
-                  className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-[#d4ff3f] transition-all"
-                  title="Nova Pasta Raiz"
-                >
-                  <Plus size={14} />
-                </button>
-              </div>
-              <div className="bg-[#0a0a0a] rounded-2xl p-2 border border-slate-800/30">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Navegação</h3>
+              <div className="max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                 <FileTree 
-                  data={folderTreeData}
-                  selectedId={selectedFolderId}
-                  onItemClick={(item) => setSelectedFolderId(item.id)}
+                  data={folderTree}
+                  selectedId={currentFolderId}
+                  onItemClick={(item) => {
+                    if (item.id === 'root') {
+                      setCurrentPath([{id: 'root', name: 'Drive Root'}]);
+                    } else {
+                      const folder = allFolders.find(f => f.id === item.id) || folders.find(f => f.id === item.id);
+                      if (folder) {
+                        // Build path by traversing parents if possible, or just jump to it
+                        // For simplicity, we'll jump to it but we could improve this
+                        setCurrentPath([{id: 'root', name: 'Drive Root'}, {id: folder.id, name: folder.nome}]);
+                      }
+                    }
+                  }}
                   onNewFolder={(parentId) => {
                     setFolderForm({ id: '', nome: '', parent_id: parentId, mode: 'create' });
                     setIsFolderModalOpen(true);
@@ -957,12 +1008,43 @@ export default function DocumentManagementPage() {
                     setFolderForm({ id: item.id, nome: item.nome, parent_id: item.parent_id || null, mode: 'edit' });
                     setIsFolderModalOpen(true);
                   }}
-                  onDelete={handleDeleteFolder}
+                  onDelete={(item) => handleDeleteFolder(item)}
                 />
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-800/50">
+            <div className="h-px bg-slate-800/50" />
+
+            <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-800/50">
+              <h3 className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-2">Status da Conexão</h3>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Supabase:</span>
+                  <span className="text-[8px] font-bold text-emerald-500 uppercase">Ativo</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Google Drive:</span>
+                  <span className={cn(
+                    "text-[8px] font-bold uppercase",
+                    connectedAccount ? "text-emerald-500" : "text-rose-500"
+                  )}>
+                    {connectedAccount ? 'Conectado' : 'Desconectado'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Arquivos:</span>
+                  <span className="text-[8px] font-bold text-white uppercase">{documents.length}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[8px] font-bold text-slate-400 uppercase">Pastas:</span>
+                  <span className="text-[8px] font-bold text-white uppercase">{folders.length}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="h-px bg-slate-800/50" />
+
+            <div>
               <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Filtros Avançados</h3>
               
               <div className="space-y-4">
@@ -991,8 +1073,15 @@ export default function DocumentManagementPage() {
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-slate-600 uppercase tracking-widest ml-1">Pasta</label>
                   <select 
-                    value={selectedFolderId}
-                    onChange={(e) => setSelectedFolderId(e.target.value)}
+                    value={currentFolderId}
+                    onChange={(e) => {
+                      if (e.target.value === 'root') {
+                        setCurrentPath([{id: 'root', name: 'Drive Root'}]);
+                      } else {
+                        const folder = folders.find(f => f.id === e.target.value);
+                        if (folder) setCurrentPath(prev => [...prev, {id: folder.id, name: folder.nome}]);
+                      }
+                    }}
                     className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-1 focus:ring-[#d4ff3f]/50"
                   >
                     <option value="root">Todos os Documentos</option>
@@ -1069,6 +1158,26 @@ export default function DocumentManagementPage() {
           </div>
 
           {/* Search and View Options */}
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 custom-scrollbar">
+              {currentPath.map((crumb, index) => (
+                <React.Fragment key={crumb.id}>
+                  <button
+                    onClick={() => setCurrentPath(prev => prev.slice(0, index + 1))}
+                    className={cn(
+                      "text-xs font-bold whitespace-nowrap transition-colors",
+                      index === currentPath.length - 1 ? "text-white" : "text-slate-500 hover:text-[#d4ff3f]"
+                    )}
+                  >
+                    {crumb.name}
+                  </button>
+                  {index < currentPath.length - 1 && (
+                    <span className="text-slate-700">/</span>
+                  )}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
@@ -1097,8 +1206,7 @@ export default function DocumentManagementPage() {
                   <option value="nome-desc">Nome (Z-A)</option>
                   <option value="created_at-desc">Data (Mais Recente)</option>
                   <option value="created_at-asc">Data (Mais Antigo)</option>
-                  <option value="Categoria-asc">Categoria</option>
-                  {selectedFolderId === 'root' && <option value="folder-asc">Pasta</option>}
+                  {currentFolderId === 'root' && <option value="folder-asc">Pasta</option>}
                 </select>
               </div>
 
@@ -1148,7 +1256,7 @@ export default function DocumentManagementPage() {
                           {getSortIcon('nome')}
                         </div>
                       </th>
-                      {selectedFolderId === 'root' && (
+                      {currentFolderId === 'root' && (
                         <th 
                           className="px-4 py-4 text-[10px] font-black text-slate-500 uppercase tracking-widest cursor-pointer hover:text-white transition-colors"
                           onClick={() => toggleSort('folder')}
@@ -1173,6 +1281,33 @@ export default function DocumentManagementPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-800/30">
                     <AnimatePresence mode='popLayout'>
+                      {currentFolders.map(folder => (
+                        <motion.tr
+                          key={folder.id}
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="group hover:bg-white/5 transition-colors cursor-pointer"
+                          onClick={() => setCurrentPath(prev => [...prev, { id: folder.id, name: folder.nome }])}
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="size-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-500">
+                                <FolderOpen size={20} />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-bold text-white group-hover:text-yellow-400 transition-colors line-clamp-1">{folder.nome}</h4>
+                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Pasta</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4"><p className="text-xs font-bold text-slate-400 uppercase">-</p></td>
+                          {currentFolderId === 'root' && <td className="px-4 py-4"><p className="text-xs font-bold text-slate-400 uppercase">-</p></td>}
+                          <td className="px-4 py-4"><p className="text-xs font-bold text-slate-400 uppercase">-</p></td>
+                          <td className="px-4 py-4"></td>
+                        </motion.tr>
+                      ))}
                       {filteredDocuments.length > 0 ? (
                         filteredDocuments.map((doc, index) => (
                           <motion.tr 
@@ -1195,7 +1330,7 @@ export default function DocumentManagementPage() {
                                 </div>
                               </div>
                             </td>
-                            {selectedFolderId === 'root' && (
+                            {currentFolderId === 'root' && (
                               <td className="px-4 py-4">
                                 <div className="flex items-center gap-1.5">
                                   <FolderOpen size={10} className="text-slate-500" />
@@ -1336,20 +1471,19 @@ export default function DocumentManagementPage() {
                             </td>
                           </motion.tr>
                         ))
-                      ) : (
+                      ) : folders.length === 0 ? (
                         <tr>
-                          <td colSpan={selectedFolderId === 'root' ? 4 : 3} className="px-6 py-20 text-center">
+                          <td colSpan={currentFolderId === 'root' ? 4 : 3} className="px-6 py-20 text-center">
                             <div className="flex flex-col items-center gap-3 text-slate-600">
                               <Search size={40} strokeWidth={1} />
                               <p className="text-sm font-bold">Nenhum documento encontrado com estes filtros.</p>
                               <button 
                                 onClick={() => {
                                   setSearchQuery('');
-                                  setSelectedCategory('Todos');
                                   setSelectedArea('Todas');
                                   setSelectedStatus('Todos');
                                   setSelectedYear('Todos');
-                                  setSelectedFolderId('root');
+                                  setCurrentPath([{id: 'root', name: 'Drive Root'}]);
                                 }}
                                 className="text-[#d4ff3f] text-xs font-black uppercase tracking-widest hover:underline"
                               >
@@ -1358,7 +1492,7 @@ export default function DocumentManagementPage() {
                             </div>
                           </td>
                         </tr>
-                      )}
+                      ) : null}
                     </AnimatePresence>
                   </tbody>
                 </table>
@@ -1380,6 +1514,25 @@ export default function DocumentManagementPage() {
             <div className="overflow-y-auto max-h-[800px] pr-2 custom-scrollbar">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               <AnimatePresence mode='popLayout'>
+                  {folders.map(folder => (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      key={folder.id}
+                      onClick={() => setCurrentPath(prev => [...prev, { id: folder.id, name: folder.nome }])}
+                      className="group bg-[#1a1a1a] border border-slate-800/50 rounded-3xl p-6 hover:border-yellow-500/30 transition-all cursor-pointer"
+                    >
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="size-12 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center text-yellow-500 group-hover:text-yellow-400 transition-colors">
+                          <FolderOpen size={24} />
+                        </div>
+                      </div>
+                      <h4 className="text-base font-bold text-white mb-2 line-clamp-2 group-hover:text-yellow-400 transition-colors">{folder.nome}</h4>
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Pasta</p>
+                    </motion.div>
+                  ))}
                 {filteredDocuments.length > 0 ? (
                   filteredDocuments.map((doc, index) => (
                     <motion.div
@@ -1406,7 +1559,7 @@ export default function DocumentManagementPage() {
                           <span className="size-1 rounded-full bg-slate-800" />
                           <span className="uppercase">{getFileExtension(doc)}</span>
                         </div>
-                        {selectedFolderId === 'root' && (
+                        {currentFolderId === 'root' && (
                           <div className="flex items-center gap-1.5 mt-2">
                             <FolderOpen size={10} className="text-slate-500" />
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
@@ -1548,14 +1701,14 @@ export default function DocumentManagementPage() {
                       </div>
                     </motion.div>
                   ))
-                ) : (
+                ) : folders.length === 0 ? (
                   <div className="col-span-full py-20 text-center">
                     <div className="flex flex-col items-center gap-3 text-slate-600">
                       <Search size={40} strokeWidth={1} />
                       <p className="text-sm font-bold">Nenhum documento encontrado.</p>
                     </div>
                   </div>
-                )}
+                ) : null}
               </AnimatePresence>
             </div>
           </div>

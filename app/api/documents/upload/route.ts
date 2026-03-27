@@ -14,14 +14,14 @@ export async function POST(req: NextRequest) {
     
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
-    const category = formData.get('category') as string;
+    const category = (formData.get('category') as string) || 'Administrativos';
     const pastaId = formData.get('pasta_id') as string;
     const caminhoLocal = formData.get('caminho_local') as string;
     const date = new Date().toISOString().split('T')[0]; // Automatic date
 
     console.log('Upload details:', { name, category, date, pastaId, caminhoLocal, fileSize: file?.size, fileType: file?.type });
 
-    if (!file || !name || !category) {
+    if (!file || !name) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
     }
 

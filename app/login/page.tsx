@@ -17,7 +17,7 @@ export default function LoginPage() {
 
   const banner = (
     <div className="fixed top-0 left-0 right-0 z-[99999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-2xl pointer-events-none">
-      VERSÃO: 20260325-1127 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
+      VERSÃO: 20260326-2358 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
     </div>
   );
 

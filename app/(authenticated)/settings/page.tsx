@@ -374,6 +374,117 @@ export default function SettingsPage() {
                   
                   <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 space-y-6">
                     <div className="space-y-2">
+                      <p className="text-sm font-black">Script SQL: Gestão de Documentos</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+                        Execute este script para criar as tabelas de pastas, documentos e tokens do Google.
+                      </p>
+                    </div>
+                    
+                    <div className="relative group">
+                      <pre className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+{`CREATE TABLE IF NOT EXISTS public.pastas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    parent_id UUID REFERENCES public.pastas(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.documentos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    "Categoria" TEXT NOT NULL,
+    area TEXT,
+    data DATE NOT NULL,
+    pasta_id UUID REFERENCES public.pastas(id) ON DELETE SET NULL,
+    file_path TEXT,
+    caminho_local TEXT,
+    tamanho_arquivo TEXT,
+    tipo_arquivo TEXT,
+    status TEXT DEFAULT 'Vigente',
+    "Ano" TEXT,
+    nome_icone TEXT DEFAULT 'FileText',
+    classe_cor TEXT,
+    classe_fundo TEXT,
+    drive_file_id TEXT,
+    "webViewLink" TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.google_tokens (
+    id INTEGER PRIMARY KEY,
+    access_token TEXT,
+    refresh_token TEXT,
+    expiry_date BIGINT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.pastas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.google_tokens ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Allow all for authenticated" ON public.pastas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for authenticated" ON public.documentos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for authenticated" ON public.google_tokens FOR ALL TO authenticated USING (true) WITH CHECK (true);`}
+                      </pre>
+                      <button 
+                        onClick={() => {
+                          const sql = `CREATE TABLE IF NOT EXISTS public.pastas (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    parent_id UUID REFERENCES public.pastas(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.documentos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    nome TEXT NOT NULL,
+    "Categoria" TEXT NOT NULL,
+    area TEXT,
+    data DATE NOT NULL,
+    pasta_id UUID REFERENCES public.pastas(id) ON DELETE SET NULL,
+    file_path TEXT,
+    caminho_local TEXT,
+    tamanho_arquivo TEXT,
+    tipo_arquivo TEXT,
+    status TEXT DEFAULT 'Vigente',
+    "Ano" TEXT,
+    nome_icone TEXT DEFAULT 'FileText',
+    classe_cor TEXT,
+    classe_fundo TEXT,
+    drive_file_id TEXT,
+    "webViewLink" TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.google_tokens (
+    id INTEGER PRIMARY KEY,
+    access_token TEXT,
+    refresh_token TEXT,
+    expiry_date BIGINT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Enable RLS
+ALTER TABLE public.pastas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.google_tokens ENABLE ROW LEVEL SECURITY;
+
+-- Create policies
+CREATE POLICY "Allow all for authenticated" ON public.pastas FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for authenticated" ON public.documentos FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all for authenticated" ON public.google_tokens FOR ALL TO authenticated USING (true) WITH CHECK (true);`;
+                          navigator.clipboard.writeText(sql);
+                          alert('Script SQL copiado!');
+                        }}
+                        className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
                       <p className="text-sm font-black">Script SQL: Contas a Receber</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
                         Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessária.
