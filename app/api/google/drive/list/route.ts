@@ -58,30 +58,52 @@ export async function GET(req: NextRequest) {
     let targetFolderId = (folderIdParam === 'null' || folderIdParam === 'undefined') ? null : folderIdParam;
 
     if (typeParam === 'folders_only') {
-      // Find the root folder "CBSL ERP Documents" first
+      // Find all possible root folders named "CBSL" or "CBSL ERP Documents"
       const rootSearch = await drive.files.list({
-        q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+        q: "(name = 'CBSL' or name = 'CBSL ERP Documents') and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
         fields: 'files(id, name)',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        corpora: 'allDrives',
       });
       
-      const virtualRootId = rootSearch.data.files && rootSearch.data.files.length > 0 
-        ? rootSearch.data.files[0].id 
-        : null;
+      const rootIds = new Set((rootSearch.data.files || []).map(f => f.id));
 
-      const allFoldersSearch = await drive.files.list({
-        q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-        fields: 'files(id, name, parents)',
-        pageSize: 1000,
-      });
+      let allFolders: any[] = [];
+      let pageToken: string | undefined = undefined;
+
+      do {
+        const response: any = await drive.files.list({
+          q: "mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+          fields: 'nextPageToken, files(id, name, parents)',
+          pageSize: 1000,
+          pageToken: pageToken,
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+          corpora: 'allDrives',
+        });
+        
+        if (response.data.files) {
+          allFolders = [...allFolders, ...response.data.files];
+        }
+        pageToken = response.data.nextPageToken;
+      } while (pageToken);
       
-      const folders = (allFoldersSearch.data.files || [])
-        .filter(f => f.id !== virtualRootId) // Hide the virtual root itself
+      const folders = allFolders
+        .filter(f => {
+          // Hide the root folders themselves from the tree (they are represented by "Todos os Documentos")
+          if (rootIds.has(f.id)) return false;
+          return true;
+        })
         .map(f => {
-          const parentId = f.parents ? f.parents[0] : 'root';
+          const parentId = f.parents && f.parents.length > 0 ? f.parents[0] : 'root';
+          // If the parent is one of our root folders, mark it as top-level
+          const isTopLevel = rootIds.has(parentId) || parentId === 'root';
+          
           return {
             id: f.id,
             nome: f.name,
-            parent_id: parentId === virtualRootId ? 'root' : parentId,
+            parent_id: isTopLevel ? 'root' : parentId,
             type: 'folder'
           };
         });
@@ -90,11 +112,14 @@ export async function GET(req: NextRequest) {
     }
 
     if (!targetFolderId || targetFolderId === 'root') {
-      // Find the root folder "CBSL ERP Documents"
+      // Find the root folder "CBSL"
       console.log('Searching for root folder...');
       const rootSearch = await drive.files.list({
-        q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+        q: "(name = 'CBSL' or name = 'CBSL ERP Documents') and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
         fields: 'files(id, name)',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        corpora: 'allDrives',
       });
       console.log('Root search result:', rootSearch.data.files);
 
@@ -114,7 +139,9 @@ export async function GET(req: NextRequest) {
         q: `'${targetFolderId}' in parents and trashed = false`,
         fields: 'files(id, name, mimeType, size, createdTime, webViewLink, parents)',
         pageSize: 1000,
-        orderBy: 'folder, name'
+        orderBy: 'folder, name',
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
       });
       console.log('Contents search result:', contentsSearch.data.files?.length, 'items');
 

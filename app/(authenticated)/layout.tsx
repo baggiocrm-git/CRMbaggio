@@ -44,7 +44,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const handleUserRole = async (userData: User) => {
       if (!mounted) return;
       console.log('DashboardLayout: handleUserRole para:', userData.email);
-      setLoadingStep(`Processando usuário: ${userData.email}`);
       
       try {
         const rawEmail = (
@@ -56,65 +55,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         );
         
         const userEmail = rawEmail.toLowerCase().trim();
-        console.log('DashboardLayout: Email processado:', userEmail);
+        const currentRole = userData.user_metadata?.role;
         
-        if (userEmail === 'lucabaggio28@gmail.com') {
-          setLoadingStep('Configurando acesso administrativo...');
-          console.log('DashboardLayout: Forçando admin para lucabaggio28');
-          const forcedUser = { 
-            ...userData, 
-            user_metadata: { ...(userData.user_metadata || {}), role: 'Administrador' } 
-          };
-          setUser(forcedUser);
-          setLoading(false);
+        // Dynamic role detection with master email fallback
+        let userRole = currentRole;
+        if (!userRole && userEmail === 'lucabaggio28@gmail.com') {
+          userRole = 'Administrador';
+          console.log('DashboardLayout: Atribuindo papel de Administrador para e-mail mestre');
+          await supabase.auth.updateUser({ data: { role: 'Administrador' } });
+        }
 
-          if (userData.user_metadata?.role !== 'Administrador') {
-            console.log('DashboardLayout: Atualizando role no Supabase...');
-            await supabase.auth.updateUser({ data: { role: 'Administrador' } });
-            await supabase.auth.refreshSession();
-          }
-        } else {
-          setUser(userData);
-          const role = userData.user_metadata?.role;
-          console.log('DashboardLayout: Papel do usuário:', role);
+        const updatedUser = { 
+          ...userData, 
+          user_metadata: { ...(userData.user_metadata || {}), role: userRole } 
+        };
+        setUser(updatedUser);
 
-          if (role === 'Cliente') {
-            setLoadingStep('Buscando projeto do cliente...');
-            console.log('DashboardLayout: Iniciando busca de projeto...');
-            
-            // Add a safety timeout for the query
-            const projectPromise = supabase
-              .from('projetos')
-              .select('id')
-              .eq('cliente_id', userData.id)
-              .single();
-            
-            const timeoutPromise = new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Timeout ao buscar projeto')), 5000)
-            );
-
-            try {
-              const { data: projectData, error: projectError } = await Promise.race([projectPromise, timeoutPromise]) as any;
-              
-              if (projectError) {
-                console.error('Erro ao buscar projeto do cliente:', projectError);
-                setLoadingStep('Erro ao buscar projeto. Continuando...');
-              }
-
-              if (projectData) {
-                console.log('DashboardLayout: Redirecionando cliente para RDO:', projectData.id);
-                router.push(`/client/rdo/${projectData.id}`);
-              } else {
-                console.log('DashboardLayout: Nenhum projeto encontrado para o cliente.');
-                setLoading(false);
-              }
-            } catch (err) {
-              console.warn('DashboardLayout: Query de projeto falhou ou timeout:', err);
-              setLoading(false);
-            }
+        if (userRole === 'Cliente') {
+          console.log('DashboardLayout: Iniciando busca de projeto para cliente...');
+          
+          const { data: projectData, error: projectError } = await supabase
+            .from('projetos')
+            .select('id')
+            .eq('cliente_id', userData.id)
+            .single();
+          
+          if (projectData) {
+            console.log('DashboardLayout: Redirecionando cliente para RDO:', projectData.id);
+            router.push(`/client/rdo/${projectData.id}`);
           } else {
             setLoading(false);
           }
+        } else {
+          setLoading(false);
         }
       } catch (e) {
         console.error('DashboardLayout: Erro em handleUserRole:', e);
@@ -207,12 +180,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     };
   }, [router]);
 
-  const banner = (
-    <div className="fixed top-0 left-0 right-0 z-[9999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-lg pointer-events-none">
-      VERSÃO: 20260326-2358 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
-    </div>
-  );
-
   const isSupabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!isSupabaseConfigured) {
@@ -237,7 +204,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-8 fixed inset-0 z-[99999]">
-        {banner}
         <div className="flex flex-col items-center gap-6 max-w-md w-full text-center relative z-[99999]">
           <Loader2 className="w-12 h-12 text-[#d4ff3f] animate-spin" />
           <div className="space-y-2">
@@ -266,53 +232,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="h-full bg-[#d4ff3f] animate-pulse w-full"></div>
           </div>
 
-          <div className="pt-8 space-y-4 w-full">
-            <button 
-              type="button"
-              onClick={() => {
-                console.log('DashboardLayout: Force reload clicked');
-                window.location.reload(true);
-              }}
-              className="w-full bg-[#d4ff3f] text-[#0a0a0a] font-black text-[10px] uppercase tracking-widest py-4 rounded-2xl hover:bg-[#c4ef2f] transition-all active:scale-95"
-            >
-              Forçar Recarregamento (F5)
-            </button>
-            
-            <button 
-              type="button"
-              onClick={() => {
-                console.log('DashboardLayout: Clear cache clicked');
-                try {
-                  localStorage.clear();
-                  sessionStorage.clear();
-                  document.cookie.split(";").forEach(function(c) { 
-                    document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                  });
-                } catch (e) {
-                  console.error('Erro ao limpar cache:', e);
-                }
-                window.location.href = '/login';
-              }}
-              className="w-full bg-rose-500/10 border border-rose-500/30 text-rose-500 font-black text-[10px] uppercase tracking-widest py-4 rounded-2xl hover:bg-rose-500/20 transition-all active:scale-95"
-            >
-              Limpar Cache e Ir para Login
-            </button>
-
-            <button 
-              type="button"
-              onClick={() => {
-                console.log('DashboardLayout: Force dashboard clicked');
-                setLoading(false);
-              }}
-              className="w-full bg-slate-800 text-slate-400 font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl hover:bg-slate-700 transition-all active:scale-95"
-            >
-              Pular Verificação (Apenas se Travado)
-            </button>
-          </div>
-
           <p className="text-slate-600 text-[8px] font-bold uppercase tracking-widest leading-relaxed mt-4">
-            Se o carregamento travar, use os botões acima. <br />
-            Isso pode ocorrer devido a restrições de cookies no navegador.
+            Se o carregamento travar, tente limpar o cache do navegador ou abrir em uma nova aba.
           </p>
         </div>
       </div>
@@ -327,7 +248,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-[#0a0a0a] gap-8 p-6">
-        {banner}
         <div className="text-center space-y-4">
           <div className={`${errorParam ? 'bg-red-500/10 border-red-500/30' : 'bg-amber-500/10 border-amber-500/30'} border rounded-full p-4 w-fit mx-auto`}>
             <AlertCircle className={errorParam ? 'text-red-500' : 'text-amber-500'} size={32} />
@@ -365,7 +285,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
-      {banner}
       <Sidebar user={user} />
       <main className="flex-1 flex flex-col overflow-hidden pt-6">
         {children}

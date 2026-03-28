@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     
     const file = formData.get('file') as File;
     const name = formData.get('name') as string;
-    const category = (formData.get('category') as string) || 'Administrativos';
+    const category = (formData.get('category') as string) || 'Geral';
     const pastaId = formData.get('pasta_id') as string;
     const caminhoLocal = formData.get('caminho_local') as string;
     const date = new Date().toISOString().split('T')[0]; // Automatic date
@@ -78,12 +78,9 @@ export async function POST(req: NextRequest) {
     console.log('Storage upload success:', storageData.path);
 
     const categoryToArea: Record<string, string> = {
-      'Administrativos': 'Administrativo',
-      'Jurídicos e Legais': 'Jurídico',
-      'Financeiros e Contábeis': 'Financeiro',
-      'Recursos Humanos': 'RH',
-      'Comerciais e Marketing': 'Comercial',
-      'Operacionais e Técnicos': 'Operacional'
+      'Geral': 'Outros',
+      'Projetos': 'Engenharia',
+      'Outros': 'Outros'
     };
 
     // 3. Save to Supabase DB
@@ -93,7 +90,7 @@ export async function POST(req: NextRequest) {
       .insert({
         nome: name,
         Categoria: category,
-        area: categoryToArea[category] || 'Administrativo',
+        area: categoryToArea[category] || 'Outros',
         data: date,
         pasta_id: pastaId || null,
         file_path: storageData.path,
@@ -144,13 +141,13 @@ export async function POST(req: NextRequest) {
       }
 
       if (drive) {
-        // Use specific folder ID if provided, otherwise default to 'CBSL ERP Documents'
+        // Use specific folder ID if provided, otherwise default to 'CBSL'
         let rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
         
         if (!rootFolderId) {
-          console.log('GOOGLE_DRIVE_ROOT_FOLDER_ID not set, searching for "CBSL ERP Documents"');
+          console.log('GOOGLE_DRIVE_ROOT_FOLDER_ID not set, searching for "CBSL"');
           const rootSearch = await drive.files.list({
-            q: "name = 'CBSL ERP Documents' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+            q: "name = 'CBSL' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
             fields: 'files(id)',
           });
 
@@ -159,7 +156,7 @@ export async function POST(req: NextRequest) {
           } else {
             const rootFolder = await drive.files.create({
               requestBody: {
-                name: 'CBSL ERP Documents',
+                name: 'CBSL',
                 mimeType: 'application/vnd.google-apps.folder',
               },
               fields: 'id',

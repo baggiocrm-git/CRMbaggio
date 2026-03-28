@@ -29,12 +29,9 @@ import { FileTree, FileSystemItem } from '@/components/documents/FileTree';
 
 // Types
 type DocumentCategory = 
-  | 'Administrativos' 
-  | 'Jurídicos e Legais' 
-  | 'Financeiros e Contábeis' 
-  | 'Recursos Humanos' 
-  | 'Comerciais e Marketing' 
-  | 'Operacionais e Técnicos';
+  | 'Geral' 
+  | 'Projetos' 
+  | 'Outros';
 
 type DocumentStatus = 'Vigente' | 'Vencido' | 'Arquivado';
 
@@ -63,15 +60,12 @@ interface Folder {
 }
 
 const CATEGORIES: DocumentCategory[] = [
-  'Administrativos',
-  'Jurídicos e Legais',
-  'Financeiros e Contábeis',
-  'Recursos Humanos',
-  'Comerciais e Marketing',
-  'Operacionais e Técnicos'
+  'Geral',
+  'Projetos',
+  'Outros'
 ];
 
-const AREAS = ['Todas', 'RH', 'Financeiro', 'Jurídico', 'Administrativo', 'Comercial', 'Operacional'];
+const AREAS = ['Todas', 'Engenharia', 'Obras', 'Outros'];
 const STATUSES = ['Todos', 'Vigente', 'Vencido', 'Arquivado'];
 const YEARS = [2026, 2025, 2024, 2023];
 
@@ -85,7 +79,7 @@ export default function DocumentManagementPage() {
   const [selectedArea, setSelectedArea] = useState('Todas');
   const [selectedStatus, setSelectedStatus] = useState('Todos');
   const [selectedYear, setSelectedYear] = useState<number | 'Todos'>('Todos');
-  const [currentPath, setCurrentPath] = useState<{id: string, name: string}[]>([{id: 'root', name: 'Drive Root'}]);
+  const [currentPath, setCurrentPath] = useState<{id: string, name: string}[]>([{id: 'root', name: 'Todos os Documentos'}]);
   const currentFolderId = currentPath[currentPath.length - 1].id;
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [isServiceAccount, setIsServiceAccount] = useState(false);
@@ -175,8 +169,10 @@ export default function DocumentManagementPage() {
           const driveData = await driveFoldersRes.json();
           const supabaseData = await supabaseFoldersRes.json();
           
-          const df = (driveData.folders || []).map((f: any) => ({ ...f, source: 'drive' }));
-          const sf = (supabaseData || []).map((f: any) => ({ ...f, source: 'supabase' }));
+          const df = (driveData.folders || [])
+            .map((f: any) => ({ ...f, source: 'drive' }));
+          const sf = (supabaseData || [])
+            .map((f: any) => ({ ...f, source: 'supabase' }));
           
           setAllFolders([...df, ...sf]);
         }
@@ -196,7 +192,8 @@ export default function DocumentManagementPage() {
           const driveData = await driveResponse.json();
           console.log('fetchDocuments: Resposta Drive:', driveData);
           if (!driveData.error) {
-            driveFoldersData = (driveData.folders || []).map((f: any) => ({ ...f, source: 'drive' }));
+            driveFoldersData = (driveData.folders || [])
+              .map((f: any) => ({ ...f, source: 'drive' }));
             allDocs = (driveData.files || []).map((f: any) => ({ ...f, source: 'drive' }));
           }
         }
@@ -210,10 +207,11 @@ export default function DocumentManagementPage() {
         if (foldersResponse.ok) {
           const foldersData = await foldersResponse.json();
           if (Array.isArray(foldersData)) {
-            const currentSupabaseFolders = foldersData.filter((f: any) => {
-              if (currentFolderId === 'root') return !f.parent_id || f.parent_id === 'root';
-              return f.parent_id === currentFolderId;
-            });
+            const currentSupabaseFolders = foldersData
+              .filter((f: any) => {
+                if (currentFolderId === 'root') return !f.parent_id || f.parent_id === 'root';
+                return f.parent_id === currentFolderId;
+              });
             supabaseFoldersData = currentSupabaseFolders.map((f: any) => ({ ...f, source: 'supabase' }));
           }
         }
@@ -276,12 +274,14 @@ export default function DocumentManagementPage() {
 
   const folderTree = useMemo(() => {
     const buildTree = (items: any[], parentId: string | null = null): any[] => {
+      const itemIds = new Set(items.map(i => i.id));
       return items
         .filter(item => {
           // If it's a drive folder, its parent might be the root folder ID
           // We need to identify which folders are top-level in our view
           if (parentId === null) {
-            return !item.parent_id || item.parent_id === 'root' || item.is_root_child;
+            // Top-level if no parent_id, parent_id is 'root', or parent is not in the list of available folders
+            return !item.parent_id || item.parent_id === 'root' || item.is_root_child || !itemIds.has(item.parent_id);
           }
           return item.parent_id === parentId;
         })
@@ -992,12 +992,17 @@ export default function DocumentManagementPage() {
                     if (item.id === 'root') {
                       setCurrentPath([{id: 'root', name: 'Drive Root'}]);
                     } else {
-                      const folder = allFolders.find(f => f.id === item.id) || folders.find(f => f.id === item.id);
-                      if (folder) {
-                        // Build path by traversing parents if possible, or just jump to it
-                        // For simplicity, we'll jump to it but we could improve this
-                        setCurrentPath([{id: 'root', name: 'Drive Root'}, {id: folder.id, name: folder.nome}]);
+                      // Build full path by traversing parents
+                      const path: {id: string, name: string}[] = [];
+                      let current = allFolders.find(f => f.id === item.id) || folders.find(f => f.id === item.id);
+                      while (current) {
+                        path.unshift({id: current.id, name: current.nome});
+                        // Try to find parent in allFolders
+                        const parent = allFolders.find(f => f.id === current.parent_id);
+                        current = parent;
                       }
+                      path.unshift({id: 'root', name: 'Drive Root'});
+                      setCurrentPath(path);
                     }
                   }}
                   onNewFolder={(parentId) => {

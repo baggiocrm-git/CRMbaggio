@@ -128,15 +128,15 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
     'Conectado'
   ).toLowerCase().trim();
   
-  const isAdminEmail = userEmail === 'lucabaggio28@gmail.com';
-  const userRole = isAdminEmail ? 'Administrador' : (user?.user_metadata?.role || 'Usuário');
+  const userRole = user?.user_metadata?.role || 'Usuário';
+  const isAdmin = userRole === 'Administrador';
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   const filteredNavItems = navItems.map(group => {
     if (group.group === 'OUTROS') {
       const items = [...group.items];
-      if (isAdminEmail || user?.user_metadata?.role === 'Administrador') {
+      if (isAdmin) {
         // Add Users management to OUTROS group if admin
         const hasUsers = items.some(i => i.name === 'Usuários');
         if (!hasUsers) {
@@ -236,22 +236,6 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
             <p className="text-xs font-bold text-white truncate">{userName}</p>
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{userRole} • {userEmail}</p>
           </div>
-        </div>
-        {/* Debug info for admin troubleshooting */}
-        <div className="mt-2 px-2 opacity-20 hover:opacity-100 transition-opacity flex flex-col gap-1">
-          <p className="text-[6px] text-slate-500 font-mono break-all">
-            V: 20260326-2358 | E: {userEmail} | R: {userRole}
-          </p>
-          <button 
-            onClick={() => {
-              localStorage.clear();
-              sessionStorage.clear();
-              window.location.replace('/login');
-            }}
-            className="text-[6px] text-rose-500 font-black uppercase tracking-widest hover:underline text-left"
-          >
-            [ FORÇAR RESET ]
-          </button>
         </div>
       </div>
     </aside>

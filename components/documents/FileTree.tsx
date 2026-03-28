@@ -50,7 +50,10 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
     return (
       <div key={item.id || `folder-${item.nome}-${depth}`} className="select-none">
         <div
-          onClick={() => onItemClick?.(item)}
+          onClick={() => {
+            onItemClick?.(item);
+            setOpenFolders(prev => ({ ...prev, [item.id]: !prev[item.id] }));
+          }}
           className={cn(
             "group flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer transition-all border border-transparent relative",
             isSelected ? "bg-[#d4ff3f]/10 border-[#d4ff3f]/20 text-[#d4ff3f]" : "hover:bg-white/5 text-slate-400 hover:text-slate-200",
@@ -60,7 +63,10 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
         >
           <div className="flex items-center gap-1.5 flex-1 min-w-0">
             <div 
-              onClick={(e) => toggleFolder(item.id, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleFolder(item.id, e);
+              }}
               className="p-0.5 hover:bg-white/10 rounded transition-colors"
             >
               {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

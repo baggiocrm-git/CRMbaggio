@@ -11,9 +11,20 @@ export async function GET() {
   const supabase = createClient(supabaseUrl, supabaseKey);
   
   try {
+    const FOLDERS_TO_REMOVE = [
+      "Administrativo",
+      "Comercial",
+      "Financeiro",
+      "Jurídico",
+      "Operacional",
+      "Recursos Humanos",
+      "TI & Segurança"
+    ];
+
     const { data, error } = await supabase
       .from('pastas')
       .select('*')
+      .not('nome', 'in', `(${FOLDERS_TO_REMOVE.map(f => `"${f}"`).join(',')})`)
       .order('nome', { ascending: true });
 
     if (error) throw error;
