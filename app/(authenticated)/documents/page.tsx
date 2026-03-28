@@ -174,7 +174,10 @@ export default function DocumentManagementPage() {
           const sf = (supabaseData || [])
             .map((f: any) => ({ ...f, source: 'supabase' }));
           
-          setAllFolders([...df, ...sf]);
+          const combinedFolders = [...df, ...sf].sort((a, b) => 
+            (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' })
+          );
+          setAllFolders(combinedFolders);
         }
       } catch (err) {
         console.error('Error fetching all folders for tree:', err);
@@ -258,8 +261,16 @@ export default function DocumentManagementPage() {
         }
       });
 
-      setFolders(mergedFolders);
-      setDocuments(allDocs);
+      const sortedFolders = [...mergedFolders].sort((a, b) => 
+        (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' })
+      );
+
+      const sortedDocs = [...allDocs].sort((a, b) => 
+        (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' })
+      );
+
+      setFolders(sortedFolders);
+      setDocuments(sortedDocs);
     } catch (error) {
       console.error('Error fetching documents:', error);
       showNotification('Erro ao carregar documentos', 'error');
@@ -289,7 +300,8 @@ export default function DocumentManagementPage() {
           ...item,
           type: 'folder',
           children: buildTree(items, item.id)
-        }));
+        }))
+        .sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt', { sensitivity: 'base' }));
     };
     return buildTree(allFolders.length > 0 ? allFolders : folders, null);
   }, [allFolders, folders]);
