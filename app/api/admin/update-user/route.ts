@@ -49,6 +49,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+    // Sync with public.equipe table
+    const { error: equipeError } = await supabaseAdmin
+      .from('equipe')
+      .update({
+        nome: name,
+        cargo: role
+      })
+      .eq('id', id);
+
+    if (equipeError) {
+      console.error('Error syncing with equipe table during update:', equipeError);
+    }
+
     return NextResponse.json({ user: data.user });
   } catch (err) {
     console.error('Error in update-user API:', err);

@@ -20,7 +20,7 @@ export async function GET() {
     const { data: tokenData, error: tokenError } = await supabase
       .from('google_tokens')
       .select('access_token, refresh_token, expiry_date')
-      .eq('id', 1)
+      .eq('id', 2)
       .maybeSingle();
 
     if (tokenError || !tokenData) {
@@ -63,7 +63,7 @@ export async function GET() {
           access_token: accessToken,
           expiry_date: newTokens.expiry_date ? new Date(newTokens.expiry_date).toISOString() : null,
           updated_at: new Date().toISOString()
-        }).eq('id', 1);
+        }).eq('id', 2);
 
         // Retry fetching calendar list
         response = await fetchCalendarList(accessToken);

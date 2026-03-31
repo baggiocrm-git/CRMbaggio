@@ -19,11 +19,11 @@ export async function GET(req: Request) {
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Get the token (assuming id: 1 for now as per existing code)
+    // Get the token (assuming id: 2 for now as per existing code)
     const { data: tokenData, error: tokenError } = await supabase
       .from('google_tokens')
       .select('access_token, refresh_token, expiry_date')
-      .eq('id', 1)
+      .eq('id', 2)
       .maybeSingle();
 
     if (tokenError || !tokenData) {
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
           access_token: accessToken,
           expiry_date: newTokens.expiry_date ? new Date(newTokens.expiry_date).toISOString() : null,
           updated_at: new Date().toISOString()
-        }).eq('id', 1);
+        }).eq('id', 2);
 
         // Retry fetching events
         response = await fetchEvents(accessToken);

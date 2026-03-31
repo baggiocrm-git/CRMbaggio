@@ -89,11 +89,27 @@ export async function GET(req: NextRequest) {
         pageToken = response.data.nextPageToken;
       } while (pageToken);
       
+      // Build a map of folder ID to its parents
+      const folderMap = new Map(allFolders.map(f => [f.id, f]));
+      
+      // Function to check if a folder is a descendant of any rootId
+      const isDescendantOfRoot = (folderId: string, visited = new Set<string>()): boolean => {
+        if (rootIds.has(folderId)) return true;
+        if (visited.has(folderId)) return false; // Prevent cycles
+        visited.add(folderId);
+        
+        const folder = folderMap.get(folderId);
+        if (!folder || !folder.parents) return false;
+        
+        return folder.parents.some((pId: string) => isDescendantOfRoot(pId, visited));
+      };
+
       const folders = allFolders
         .filter(f => {
-          // Hide the root folders themselves from the tree (they are represented by "Todos os Documentos")
+          // Hide the root folders themselves from the tree
           if (rootIds.has(f.id)) return false;
-          return true;
+          // ONLY include folders that are descendants of our root folders
+          return isDescendantOfRoot(f.id);
         })
         .map(f => {
           const parentId = f.parents && f.parents.length > 0 ? f.parents[0] : 'root';
@@ -152,19 +168,19 @@ export async function GET(req: NextRequest) {
     }
 
     const folders = items
-      .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+      .filter(f => f.mimeType === 'application/vnd.google-apps.folder' && f.id)
       .map(f => ({
         id: f.id,
-        nome: f.name,
+        nome: f.name || 'Pasta sem nome',
         parent_id: (targetFolderId === 'root' || folderIdParam === 'root' || !folderIdParam) ? 'root' : targetFolderId,
         type: 'folder'
       }));
 
     const files = items
-      .filter(f => f.mimeType !== 'application/vnd.google-apps.folder')
+      .filter(f => f.mimeType !== 'application/vnd.google-apps.folder' && f.id)
       .map(file => ({
         id: `drive-${file.id}`,
-        nome: file.name,
+        nome: file.name || 'Arquivo sem nome',
         Categoria: 'Drive',
         data: file.createdTime ? new Date(file.createdTime).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
         tamanho_arquivo: file.size && !isNaN(parseInt(file.size)) ? `${(parseInt(file.size) / 1024 / 1024).toFixed(2)} MB` : '-',

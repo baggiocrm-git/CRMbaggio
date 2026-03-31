@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=2048' next build --no-lint",
     "start": "next start",
     "lint": "next lint"
   },
@@ -21,14 +21,14 @@
     "googleapis": "^171.4.0",
     "lucide-react": "latest",
     "motion": "latest",
-    "next": "latest",
+    "next": "^15.1.7",
     "pizzip": "^3.2.0",
-    "react": "latest",
+    "react": "^19.0.0",
     "react-currency-input-field": "^4.0.5",
-    "react-dom": "latest",
+    "react-dom": "^19.0.0",
     "react-hook-form": "^7.72.0",
     "react-markdown": "latest",
-    "recharts": "^3.8.0",
+    "recharts": "^2.15.0",
     "tailwind-merge": "latest",
     "xlsx": "^0.18.5"
   },
@@ -38,6 +38,8 @@
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "autoprefixer": "^10.4.27",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.1",
     "postcss": "latest",
     "tailwindcss": "latest",
     "typescript": "latest"

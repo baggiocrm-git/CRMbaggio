@@ -239,7 +239,7 @@ export default function CalendarPage() {
       const { data: tokens } = await supabase
         .from('google_tokens')
         .select('id')
-        .limit(1)
+        .eq('id', 2)
         .maybeSingle();
       
       if (tokens) {
@@ -329,7 +329,7 @@ export default function CalendarPage() {
             <button 
               onClick={async () => {
                 if (confirm('Deseja realmente desconectar sua conta Google?')) {
-                  const { error } = await supabase.from('google_tokens').delete().eq('id', 1);
+                  const { error } = await supabase.from('google_tokens').delete().eq('id', 2);
                   if (!error) {
                     setIsGoogleConnected(false);
                     setEvents(MOCK_EVENTS);

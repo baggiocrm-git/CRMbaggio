@@ -397,7 +397,6 @@ CREATE TABLE IF NOT EXISTS public.documentos (
     data DATE NOT NULL,
     pasta_id UUID REFERENCES public.pastas(id) ON DELETE SET NULL,
     file_path TEXT,
-    caminho_local TEXT,
     tamanho_arquivo TEXT,
     tipo_arquivo TEXT,
     status TEXT DEFAULT 'Vigente',
@@ -409,6 +408,17 @@ CREATE TABLE IF NOT EXISTS public.documentos (
     "webViewLink" TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Add missing columns if they don't exist
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documentos' AND column_name='drive_file_id') THEN
+        ALTER TABLE public.documentos ADD COLUMN drive_file_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documentos' AND column_name='webViewLink') THEN
+        ALTER TABLE public.documentos ADD COLUMN "webViewLink" TEXT;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.google_tokens (
     id INTEGER PRIMARY KEY,
@@ -445,7 +455,6 @@ CREATE TABLE IF NOT EXISTS public.documentos (
     data DATE NOT NULL,
     pasta_id UUID REFERENCES public.pastas(id) ON DELETE SET NULL,
     file_path TEXT,
-    caminho_local TEXT,
     tamanho_arquivo TEXT,
     tipo_arquivo TEXT,
     status TEXT DEFAULT 'Vigente',
@@ -457,6 +466,17 @@ CREATE TABLE IF NOT EXISTS public.documentos (
     "webViewLink" TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Add missing columns if they don't exist
+DO $$ 
+BEGIN 
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documentos' AND column_name='drive_file_id') THEN
+        ALTER TABLE public.documentos ADD COLUMN drive_file_id TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='documentos' AND column_name='webViewLink') THEN
+        ALTER TABLE public.documentos ADD COLUMN "webViewLink" TEXT;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.google_tokens (
     id INTEGER PRIMARY KEY,

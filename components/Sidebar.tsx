@@ -43,6 +43,7 @@ const navItems: NavGroup[] = [
     { name: 'Panorama', icon: LayoutDashboard, href: '/dashboard' },
     { name: 'Agenda', icon: Calendar, href: '/calendar' },
     { name: 'Contatos', icon: Contact, href: '/contacts' },
+    { name: 'Chat', icon: Users, href: '/chat' },
     { name: 'R.H.', icon: Users, href: '/staff' },
     { name: 'Gestão de Documentos', icon: FileText, href: '/documents' },
   ]},

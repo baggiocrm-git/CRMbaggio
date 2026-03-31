@@ -1,5 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { Readable } from 'stream';
+
+// ─── Mapa de pastas do Google Drive ───────────────────────────────────────────
+// Cada chave corresponde a uma variável de ambiente com o ID da pasta no Drive.
+// Para adicionar novas pastas: inclua no .env.local e adicione aqui.
+const DRIVE_FOLDERS: Record<string, string | undefined> = {
+  uploads:           process.env.GOOGLE_DRIVE_FOLDER_CBSL,           // pasta raiz / fallback
+  custos:            process.env.GOOGLE_DRIVE_FOLDER_CUSTOS,
+  escritorio_cbsl:   process.env.GOOGLE_DRIVE_FOLDER_ESCRITORIO_CBSL,
+  nfe_marketup:      process.env.GOOGLE_DRIVE_FOLDER_NFE_MARKETUP,
+  nfse_pmpg:         process.env.GOOGLE_DRIVE_FOLDER_NFSE_PMPG,
+  obras_realizadas:  process.env.GOOGLE_DRIVE_FOLDER_OBRAS_REALIZADAS,
+  ordem_de_compra:   process.env.GOOGLE_DRIVE_FOLDER_ORDEM_DE_COMPRA,
+  relatorios_kadu:   process.env.GOOGLE_DRIVE_FOLDER_RELATORIOS_KADU,
+  setor_pessoal:     process.env.GOOGLE_DRIVE_FOLDER_SETOR_PESSOAL,
+  transponta:        process.env.GOOGLE_DRIVE_FOLDER_TRANSPONTA,
+  // documentos_castro_alves: process.env.GOOGLE_DRIVE_FOLDER_DOCUMENTOS_CASTRO_ALVES,
+};
+
+/**
+ * Resolve o ID da pasta do Drive a partir de:
+ * 1. drive_folder_key enviado pelo frontend (ex: "custos")
+ * 2. pastaId UUID do Supabase → busca nome → tenta mapear pela chave normalizada
+ * 3. pastaId que já é um ID do Drive diretamente (não-UUID)
+ * 4. Fallback: GOOGLE_DRIVE_FOLDER_UPLOADS → GOOGLE_DRIVE_ROOT_FOLDER_ID → 'root'
+ */
+function normalizeFolderKey(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+}
+
+function resolveDriveFolderFromKey(key: string): string | undefined {
+  const normalized = normalizeFolderKey(key);
+  return DRIVE_FOLDERS[normalized];
+}
 
 export async function POST(req: NextRequest) {
   console.log('POST /api/documents/upload - Request received');
@@ -9,17 +48,20 @@ export async function POST(req: NextRequest) {
       formData = await req.formData();
     } catch (formErr) {
       console.error('Error parsing form data:', formErr);
-      return NextResponse.json({ error: 'Falha ao processar os dados do formulário. O arquivo pode ser muito grande ou o formato é inválido.' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Falha ao processar os dados do formulário. O arquivo pode ser muito grande ou o formato é inválido.' },
+        { status: 400 }
+      );
     }
-    
-    const file = formData.get('file') as File;
-    const name = formData.get('name') as string;
-    const category = (formData.get('category') as string) || 'Geral';
-    const pastaId = formData.get('pasta_id') as string;
-    const caminhoLocal = formData.get('caminho_local') as string;
-    const date = new Date().toISOString().split('T')[0]; // Automatic date
 
-    console.log('Upload details:', { name, category, date, pastaId, caminhoLocal, fileSize: file?.size, fileType: file?.type });
+    const category     = (formData.get('category') as string) || (formData.get('categoria') as string) || 'Geral';
+    const pastaId      = formData.get('pasta_id') as string;
+    const driveFolderKey = formData.get('drive_folder_key') as string | null; // ex: "custos"
+    const file         = formData.get('file') as File;
+    const name         = formData.get('name') as string;
+    const date         = new Date().toISOString().split('T')[0];
+
+    console.log('Upload details:', { name, category, date, pastaId, driveFolderKey, fileSize: file?.size, fileType: file?.type });
 
     if (!file || !name) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
@@ -35,41 +77,35 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // 1. Ensure bucket exists
+    // 1. Garantir que o bucket existe
     const { data: buckets, error: listError } = await supabase.storage.listBuckets();
     if (listError) {
       console.error('Error listing buckets:', listError);
     } else {
       const bucketExists = buckets?.some(b => b.name === 'documentos');
       if (!bucketExists) {
-        const { error: createError } = await supabase.storage.createBucket('documentos', {
-          public: true,
-        });
+        const { error: createError } = await supabase.storage.createBucket('documentos', { public: true });
         if (createError) {
           console.error('Error creating bucket:', createError);
-          throw new Error(`O bucket 'documentos' não existe e não pôde ser criado automaticamente. Por favor, crie-o no painel do Supabase.`);
+          throw new Error(`O bucket 'documentos' não existe e não pôde ser criado automaticamente.`);
         }
       }
     }
 
-    // 2. Upload to Supabase Storage
+    // 2. Upload para o Supabase Storage
     console.log('Uploading to Supabase Storage...');
     const fileBuffer = await file.arrayBuffer();
-    
-    // Sanitize filename for Supabase Storage
+
     const sanitizedOriginalName = file.name
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Remove accents
-      .replace(/[^a-zA-Z0-9.-]/g, '_'); // Replace special chars with underscore
-      
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9.-]/g, '_');
+
     const fileName = `${Date.now()}-${sanitizedOriginalName}`;
-    
+
     const { data: storageData, error: storageError } = await supabase.storage
       .from('documentos')
-      .upload(fileName, fileBuffer, {
-        contentType: file.type,
-        upsert: true
-      });
+      .upload(fileName, fileBuffer, { contentType: file.type, upsert: true });
 
     if (storageError) {
       console.error('Storage error:', storageError);
@@ -80,10 +116,10 @@ export async function POST(req: NextRequest) {
     const categoryToArea: Record<string, string> = {
       'Geral': 'Outros',
       'Projetos': 'Engenharia',
-      'Outros': 'Outros'
+      'Outros': 'Outros',
     };
 
-    // 3. Save to Supabase DB
+    // 3. Salvar no banco Supabase
     console.log('Saving to Supabase DB...');
     const { data: dbData, error: dbError } = await supabase
       .from('documentos')
@@ -94,14 +130,13 @@ export async function POST(req: NextRequest) {
         data: date,
         pasta_id: pastaId || null,
         file_path: storageData.path,
-        caminho_local: caminhoLocal || null,
         tamanho_arquivo: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
         tipo_arquivo: file.type,
         status: 'Vigente',
         Ano: new Date(date).getFullYear().toString(),
         nome_icone: 'FileText',
         classe_cor: 'text-slate-400',
-        classe_fundo: 'bg-[#0a0a0a]'
+        classe_fundo: 'bg-[#0a0a0a]',
       })
       .select()
       .single();
@@ -112,107 +147,142 @@ export async function POST(req: NextRequest) {
     }
     console.log('Database save success:', dbData.id);
 
-    // 4. Sync to Google Drive
+    // 4. Sincronizar com Google Drive via OAuth do usuário
     try {
-      console.log('Starting Google Drive sync...');
+      console.log('Starting Google Drive sync via user OAuth...');
       const { getDriveService } = await import('@/lib/google-drive');
-      
-      // Try Service Account first for automatic access
-      let drive;
-      try {
-        drive = await getDriveService();
-        console.log('Using Service Account for Drive sync');
-      } catch (err) {
-        console.warn('Service Account not available, trying user tokens:', err);
-        // Fallback to user tokens if Service Account fails
-        const { data: tokenData } = await supabase
-          .from('google_tokens')
-          .select('*')
-          .eq('id', 2)
-          .single();
 
-        if (tokenData && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-          drive = await getDriveService({
-            access_token: tokenData.access_token,
-            refresh_token: tokenData.refresh_token,
-            expiry_date: tokenData.expiry_date ? Number(tokenData.expiry_date) : undefined
-          });
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('google_tokens')
+        .select('*')
+        .eq('id', 2)
+        .single();
+
+      if (tokenError || !tokenData) {
+        console.warn('No user OAuth tokens found, skipping Drive sync');
+        return NextResponse.json({
+          success: true,
+          data: dbData,
+          driveError: 'Tokens OAuth não encontrados. Conecte o Google Drive nas configurações.',
+        });
+      }
+
+      console.log('User OAuth tokens found, initializing Drive service...');
+      const drive = await getDriveService({
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expiry_date: tokenData.expiry_date ? Number(tokenData.expiry_date) : undefined,
+      });
+
+      // ─── Resolução da pasta de destino no Drive ──────────────────────────────
+      //
+      // Prioridade:
+      //   1. drive_folder_key enviado pelo frontend → mapa DRIVE_FOLDERS
+      //   2. pastaId = ID direto do Drive (não-UUID)
+      //   3. pastaId = UUID do Supabase → busca nome → tenta normalizar no mapa
+      //   4. Fallback: UPLOADS → ROOT → 'root'
+      //
+      const fallbackFolderId =
+        DRIVE_FOLDERS['uploads'] ||
+        process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID ||
+        'root';
+
+      let driveParentId: string = fallbackFolderId;
+
+      if (driveFolderKey) {
+        // Caso 1: frontend enviou a chave explícita
+        const resolved = resolveDriveFolderFromKey(driveFolderKey);
+        if (resolved) {
+          driveParentId = resolved;
+          console.log(`Drive folder resolved from key "${driveFolderKey}":`, driveParentId);
+        } else {
+          console.warn(`drive_folder_key "${driveFolderKey}" não encontrado no mapa, usando fallback.`);
+        }
+      } else if (pastaId && pastaId !== 'root') {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pastaId);
+
+        if (!isUUID) {
+          // Caso 2: ID direto do Drive
+          driveParentId = pastaId;
+          console.log('Using direct Drive folder ID from pastaId:', driveParentId);
+        } else {
+          // Caso 3: UUID do Supabase → busca nome → normaliza → mapa
+          console.log('pastaId is UUID, fetching folder name from Supabase...');
+          const { data: folderData } = await supabase
+            .from('pastas')
+            .select('nome')
+            .eq('id', pastaId)
+            .single();
+
+          if (folderData?.nome) {
+            const resolved = resolveDriveFolderFromKey(folderData.nome);
+            if (resolved) {
+              driveParentId = resolved;
+              console.log(`Drive folder resolved from Supabase name "${folderData.nome}":`, driveParentId);
+            } else {
+              console.warn(`Pasta "${folderData.nome}" não tem mapeamento no Drive, usando fallback.`);
+            }
+          }
         }
       }
 
-      if (drive) {
-        // Use specific folder ID if provided, otherwise default to 'CBSL'
-        let rootFolderId = process.env.GOOGLE_DRIVE_ROOT_FOLDER_ID;
-        
-        if (!rootFolderId) {
-          console.log('GOOGLE_DRIVE_ROOT_FOLDER_ID not set, searching for "CBSL"');
-          const rootSearch = await drive.files.list({
-            q: "name = 'CBSL' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-            fields: 'files(id)',
-          });
+      console.log('Final driveParentId:', driveParentId);
 
-          if (rootSearch.data.files && rootSearch.data.files.length > 0) {
-            rootFolderId = rootSearch.data.files[0].id!;
-          } else {
-            const rootFolder = await drive.files.create({
-              requestBody: {
-                name: 'CBSL',
-                mimeType: 'application/vnd.google-apps.folder',
-              },
-              fields: 'id',
-            });
-            rootFolderId = rootFolder.data.id!;
-          }
-        }
+      // ─── Upload para o Drive ─────────────────────────────────────────────────
+      const driveBuffer = Buffer.from(await file.arrayBuffer());
+      const readableStream = Readable.from(driveBuffer);
 
-        // Find or create category folder
-        let categoryFolderId = '';
-        const catSearch = await drive.files.list({
-          q: `name = '${category}' and '${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-          fields: 'files(id)',
-        });
+      const extension = file.name.split('.').pop();
+      const driveFileName = name.includes('.') ? name : `${name}.${extension}`;
+      console.log('Uploading to Drive:', driveFileName, '→', driveParentId);
 
-        if (catSearch.data.files && catSearch.data.files.length > 0) {
-          categoryFolderId = catSearch.data.files[0].id!;
-        } else {
-          const catFolder = await drive.files.create({
-            requestBody: {
-              name: category,
-              mimeType: 'application/vnd.google-apps.folder',
-              parents: [rootFolderId!],
-            },
-            fields: 'id',
-          });
-          categoryFolderId = catFolder.data.id!;
-        }
-
-        // Upload file to Drive
+      try {
         const driveFile = await drive.files.create({
           requestBody: {
-            name: file.name,
-            parents: [categoryFolderId],
+            name: driveFileName,
+            parents: [driveParentId],
           },
           media: {
             mimeType: file.type,
-            body: Buffer.from(fileBuffer),
+            body: readableStream,
           },
           fields: 'id, webViewLink',
         });
 
-        // Update DB with Drive ID and Link
-        await supabase
-          .from('documentos')
-          .update({ 
-            drive_file_id: driveFile.data.id,
-            webViewLink: driveFile.data.webViewLink
-          })
-          .eq('id', dbData.id);
-        
-        console.log('Google Drive sync successful:', driveFile.data.id);
+        console.log('Drive upload response:', driveFile.data);
+
+        if (driveFile.data.id) {
+          const { error: updateError } = await supabase
+            .from('documentos')
+            .update({
+              drive_file_id: driveFile.data.id,
+              webViewLink: driveFile.data.webViewLink,
+            })
+            .eq('id', dbData.id);
+
+          if (updateError) {
+            console.error('Error updating DB with Drive info:', updateError);
+          } else {
+            console.log('Google Drive sync successful, Drive ID:', driveFile.data.id);
+          }
+        }
+      } catch (apiErr: unknown) {
+        const err = apiErr as { message?: string; response?: { data: unknown } };
+        console.error('Google Drive API Create Error:', err.message, err.response?.data || apiErr);
+        return NextResponse.json({
+          success: true,
+          data: dbData,
+          driveError: err.message || 'Erro ao fazer upload para o Google Drive',
+        });
       }
-    } catch (driveErr) {
-      console.error('Google Drive Sync Error:', driveErr);
-      // Don't fail the whole request if Drive sync fails
+    } catch (driveErr: unknown) {
+      const err = driveErr as { message?: string };
+      console.error('General Google Drive Sync Error:', driveErr);
+      return NextResponse.json({
+        success: true,
+        data: dbData,
+        driveError: err.message || 'Erro na sincronização com Google Drive',
+      });
     }
 
     return NextResponse.json({ success: true, data: dbData });

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
+import AccountAlarm from '@/components/AccountAlarm';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -286,6 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
       <Sidebar user={user} />
+      <AccountAlarm />
       <main className="flex-1 flex flex-col overflow-hidden pt-6">
         {children}
       </main>

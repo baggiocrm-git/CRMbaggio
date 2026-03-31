@@ -40,7 +40,7 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
     setOpenFolders(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const renderItem = (item: FileSystemItem, depth: number = 0) => {
+  const renderItem = (item: FileSystemItem, depth: number = 0, index: number = 0) => {
     const isFolder = item.type === 'folder';
     if (!isFolder) return null; // Show only folders in the tree
 
@@ -48,7 +48,7 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
     const isSelected = selectedId === item.id;
 
     return (
-      <div key={item.id || `folder-${item.nome}-${depth}`} className="select-none">
+      <div key={item.id ? `tree-folder-${item.id}` : `tree-folder-idx-${depth}-${index}-${item.nome}`} className="select-none">
         <div
           onClick={() => {
             onItemClick?.(item);
@@ -161,7 +161,7 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              {item.children.map(child => renderItem(child, depth + 1))}
+              {item.children.map((child, idx) => renderItem(child, depth + 1, idx))}
             </motion.div>
           )}
         </AnimatePresence>
@@ -181,7 +181,7 @@ export function FileTree({ data, selectedId, onItemClick, onRename, onNewFolder,
         <Folder size={18} className={selectedId === 'root' ? "text-[#d4ff3f]" : "text-slate-500"} />
         <span className="text-xs font-medium">Todos os Documentos</span>
       </div>
-      {data.map((item) => renderItem(item, 0))}
+      {data.map((item, idx) => renderItem(item, 0, idx))}
     </div>
   );
 }
