@@ -1,0 +1,91 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: documents
+    // Document ID: {documentId}
+    // Fields:
+    //   - title: string (required, < 100 chars)
+    //   - content: string (required, < 1MB)
+    //   - authorId: string (required, immutable)
+    //   - authorName: string (optional, < 50 chars)
+    //   - createdAt: timestamp (required, immutable)
+    //   - updatedAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.authorId;
+    }
+
+    function uidUnchanged() {
+      return !('authorId' in request.resource.data) ||
+        request.resource.data.authorId == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('authorId' in request.resource.data) ||
+        request.resource.data.authorId == resource.data.authorId;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidDocument(data) {
+      return hasOnlyAllowedFields(['title', 'content', 'authorId', 'authorName', 'createdAt', 'updatedAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.content is string && data.content.size() < 1048576 && // 1MB
+             data.authorId is string && data.authorId.size() > 0 &&
+             data.createdAt is timestamp &&
+             data.updatedAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /documents/{documentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && 
+                      isValidDocument(request.resource.data) && 
+                      uidUnchanged();
+      allow update: if isAuthenticated() && 
+                      isDocOwner() && 
+                      isValidDocument(request.resource.data) && 
+                      uidNotModified() && 
+                      areImmutableFieldsUnchanged(['authorId', 'createdAt']);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+  }
+}
