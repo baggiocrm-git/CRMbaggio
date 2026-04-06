@@ -3,6 +3,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import { supabase } from '@/lib/supabase';
+<<<<<<< HEAD
+=======
+import Image from 'next/image';
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
 import { 
   Construction, 
   Users, 
@@ -451,6 +455,34 @@ export default function DashboardPage() {
               </motion.div>
             )}
 
+<<<<<<< HEAD
+=======
+            {/* Site Map Card */}
+            <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-3xl overflow-hidden shadow-sm">
+              <div className="p-6 border-b border-slate-800/50">
+                <h3 className="text-xs font-black uppercase tracking-widest">Mapa do Local</h3>
+              </div>
+              <div className="aspect-square relative bg-[#0a0a0a] flex items-center justify-center">
+                <Image 
+                  src="https://picsum.photos/seed/map/400/400?grayscale&blur=2" 
+                  alt="Map" 
+                  fill
+                  className="object-cover opacity-20"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="size-4 bg-[#d4ff3f] rounded-full animate-pulse border-2 border-[#0a0a0a] shadow-lg shadow-[#d4ff3f]/50"></div>
+                  <div className="size-4 bg-blue-500 rounded-full absolute top-1/4 left-1/3 border-2 border-[#0a0a0a] shadow-lg shadow-blue-500/50"></div>
+                  <div className="size-4 bg-orange-500 rounded-full absolute bottom-1/3 right-1/4 border-2 border-[#0a0a0a] shadow-lg shadow-orange-500/50"></div>
+                </div>
+                <div className="absolute bottom-6 left-6 right-6 bg-black/40 backdrop-blur-md p-4 rounded-2xl border border-white/5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f]">Localização dos Projetos</p>
+                  <p className="text-[10px] text-white/60 font-medium">Rastreamento ativo para 12 zonas primárias</p>
+                </div>
+              </div>
+            </div>
+
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
             {/* Recent Activity */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}

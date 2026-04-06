@@ -16,12 +16,19 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+<<<<<<< HEAD
     "jsx": "preserve",
     "baseUrl": ".",
     "paths": {
       "@/*": [
         "./*"
       ]
+=======
+    "jsx": "react-jsx",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
     },
     "plugins": [
       {

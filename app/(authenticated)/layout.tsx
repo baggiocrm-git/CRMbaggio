@@ -2,7 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
+<<<<<<< HEAD
 import InternalChat from '@/components/chat/InternalChat';
+=======
+import AccountAlarm from '@/components/AccountAlarm';
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
@@ -287,10 +291,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
       <Sidebar user={user} />
+<<<<<<< HEAD
       <main className="flex-1 flex flex-col overflow-hidden pt-6">
         {children}
       </main>
       <InternalChat />
+=======
+      <AccountAlarm />
+      <main className="flex-1 flex flex-col overflow-hidden pt-6">
+        {children}
+      </main>
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
     </div>
   );
 }

@@ -54,6 +54,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
+<<<<<<< HEAD
+=======
+    // Sync with public.equipe table
+    if (data.user) {
+      const { error: equipeError } = await supabaseAdmin
+        .from('equipe')
+        .insert({
+          id: data.user.id,
+          nome: name,
+          id_funcionario: data.user.id.substring(0, 8).toUpperCase(), // Gera um ID automático
+          cargo: role,
+          status: 'Ativo',
+          departamento: 'Geral'
+        });
+
+      if (equipeError) {
+        console.error('Error syncing with equipe table:', equipeError);
+      }
+    }
+
+>>>>>>> d554f446d82c927bc09f0bd637f90b16474ed18b
     return NextResponse.json({ user: data.user });
   } catch (err) {
     console.error('Error in create-user API:', err);
