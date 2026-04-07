@@ -17,10 +17,8 @@ import {
   TrendingUp,
   TrendingDown,
   FileText,
-  PieChart,
   Target,
   Layers,
-  Percent,
   ClipboardList,
   Calendar,
   BarChart3
@@ -57,11 +55,6 @@ const navItems: NavGroup[] = [
     { name: 'Orçamento', icon: Target, href: '/finances/budget' },
     { name: 'Insumos', icon: ClipboardList, href: '/finances/insumos' },
     { name: 'Serviços', icon: Layers, href: '/finances/services' },
-  ]},
-  { group: 'FISCAL', items: [
-    { name: 'Impostos', icon: Percent, href: '/finances/taxes' },
-    { name: 'Obrigações', icon: ClipboardList, href: '/finances/obligations' },
-    { name: 'DRE', icon: PieChart, href: '/finances/dre' },
   ]},
   { group: 'OUTROS', items: [] },
 ];

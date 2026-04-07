@@ -367,30 +367,7 @@ export default function FinanceDashboard() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* DRE Resumido */}
-          <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
-            <div className="flex justify-between items-center mb-8">
-              <h3 className="text-lg font-black tracking-tight">DRE Resumido — {months[currentMonth]} {currentYear}</h3>
-            </div>
-            <div className="space-y-4">
-              {[
-                { label: '(+) Receita Bruta', value: formatCurrency(monthlyRevenue), color: 'text-[#d4ff3f]' },
-                { label: '(-) Despesas do Mês', value: `- ${formatCurrency(monthlyExpenses)}`, color: 'text-rose-500' },
-                { label: '(=) Resultado Operacional', value: formatCurrency(netProfit), color: 'text-white', bold: true },
-                { label: '(+) Saldo Acumulado (Recebido)', value: formatCurrency(totalReceived), color: 'text-[#d4ff3f]' },
-                { label: '(-) Saldo Acumulado (Pago)', value: `- ${formatCurrency(totalPaid)}`, color: 'text-rose-500' },
-                { label: '(=) Saldo em Caixa', value: formatCurrency(cashBalance), color: 'text-[#d4ff3f]', bold: true },
-              ].map((item) => (
-                <div key={item.label} className={`flex justify-between items-center py-2 border-b border-slate-800/30 ${item.bold ? 'pt-4' : ''}`}>
-                  <p className={`text-xs ${item.bold ? 'font-black text-white' : 'font-bold text-slate-400'}`}>{item.label}</p>
-                  <p className={`text-sm font-black ${item.color}`}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-8">
+        <div className="space-y-8">
             {/* Alertas Reais */}
             <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
               <h3 className="text-lg font-black tracking-tight mb-6">Alertas</h3>
@@ -444,7 +421,6 @@ export default function FinanceDashboard() {
                 )}
               </div>
             </div>
-          </div>
         </div>
       </div>
     </div>
