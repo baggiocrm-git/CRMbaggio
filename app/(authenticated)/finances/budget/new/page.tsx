@@ -112,29 +112,62 @@ export default function NewBudgetPage() {
     fetchProjects();
   }, []);
 
+  const isMissingVariacaoColumnError = (error: unknown) =>
+    Boolean(
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      typeof error.message === 'string' &&
+      error.message.includes("Could not find the 'variacao_anual' column")
+    );
+
   const handleSave = async () => {
-    if (!selectedProjectId || !budgetName || items.length === 0) {
-      alert('Preencha os campos obrigatórios e adicione pelo menos um item.');
+    if (!selectedProjectId) {
+      alert('Selecione ou cadastre uma obra/projeto antes de salvar o or?amento.');
+      return;
+    }
+
+    if (!budgetName.trim()) {
+      alert('Preencha o nome do or?amento antes de salvar.');
+      return;
+    }
+
+    if (items.length === 0) {
+      alert('Adicione pelo menos um item ao or?amento antes de salvar.');
       return;
     }
 
     setIsSaving(true);
     try {
       // 1. Create Budget
-      const { data: budget, error: budgetError } = await supabase
+      const baseBudgetPayload = {
+        projeto_id: selectedProjectId,
+        nome: budgetName,
+        descricao: budgetDesc,
+        total_mo: totals.mo,
+        total_mat: totals.mat,
+        total_eq: totals.eq,
+        total_geral: totals.total,
+      };
+
+      let budgetResponse = await supabase
         .from('orcamentos')
         .insert({
-          projeto_id: selectedProjectId,
-          nome: budgetName,
-          descricao: budgetDesc,
-          total_mo: totals.mo,
-          total_mat: totals.mat,
-          total_eq: totals.eq,
-          total_geral: totals.total,
+          ...baseBudgetPayload,
           variacao_anual: variacaoAnual
         })
         .select()
         .single();
+
+      if (budgetResponse.error && isMissingVariacaoColumnError(budgetResponse.error)) {
+        budgetResponse = await supabase
+          .from('orcamentos')
+          .insert(baseBudgetPayload)
+          .select()
+          .single();
+      }
+
+      const { data: budget, error: budgetError } = budgetResponse;
 
       if (budgetError) throw budgetError;
 
@@ -176,8 +209,12 @@ export default function NewBudgetPage() {
 
       router.push('/finances/budget');
     } catch (error) {
-      console.error('Error saving budget:', error);
-      alert('Erro ao salvar orçamento.');
+      const errorMessage =
+        error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+          ? error.message
+          : 'Erro desconhecido ao salvar orçamento.';
+      console.error('Error saving budget:', errorMessage, error);
+      alert(`Erro ao salvar orçamento: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
@@ -653,14 +690,16 @@ export default function NewBudgetPage() {
         onClose={() => setIsProjectModalOpen(false)}
         onSuccess={async () => {
           await fetchProjects();
-          // After success, we might want to select the newest project
           const { data } = await supabase
             .from('projetos')
-            .select('id')
+            .select('id, nome')
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
-          if (data) setSelectedProjectId(data.id);
+          if (data) {
+            setSelectedProjectId(data.id);
+            setBudgetName((currentName) => currentName.trim() || data.nome);
+          }
           setIsProjectModalOpen(false);
         }}
       />

@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 import { Project } from '@/lib/types';
 import CustomCurrencyInput from '@/components/CurrencyInput';
+import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 
 interface ProjectModalProps {
   isOpen: boolean;
@@ -115,8 +116,12 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Error saving project:', error);
-      alert('Erro ao salvar projeto. Verifique o console.');
+      const errorMessage =
+        error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+          ? error.message
+          : 'Erro desconhecido ao salvar projeto.';
+      console.error('Error saving project:', errorMessage, error);
+      alert(`Erro ao salvar projeto: ${errorMessage}`);
     }
   };
 
@@ -183,33 +188,45 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
                 />
               </div>
 
-              <Controller
-                name="orcamento"
-                control={control}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <CustomCurrencyInput
-                    label="Orçamento (R$)"
-                    value={field.value}
-                    onChange={field.onChange}
-                    error={errors.orcamento ? 'Obrigatório' : undefined}
-                    placeholder="R$ 0,00"
-                  />
-                )}
-              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Orçamento (R$)</label>
+                <Controller
+                  name="orcamento"
+                  control={control}
+                  rules={{ required: true }}
+                  render={({ field }) => (
+                    <CustomCurrencyInput
+                      value={field.value}
+                      onValueChange={(value) => handleFixedDecimalValueChange(value, field.onChange)}
+                      transformRawValue={transformRawCurrencyValue}
+                      decimalSeparator="," 
+                      groupSeparator="."
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all placeholder:text-slate-700"
+                      placeholder="R$ 0,00"
+                    />
+                  )}
+                />
+                {errors.orcamento && <span className="text-rose-500 text-[9px] font-black uppercase tracking-widest ml-1">Obrigatório</span>}
+              </div>
 
-              <Controller
-                name="gasto"
-                control={control}
-                render={({ field }) => (
-                  <CustomCurrencyInput
-                    label="Gasto Atual (R$)"
-                    value={field.value}
-                    onChange={field.onChange}
-                    placeholder="R$ 0,00"
-                  />
-                )}
-              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Gasto Atual (R$)</label>
+                <Controller
+                  name="gasto"
+                  control={control}
+                  render={({ field }) => (
+                    <CustomCurrencyInput
+                      value={field.value}
+                      onValueChange={(value) => handleFixedDecimalValueChange(value, field.onChange)}
+                      transformRawValue={transformRawCurrencyValue}
+                      decimalSeparator="," 
+                      groupSeparator="."
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all placeholder:text-slate-700"
+                      placeholder="R$ 0,00"
+                    />
+                  )}
+                />
+              </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Liquidez (%)</label>

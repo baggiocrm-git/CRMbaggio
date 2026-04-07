@@ -154,6 +154,15 @@ export default function EditBudgetPage() {
     if (id) fetchData();
   }, [id, setItems, setVariacaoAnual]);
 
+  const isMissingVariacaoColumnError = (error: unknown) =>
+    Boolean(
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      typeof error.message === 'string' &&
+      error.message.includes("Could not find the 'variacao_anual' column")
+    );
+
   const handleSave = async () => {
     if (!selectedProjectId || !budgetName || items.length === 0) {
       alert('Preencha os campos obrigatórios e adicione pelo menos um item.');
@@ -163,20 +172,33 @@ export default function EditBudgetPage() {
     setIsSaving(true);
     try {
       // 1. Update Budget
-      const { error: budgetError } = await supabase
+      const baseBudgetPayload = {
+        projeto_id: selectedProjectId,
+        nome: budgetName,
+        descricao: budgetDesc,
+        total_mo: totals.mo,
+        total_mat: totals.mat,
+        total_eq: totals.eq,
+        total_geral: totals.total,
+        updated_at: new Date().toISOString()
+      };
+
+      let budgetResponse = await supabase
         .from('orcamentos')
         .update({
-          projeto_id: selectedProjectId,
-          nome: budgetName,
-          descricao: budgetDesc,
-          total_mo: totals.mo,
-          total_mat: totals.mat,
-          total_eq: totals.eq,
-          total_geral: totals.total,
+          ...baseBudgetPayload,
           variacao_anual: variacaoAnual,
-          updated_at: new Date().toISOString()
         })
         .eq('id', id);
+
+      if (budgetResponse.error && isMissingVariacaoColumnError(budgetResponse.error)) {
+        budgetResponse = await supabase
+          .from('orcamentos')
+          .update(baseBudgetPayload)
+          .eq('id', id);
+      }
+
+      const { error: budgetError } = budgetResponse;
 
       if (budgetError) throw budgetError;
 
