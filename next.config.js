@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   productionBrowserSourceMaps: false,
   poweredByHeader: false,
   typescript: {
@@ -34,7 +33,7 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'www.google.com', // <-- Adicionado para o ícone do Google
+        hostname: 'www.google.com',
         port: '',
         pathname: '/**',
       },
@@ -42,4 +41,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
