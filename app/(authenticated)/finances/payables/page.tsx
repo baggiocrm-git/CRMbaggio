@@ -25,8 +25,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 // import * as XLSX from 'xlsx';
-import CurrencyInput from 'react-currency-input-field';
-import { handleFixedDecimalValueChange } from '@/lib/currency';
+import CurrencyInput from '@/components/CurrencyInput';
+import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 import { COST_CATEGORIES, CONSTRUCTION_STAGES } from '@/lib/constants';
 
 interface Payable {
@@ -56,6 +56,11 @@ interface Project {
   nome: string;
 }
 
+interface PayableSupplier {
+  id: string;
+  nome: string;
+}
+
 interface ExcelRow {
   id?: string;
   fornecedor?: string;
@@ -69,9 +74,11 @@ interface ExcelRow {
 
 export default function PayablesPage() {
   const [payables, setPayables] = useState<Payable[]>([]);
+  const [supplierOptions, setSupplierOptions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Payable | null>(null);
+  const [isCustomSupplier, setIsCustomSupplier] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -105,6 +112,13 @@ export default function PayablesPage() {
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const NEW_SUPPLIER_OPTION = '__novo_fornecedor__';
+
+  const normalizeSupplierName = (value: string) =>
+    value
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase('pt-BR');
 
   const fetchProjects = async () => {
     const { data } = await supabase.from('projetos').select('id, nome');
@@ -225,12 +239,48 @@ export default function PayablesPage() {
     }
   }, []);
 
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contas_pagar_fornecedores')
+        .select('id, nome')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        const { data: payablesData, error: payablesError } = await supabase
+          .from('contas_pagar')
+          .select('fornecedor')
+          .order('fornecedor', { ascending: true });
+
+        if (payablesError) throw payablesError;
+
+        const fallbackSuppliers = Array.from(
+          new Set(
+            ((payablesData as Array<{ fornecedor: string | null }> | null) || [])
+              .map((item) => (item.fornecedor || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+        setSupplierOptions(fallbackSuppliers);
+        return;
+      }
+
+      setSupplierOptions(((data as PayableSupplier[] | null) || []).map((supplier) => supplier.nome));
+    } catch (err) {
+      console.error('Error fetching suppliers:', err instanceof Error ? err.message : err);
+      setSupplierOptions([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchPayables();
-  }, [fetchPayables]);
+    fetchSuppliers();
+  }, [fetchPayables, fetchSuppliers]);
 
   const handleOpenModal = (item?: Payable) => {
     if (item) {
+      setIsCustomSupplier(!supplierOptions.some((supplier) => normalizeSupplierName(supplier) === normalizeSupplierName(item.fornecedor)));
       setEditingItem(item);
       setFormData({
         fornecedor: item.fornecedor,
@@ -247,6 +297,7 @@ export default function PayablesPage() {
         socio_id: item.socio_id || ''
       });
     } else {
+      setIsCustomSupplier(false);
       setEditingItem(null);
       setFormData({
         fornecedor: '',
@@ -268,9 +319,24 @@ export default function PayablesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanedFornecedor = formData.fornecedor.trim().replace(/\s+/g, ' ');
+    const existingSupplier = supplierOptions.find(
+      (supplier) => normalizeSupplierName(supplier) === normalizeSupplierName(cleanedFornecedor)
+    );
+    const finalFornecedor = existingSupplier || cleanedFornecedor;
     try {
+      if (finalFornecedor) {
+        const { error: supplierError } = await supabase
+          .from('contas_pagar_fornecedores')
+          .upsert([{ nome: finalFornecedor }], { onConflict: 'nome' });
+
+        if (supplierError) {
+          console.warn('Unable to persist supplier option:', supplierError);
+        }
+      }
+
       const payload: Record<string, string | number | null> = {
-        fornecedor: formData.fornecedor,
+        fornecedor: finalFornecedor,
         descricao: formData.descricao,
         data_vencimento: formData.data_vencimento,
         data_pagamento: formData.data_pagamento || null,
@@ -300,11 +366,16 @@ export default function PayablesPage() {
         if (error) throw error;
       }
 
-      setIsModalOpen(false);
+      handleCloseModal();
       fetchPayables();
+      fetchSuppliers();
     } catch (err) {
-      console.error('Error saving payable:', err);
-      alert('Erro ao salvar conta a pagar. Verifique se a tabela "contas_pagar" existe no Supabase.');
+      const errorMessage =
+        err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+          ? err.message
+          : 'Erro desconhecido ao salvar a conta a pagar.';
+      console.error('Error saving payable:', errorMessage, err);
+      alert(`Erro ao salvar conta a pagar: ${errorMessage}`);
     }
   };
 
@@ -320,6 +391,11 @@ export default function PayablesPage() {
     } catch (err) {
       console.error('Error deleting payable:', err);
     }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setIsCustomSupplier(false);
   };
 
   const handleExport = async () => {
@@ -380,7 +456,23 @@ export default function PayablesPage() {
       try {
         const { error } = await supabase.from('contas_pagar').insert(mappedData);
         if (error) throw error;
+        const importedSuppliers = Array.from(
+          new Set(
+            mappedData
+              .map((item) => item.fornecedor.trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+          )
+        ).map((nome) => ({ nome }));
+        if (importedSuppliers.length > 0) {
+          const { error: supplierError } = await supabase
+            .from('contas_pagar_fornecedores')
+            .upsert(importedSuppliers, { onConflict: 'nome' });
+          if (supplierError) {
+            console.warn('Unable to persist imported suppliers:', supplierError);
+          }
+        }
         fetchPayables();
+        fetchSuppliers();
         alert('Dados importados com sucesso!');
       } catch (err) {
         console.error('Error importing data:', err);
@@ -448,7 +540,7 @@ export default function PayablesPage() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
           >
             <Plus size={18} /> CONTA A PAGAR
           </button>
@@ -456,7 +548,7 @@ export default function PayablesPage() {
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
                 isFilterOpen ? "bg-[#1a1a1a] border-[#d4ff3f] text-[#d4ff3f]" : "bg-[#1a1a1a] border-slate-800/50 text-slate-500 hover:text-white"
               )}
             >
@@ -521,13 +613,13 @@ export default function PayablesPage() {
           </div>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Download size={16} /> EXPORTAR
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Upload size={16} /> IMPORTAR
           </button>
@@ -551,7 +643,7 @@ export default function PayablesPage() {
           {error.includes('configurações') && (
             <a 
               href="/settings" 
-              className="px-4 py-2 bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
+              className="px-4 py-2 bg-rose-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
             >
               Ir para Configurações
             </a>
@@ -572,8 +664,8 @@ export default function PayablesPage() {
               <card.icon size={24} />
             </div>
             <div>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-xl font-black text-white">{card.value}</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-2xl font-black text-white">{card.value}</p>
             </div>
           </div>
         ))}
@@ -597,7 +689,7 @@ export default function PayablesPage() {
         <div className="">
           <table className="w-full text-left border-collapse table-fixed">
             <thead>
-              <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
+              <tr className="bg-[#0a0a0a] text-slate-500 text-xs font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[15%]" onClick={() => handleSort('fornecedor')}>
                   <div className="flex items-center gap-1">
                     Fornecedor {getSortIcon('fornecedor')}
@@ -640,7 +732,7 @@ export default function PayablesPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
                   </td>
                 </tr>
               ) : currentItems.length === 0 ? (
@@ -654,7 +746,7 @@ export default function PayablesPage() {
                   <tr 
                     key={item.id} 
                     onClick={() => handleOpenModal(item)}
-                    className="hover:bg-[#0a0a0a] transition-colors group text-[10px] cursor-pointer"
+                    className="hover:bg-[#0a0a0a] transition-colors group text-sm cursor-pointer"
                   >
                     <td className="px-2 py-2">
                       <p className="font-bold text-white leading-tight truncate" title={item.fornecedor}>{item.fornecedor}</p>
@@ -676,7 +768,7 @@ export default function PayablesPage() {
                     </td>
                     <td className="px-1 py-2">
                       <span className={cn(
-                        "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                        "inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
                         item.situacao === 'Pago' ? "bg-emerald-500/10 text-emerald-500" : 
                         item.situacao === 'Aberto' ? "bg-orange-500/10 text-orange-500" : 
                         "bg-blue-500/10 text-blue-500"
@@ -695,11 +787,11 @@ export default function PayablesPage() {
         <div className="p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Página</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Página</span>
               <select 
                 value={currentPage}
                 onChange={(e) => setCurrentPage(Number(e.target.value))}
-                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-white outline-none"
+                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-xs font-black text-white outline-none"
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                   <option key={p} value={p}>{p}</option>
@@ -707,11 +799,11 @@ export default function PayablesPage() {
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibir</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Exibir</span>
               <select 
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-white outline-none"
+                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-xs font-black text-white outline-none"
               >
                 {[10, 20, 50, 100].map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -720,7 +812,7 @@ export default function PayablesPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
               {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredPayables.length)} de {filteredPayables.length}
             </span>
             <div className="flex gap-1">
@@ -751,7 +843,7 @@ export default function PayablesPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={handleCloseModal}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
             <motion.div 
@@ -764,7 +856,7 @@ export default function PayablesPage() {
                 <h3 className="text-lg font-black tracking-tight text-white">
                   {editingItem ? 'Editar Conta' : 'Nova Conta a Pagar'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -773,14 +865,43 @@ export default function PayablesPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Fornecedor</label>
-                    <input 
-                      required
-                      type="text" 
-                      value={formData.fornecedor}
-                      onChange={(e) => setFormData({...formData, fornecedor: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                      placeholder="Nome do fornecedor"
-                    />
+                    <select
+                      required={!isCustomSupplier}
+                      value={isCustomSupplier ? NEW_SUPPLIER_OPTION : formData.fornecedor}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === NEW_SUPPLIER_OPTION) {
+                          setIsCustomSupplier(true);
+                          setFormData({ ...formData, fornecedor: '' });
+                          return;
+                        }
+
+                        setIsCustomSupplier(false);
+                        setFormData({ ...formData, fornecedor: value });
+                      }}
+                      className={cn(
+                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
+                        isCustomSupplier ? "text-[#d4ff3f]" : "text-white"
+                      )}
+                    >
+                      <option value="" disabled>Selecione um fornecedor</option>
+                      {supplierOptions.map((supplier) => (
+                        <option key={`supplier-${supplier}`} value={supplier}>
+                          {supplier}
+                        </option>
+                      ))}
+                      <option value={NEW_SUPPLIER_OPTION} className="text-[#d4ff3f]">Novo fornecedor</option>
+                    </select>
+                    {isCustomSupplier && (
+                      <input
+                        required
+                        type="text"
+                        value={formData.fornecedor}
+                        onChange={(e) => setFormData({ ...formData, fornecedor: e.target.value })}
+                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        placeholder="Digite o nome do novo fornecedor"
+                      />
+                    )}
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Descrição</label>
@@ -817,8 +938,14 @@ export default function PayablesPage() {
                     <CurrencyInput
                       required
                       prefix="R$ "
+                      allowDecimals={false}
+                      disableAbbreviations
                       decimalSeparator=","
                       groupSeparator="."
+                      decimalsLimit={2}
+                      fixedDecimalLength={2}
+                      formatValueOnBlur={false}
+                      transformRawValue={transformRawCurrencyValue}
                       value={formData.valor}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
@@ -829,8 +956,14 @@ export default function PayablesPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Valor Pago</label>
                     <CurrencyInput
                       prefix="R$ "
+                      allowDecimals={false}
+                      disableAbbreviations
                       decimalSeparator=","
                       groupSeparator="."
+                      decimalsLimit={2}
+                      fixedDecimalLength={2}
+                      formatValueOnBlur={false}
+                      transformRawValue={transformRawCurrencyValue}
                       value={formData.valor_pago}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor_pago: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
@@ -941,7 +1074,7 @@ export default function PayablesPage() {
                   <div className="flex gap-3">
                     <button 
                       type="button"
-                      onClick={() => setIsModalOpen(false)}
+                      onClick={handleCloseModal}
                       className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
                     >
                       Cancelar
@@ -959,7 +1092,7 @@ export default function PayablesPage() {
                       onClick={() => {
                         if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
                           handleDelete(editingItem.id);
-                          setIsModalOpen(false);
+                          handleCloseModal();
                         }
                       }}
                       className="w-full px-4 py-3 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
