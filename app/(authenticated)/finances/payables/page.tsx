@@ -540,7 +540,7 @@ export default function PayablesPage() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
           >
             <Plus size={18} /> CONTA A PAGAR
           </button>
@@ -548,7 +548,7 @@ export default function PayablesPage() {
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest transition-all",
                 isFilterOpen ? "bg-[#1a1a1a] border-[#d4ff3f] text-[#d4ff3f]" : "bg-[#1a1a1a] border-slate-800/50 text-slate-500 hover:text-white"
               )}
             >
@@ -578,7 +578,7 @@ export default function PayablesPage() {
                     <select 
                       value={filters.situacao}
                       onChange={(e) => setFilters({ ...filters, situacao: e.target.value })}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-4 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-4 py-2 text-[12px] leading-none font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                     >
                       <option value="Todas">Todas as situações</option>
                       <option value="Aberto">Aberto</option>
@@ -594,7 +594,7 @@ export default function PayablesPage() {
                         type="date" 
                         value={filters.dataInicio}
                         onChange={(e) => setFilters({ ...filters, dataInicio: e.target.value })}
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-[12px] leading-none font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -603,7 +603,7 @@ export default function PayablesPage() {
                         type="date" 
                         value={filters.dataFim}
                         onChange={(e) => setFilters({ ...filters, dataFim: e.target.value })}
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2 text-[12px] leading-none font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                       />
                     </div>
                   </div>
@@ -613,13 +613,13 @@ export default function PayablesPage() {
           </div>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Download size={16} /> EXPORTAR
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Upload size={16} /> IMPORTAR
           </button>
@@ -638,12 +638,12 @@ export default function PayablesPage() {
         <div className="mb-8 p-4 bg-rose-500/10 border border-rose-500/20 rounded-2xl flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <AlertCircle className="text-rose-500" size={20} />
-            <p className="text-xs font-bold text-rose-500 uppercase tracking-tight">{error}</p>
+            <p className="text-[12px] leading-none font-bold text-rose-500 uppercase tracking-tight">{error}</p>
           </div>
           {error.includes('configurações') && (
             <a 
               href="/settings" 
-              className="px-4 py-2 bg-rose-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
+              className="px-4 py-2 bg-rose-500 text-white text-[12px] leading-none font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
             >
               Ir para Configurações
             </a>
@@ -664,8 +664,8 @@ export default function PayablesPage() {
               <card.icon size={24} />
             </div>
             <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-2xl font-black text-white">{card.value}</p>
+              <p className="text-slate-500 text-[12px] leading-none font-bold uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-[24px] leading-none font-black text-white">{card.value}</p>
             </div>
           </div>
         ))}
@@ -681,7 +681,7 @@ export default function PayablesPage() {
               placeholder="Pesquisar fornecedor ou descrição..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl pl-10 pr-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl pl-10 pr-4 py-2.5 text-[14px] leading-tight text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
             />
           </div>
         </div>
@@ -689,7 +689,7 @@ export default function PayablesPage() {
         <div className="">
           <table className="w-full text-left border-collapse table-fixed">
             <thead>
-              <tr className="bg-[#0a0a0a] text-slate-500 text-xs font-black uppercase tracking-widest border-b border-slate-800/50">
+              <tr className="bg-[#0a0a0a] text-slate-500 text-[12px] leading-none font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[15%]" onClick={() => handleSort('fornecedor')}>
                   <div className="flex items-center gap-1">
                     Fornecedor {getSortIcon('fornecedor')}
@@ -732,7 +732,7 @@ export default function PayablesPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
-                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
+                    <p className="text-[12px] leading-none font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
                   </td>
                 </tr>
               ) : currentItems.length === 0 ? (
@@ -746,7 +746,7 @@ export default function PayablesPage() {
                   <tr 
                     key={item.id} 
                     onClick={() => handleOpenModal(item)}
-                    className="hover:bg-[#0a0a0a] transition-colors group text-sm cursor-pointer"
+                    className="hover:bg-[#0a0a0a] transition-colors group text-[14px] leading-tight cursor-pointer"
                   >
                     <td className="px-2 py-2">
                       <p className="font-bold text-white leading-tight truncate" title={item.fornecedor}>{item.fornecedor}</p>
@@ -768,7 +768,7 @@ export default function PayablesPage() {
                     </td>
                     <td className="px-1 py-2">
                       <span className={cn(
-                        "inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                        "inline-flex items-center px-2 py-1 rounded-full text-[11px] leading-none font-black uppercase tracking-widest",
                         item.situacao === 'Pago' ? "bg-emerald-500/10 text-emerald-500" : 
                         item.situacao === 'Aberto' ? "bg-orange-500/10 text-orange-500" : 
                         "bg-blue-500/10 text-blue-500"
@@ -787,11 +787,11 @@ export default function PayablesPage() {
         <div className="p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Página</span>
+              <span className="text-[12px] leading-none font-bold text-slate-500 uppercase tracking-widest">Página</span>
               <select 
                 value={currentPage}
                 onChange={(e) => setCurrentPage(Number(e.target.value))}
-                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-xs font-black text-white outline-none"
+                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-[12px] leading-none font-black text-white outline-none"
               >
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
                   <option key={p} value={p}>{p}</option>
@@ -799,11 +799,11 @@ export default function PayablesPage() {
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Exibir</span>
+              <span className="text-[12px] leading-none font-bold text-slate-500 uppercase tracking-widest">Exibir</span>
               <select 
                 value={itemsPerPage}
                 onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-xs font-black text-white outline-none"
+                className="bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2.5 py-1.5 text-[12px] leading-none font-black text-white outline-none"
               >
                 {[10, 20, 50, 100].map(n => (
                   <option key={n} value={n}>{n}</option>
@@ -812,7 +812,7 @@ export default function PayablesPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+            <span className="text-[12px] leading-none font-bold text-slate-500 uppercase tracking-widest">
               {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredPayables.length)} de {filteredPayables.length}
             </span>
             <div className="flex gap-1">
