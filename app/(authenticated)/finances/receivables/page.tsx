@@ -20,13 +20,13 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Clock,
+  Building2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 // import * as XLSX from 'xlsx';
-import CurrencyInput from 'react-currency-input-field';
-import { handleFixedDecimalValueChange } from '@/lib/currency';
+import CurrencyInput from '@/components/CurrencyInput';
+import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 
 interface Receivable {
   id: string;
@@ -36,8 +36,13 @@ interface Receivable {
   data_recebimento: string | null;
   valor: number;
   valor_recebido: number;
-  situacao: 'Aberto' | 'Recebido' | 'Em andamento';
+  situacao: 'Aberto' | 'Recebido' | 'REC. PARCIAL';
   created_at?: string;
+}
+
+interface ReceivablePayer {
+  id: string;
+  nome: string;
 }
 
 interface ExcelRow {
@@ -53,9 +58,11 @@ interface ExcelRow {
 
 export default function ReceivablesPage() {
   const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [payerOptions, setPayerOptions] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Receivable | null>(null);
+  const [isCustomPayer, setIsCustomPayer] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -82,6 +89,23 @@ export default function ReceivablesPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
+  const NEW_PAYER_OPTION = '__novo_pagador__';
+
+  const normalizePayerName = (value: string) =>
+    value
+      .trim()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase('pt-BR');
+
+  const resolveReceivableSituation = (
+    valor: number,
+    valorRecebido: number,
+    currentSituation: Receivable['situacao']
+  ): Receivable['situacao'] => {
+    if (valor > 0 && valorRecebido >= valor) return 'Recebido';
+    if (valorRecebido > 0 && valorRecebido < valor) return 'REC. PARCIAL';
+    return 'Aberto';
+  };
 
   const generateNextId = async () => {
     const now = new Date();
@@ -177,7 +201,12 @@ export default function ReceivablesPage() {
         console.error('Error fetching receivables:', error);
         return;
       }
-      setReceivables(data || []);
+      setReceivables(
+        (data || []).map((item) => ({
+          ...item,
+          situacao: resolveReceivableSituation(item.valor, item.valor_recebido, item.situacao),
+        }))
+      );
     } catch (err) {
       console.error('Unexpected error:', err);
       setError('Erro inesperado ao carregar dados.');
@@ -186,12 +215,48 @@ export default function ReceivablesPage() {
     }
   }, []);
 
+  const fetchPayers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('contas_receber_pagadores')
+        .select('id, nome')
+        .order('nome', { ascending: true });
+
+      if (error) {
+        const { data: receivablesData, error: receivablesError } = await supabase
+          .from('contas_receber')
+          .select('cliente')
+          .order('cliente', { ascending: true });
+
+        if (receivablesError) throw receivablesError;
+
+        const fallbackPayers = Array.from(
+          new Set(
+            ((receivablesData as Array<{ cliente: string | null }> | null) || [])
+              .map((item) => (item.cliente || '').trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+          )
+        ).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+        setPayerOptions(fallbackPayers);
+        return;
+      }
+
+      setPayerOptions(((data as ReceivablePayer[] | null) || []).map((payer) => payer.nome));
+    } catch (err) {
+      console.error('Error fetching payers:', err instanceof Error ? err.message : err);
+      setPayerOptions([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchReceivables();
-  }, [fetchReceivables]);
+    fetchPayers();
+  }, [fetchReceivables, fetchPayers]);
 
   const handleOpenModal = (item?: Receivable) => {
     if (item) {
+      setIsCustomPayer(!payerOptions.some((payer) => normalizePayerName(payer) === normalizePayerName(item.cliente)));
       setEditingItem(item);
       setFormData({
         cliente: item.cliente,
@@ -203,6 +268,7 @@ export default function ReceivablesPage() {
         situacao: item.situacao
       });
     } else {
+      setIsCustomPayer(false);
       setEditingItem(null);
       setFormData({
         cliente: '',
@@ -219,10 +285,32 @@ export default function ReceivablesPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanedCliente = formData.cliente.trim().replace(/\s+/g, ' ');
+    const existingPayer = payerOptions.find(
+      (payer) => normalizePayerName(payer) === normalizePayerName(cleanedCliente)
+    );
+    const finalCliente = existingPayer || cleanedCliente;
+    const resolvedSituation = resolveReceivableSituation(
+      formData.valor,
+      formData.valor_recebido,
+      formData.situacao
+    );
     try {
+      if (finalCliente) {
+        const { error: payerError } = await supabase
+          .from('contas_receber_pagadores')
+          .upsert([{ nome: finalCliente }], { onConflict: 'nome' });
+
+        if (payerError) {
+          console.warn('Unable to persist payer option:', payerError);
+        }
+      }
+
       const payload = {
         ...formData,
+        cliente: finalCliente,
         data_recebimento: formData.data_recebimento || null,
+        situacao: resolvedSituation,
       };
 
       if (editingItem) {
@@ -239,11 +327,16 @@ export default function ReceivablesPage() {
         if (error) throw error;
       }
 
-      setIsModalOpen(false);
+      handleCloseModal();
       fetchReceivables();
+      fetchPayers();
     } catch (err) {
-      console.error('Error saving receivable:', err);
-      alert('Erro ao salvar conta a receber. Verifique se a tabela "contas_receber" existe no Supabase.');
+      const errorMessage =
+        err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
+          ? err.message
+          : 'Erro desconhecido ao salvar a conta a receber.';
+      console.error('Error saving receivable:', errorMessage, err);
+      alert(`Erro ao salvar conta a receber: ${errorMessage}`);
     }
   };
 
@@ -259,6 +352,11 @@ export default function ReceivablesPage() {
     } catch (err) {
       console.error('Error deleting receivable:', err);
     }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setIsCustomPayer(false);
   };
 
   const handleExport = async () => {
@@ -301,8 +399,11 @@ export default function ReceivablesPage() {
         let situacao: Receivable['situacao'] = 'Aberto';
         const rawSituacao = String(item.situacao || '').toUpperCase();
         if (rawSituacao === 'RECEBIDO' || rawSituacao === 'PAGO') situacao = 'Recebido';
-        else if (rawSituacao === 'EM ANDAMENTO') situacao = 'Em andamento';
+        else if (rawSituacao === 'REC. PARCIAL' || rawSituacao === 'REC PARCIAL' || rawSituacao === 'PARCIAL') situacao = 'REC. PARCIAL';
         else situacao = 'Aberto';
+
+        const valor = Number(item.valor) || 0;
+        const valorRecebido = Number(item.valor_recebido) || 0;
 
         return {
           id: ids[index],
@@ -310,16 +411,30 @@ export default function ReceivablesPage() {
           descricao: item.descricao || '',
           data_vencimento: formatDate(item.data_vencimento) || new Date().toISOString().split('T')[0],
           data_recebimento: formatDate(item.data_recebimento),
-          valor: Number(item.valor) || 0,
-          valor_recebido: Number(item.valor_recebido) || 0,
-          situacao
+          valor,
+          valor_recebido: valorRecebido,
+          situacao: resolveReceivableSituation(valor, valorRecebido, situacao)
         };
       });
 
       try {
         const { error } = await supabase.from('contas_receber').insert(mappedData);
         if (error) throw error;
+        const importedPayers = Array.from(
+          new Set(
+            mappedData
+              .map((item) => item.cliente.trim().replace(/\s+/g, ' '))
+              .filter(Boolean)
+          )
+        ).map((nome) => ({ nome }));
+        if (importedPayers.length > 0) {
+          const { error: payerError } = await supabase
+            .from('contas_receber_pagadores')
+            .upsert(importedPayers, { onConflict: 'nome' });
+          if (payerError) throw payerError;
+        }
         fetchReceivables();
+        fetchPayers();
         alert('Dados importados com sucesso!');
       } catch (err) {
         console.error('Error importing data:', err);
@@ -360,7 +475,14 @@ export default function ReceivablesPage() {
   const totalValue = receivables.reduce((acc, curr) => acc + curr.valor, 0);
   const receivedValue = receivables.reduce((acc, curr) => acc + curr.valor_recebido, 0);
   const openValue = receivables.filter(r => r.situacao === 'Aberto').reduce((acc, curr) => acc + curr.valor, 0);
-  const inProgressValue = receivables.filter(r => r.situacao === 'Em andamento').reduce((acc, curr) => acc + curr.valor, 0);
+  const partialReceivables = receivables
+    .filter((item) => item.valor_recebido > 0 && item.valor_recebido < item.valor)
+    .map((item) => ({
+      ...item,
+      saldoDevedor: item.valor - item.valor_recebido,
+    }))
+    .sort((a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR'));
+  const partialDebtValue = partialReceivables.reduce((acc, curr) => acc + curr.saldoDevedor, 0);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -387,7 +509,7 @@ export default function ReceivablesPage() {
         <div className="flex items-center gap-4">
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
           >
             <Plus size={18} /> CONTA A RECEBER
           </button>
@@ -395,7 +517,7 @@ export default function ReceivablesPage() {
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
                 isFilterOpen ? "bg-[#1a1a1a] border-[#d4ff3f] text-[#d4ff3f]" : "bg-[#1a1a1a] border-slate-800/50 text-slate-500 hover:text-white"
               )}
             >
@@ -430,7 +552,7 @@ export default function ReceivablesPage() {
                       <option value="Todas">Todas as situações</option>
                       <option value="Aberto">Aberto</option>
                       <option value="Recebido">Recebido</option>
-                      <option value="Em andamento">Em andamento</option>
+                      <option value="REC. PARCIAL">REC. PARCIAL</option>
                     </select>
                   </div>
                   
@@ -460,13 +582,13 @@ export default function ReceivablesPage() {
           </div>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Download size={16} /> EXPORTAR
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
           >
             <Upload size={16} /> IMPORTAR
           </button>
@@ -490,7 +612,7 @@ export default function ReceivablesPage() {
           {error.includes('configurações') && (
             <a 
               href="/settings" 
-              className="px-4 py-2 bg-rose-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
+              className="px-4 py-2 bg-rose-500 text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-rose-600 transition-all"
             >
               Ir para Configurações
             </a>
@@ -504,15 +626,15 @@ export default function ReceivablesPage() {
           { label: 'Valor', value: formatCurrency(totalValue), icon: TrendingUp, color: 'text-slate-500' },
           { label: 'Valor recebido', value: formatCurrency(receivedValue), icon: CheckCircle2, color: 'text-emerald-500' },
           { label: 'Valor em aberto', value: formatCurrency(openValue), icon: AlertCircle, color: 'text-orange-500' },
-          { label: 'Valor em andamento', value: formatCurrency(inProgressValue), icon: Clock, color: 'text-blue-500' },
+          { label: 'Saldo parcial', value: formatCurrency(partialDebtValue), icon: Building2, color: 'text-amber-400' },
         ].map((card) => (
           <div key={card.label} className="bg-[#1a1a1a] p-6 rounded-2xl border border-slate-800/50 shadow-sm flex items-center gap-4">
             <div className={cn("p-3 rounded-xl bg-[#0a0a0a]", card.color)}>
               <card.icon size={24} />
             </div>
             <div>
-              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-xl font-black text-white">{card.value}</p>
+              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-2xl font-black text-white">{card.value}</p>
             </div>
           </div>
         ))}
@@ -536,7 +658,7 @@ export default function ReceivablesPage() {
         <div className="">
           <table className="w-full text-left border-collapse table-fixed">
             <thead>
-              <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
+              <tr className="bg-[#0a0a0a] text-slate-500 text-xs font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[15%]" onClick={() => handleSort('cliente')}>
                   <div className="flex items-center gap-1">
                     Cliente {getSortIcon('cliente')}
@@ -579,7 +701,7 @@ export default function ReceivablesPage() {
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
+                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">Carregando dados...</p>
                   </td>
                 </tr>
               ) : currentItems.length === 0 ? (
@@ -593,7 +715,7 @@ export default function ReceivablesPage() {
                   <tr 
                     key={item.id} 
                     onClick={() => handleOpenModal(item)}
-                    className="hover:bg-[#0a0a0a] transition-colors group text-[10px] cursor-pointer"
+                    className="hover:bg-[#0a0a0a] transition-colors group text-sm cursor-pointer"
                   >
                     <td className="px-2 py-2">
                       <p className="font-bold text-white leading-tight truncate" title={item.cliente}>{item.cliente}</p>
@@ -615,8 +737,9 @@ export default function ReceivablesPage() {
                     </td>
                     <td className="px-1 py-2">
                       <span className={cn(
-                        "inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest",
+                        "inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
                         item.situacao === 'Recebido' ? "bg-emerald-500/10 text-emerald-500" : 
+                        item.situacao === 'REC. PARCIAL' ? "bg-amber-500/10 text-amber-400" :
                         item.situacao === 'Aberto' ? "bg-orange-500/10 text-orange-500" : 
                         "bg-blue-500/10 text-blue-500"
                       )}>
@@ -682,6 +805,71 @@ export default function ReceivablesPage() {
         </div>
       </div>
 
+      <div className="mt-8 bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-black tracking-tight">Recebimentos Parciais</h3>
+            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">
+              Clientes com saldo devedor ainda não totalizado
+            </p>
+          </div>
+          <span className="inline-flex items-center px-3 py-1 rounded-xl bg-amber-500/10 text-amber-400 text-xs font-black uppercase tracking-widest">
+            {partialReceivables.length} pendências
+          </span>
+        </div>
+
+        {partialReceivables.length === 0 ? (
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm font-bold text-slate-500">Nenhum recebimento parcial no momento.</p>
+          </div>
+        ) : (
+          <div>
+            <table className="w-full text-left border-collapse table-fixed">
+              <thead>
+                <tr className="bg-[#0a0a0a] text-slate-500 text-xs font-black uppercase tracking-widest border-b border-slate-800/50">
+                  <th className="px-2 py-2 w-[20%]">Cliente</th>
+                  <th className="px-2 py-2 w-[24%]">Descrição</th>
+                  <th className="px-1 py-2 w-[14%]">Situação</th>
+                  <th className="px-1 py-2 w-[14%]">Valor Total</th>
+                  <th className="px-1 py-2 w-[14%]">Valor Pago</th>
+                  <th className="px-1 py-2 w-[14%]">Saldo Devedor</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/50">
+                {partialReceivables.map((item) => (
+                  <tr
+                    key={`partial-${item.id}`}
+                    onClick={() => handleOpenModal(item)}
+                    className="hover:bg-[#0a0a0a] transition-colors group text-sm cursor-pointer"
+                  >
+                    <td className="px-2 py-2">
+                      <p className="font-bold text-white leading-tight truncate" title={item.cliente}>{item.cliente}</p>
+                    </td>
+                    <td className="px-2 py-2">
+                      <p className="text-slate-400 leading-tight truncate" title={item.descricao}>{item.descricao}</p>
+                    </td>
+                    <td className="px-1 py-2">
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-500/10 text-amber-400">
+                        REC. PARCIAL
+                      </span>
+                    </td>
+                    <td className="px-1 py-2">
+                      <p className="font-black text-white">{formatCurrency(item.valor)}</p>
+                    </td>
+                    <td className="px-1 py-2">
+                      <p className="font-bold text-emerald-500">{formatCurrency(item.valor_recebido)}</p>
+                    </td>
+                    <td className="px-1 py-2">
+                      <p className="font-black text-amber-400">{formatCurrency(item.saldoDevedor)}</p>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Modal */}
       <AnimatePresence>
         {isModalOpen && (
@@ -690,7 +878,7 @@ export default function ReceivablesPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setIsModalOpen(false)}
+              onClick={handleCloseModal}
               className="absolute inset-0 bg-black/40 backdrop-blur-sm"
             />
             <motion.div 
@@ -703,7 +891,7 @@ export default function ReceivablesPage() {
                 <h3 className="text-lg font-black tracking-tight text-white">
                   {editingItem ? 'Editar Conta' : 'Nova Conta a Receber'}
                 </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -711,15 +899,44 @@ export default function ReceivablesPage() {
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Cliente</label>
-                    <input 
-                      required
-                      type="text" 
-                      value={formData.cliente}
-                      onChange={(e) => setFormData({...formData, cliente: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                      placeholder="Nome do cliente"
-                    />
+                    <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Pagador</label>
+                    <select
+                      required={!isCustomPayer}
+                      value={isCustomPayer ? NEW_PAYER_OPTION : formData.cliente}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === NEW_PAYER_OPTION) {
+                          setIsCustomPayer(true);
+                          setFormData({ ...formData, cliente: '' });
+                          return;
+                        }
+
+                        setIsCustomPayer(false);
+                        setFormData({ ...formData, cliente: value });
+                      }}
+                      className={cn(
+                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
+                        isCustomPayer ? "text-[#d4ff3f]" : "text-white"
+                      )}
+                    >
+                      <option value="" disabled>Selecione um pagador</option>
+                      {payerOptions.map((payer) => (
+                        <option key={`payer-${payer}`} value={payer}>
+                          {payer}
+                        </option>
+                      ))}
+                      <option value={NEW_PAYER_OPTION} className="text-[#d4ff3f]">Novo pagador</option>
+                    </select>
+                    {isCustomPayer && (
+                      <input
+                        required
+                        type="text"
+                        value={formData.cliente}
+                        onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
+                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        placeholder="Digite o nome do novo pagador"
+                      />
+                    )}
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Descrição</label>
@@ -756,8 +973,14 @@ export default function ReceivablesPage() {
                     <CurrencyInput
                       required
                       prefix="R$ "
+                      allowDecimals={false}
+                      disableAbbreviations
                       decimalSeparator=","
                       groupSeparator="."
+                      decimalsLimit={2}
+                      fixedDecimalLength={2}
+                      formatValueOnBlur={false}
+                      transformRawValue={transformRawCurrencyValue}
                       value={formData.valor}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
@@ -768,8 +991,14 @@ export default function ReceivablesPage() {
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Valor Recebido</label>
                     <CurrencyInput
                       prefix="R$ "
+                      allowDecimals={false}
+                      disableAbbreviations
                       decimalSeparator=","
                       groupSeparator="."
+                      decimalsLimit={2}
+                      fixedDecimalLength={2}
+                      formatValueOnBlur={false}
+                      transformRawValue={transformRawCurrencyValue}
                       value={formData.valor_recebido}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor_recebido: Number(v || 0)}))}
                       className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
@@ -779,7 +1008,7 @@ export default function ReceivablesPage() {
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Situação</label>
                     <div className="grid grid-cols-3 gap-2">
-                      {['Aberto', 'Recebido', 'Em andamento'].map((s) => (
+                      {['Aberto', 'Recebido', 'REC. PARCIAL'].map((s) => (
                         <button
                           key={s}
                           type="button"
@@ -802,7 +1031,7 @@ export default function ReceivablesPage() {
                   <div className="flex gap-3">
                     <button 
                       type="button"
-                      onClick={() => setIsModalOpen(false)}
+                      onClick={handleCloseModal}
                       className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
                     >
                       Cancelar
@@ -820,7 +1049,7 @@ export default function ReceivablesPage() {
                       onClick={() => {
                         if (window.confirm('Tem certeza que deseja excluir esta conta? Esta ação não pode ser desfeita.')) {
                           handleDelete(editingItem.id);
-                          setIsModalOpen(false);
+                          handleCloseModal();
                         }
                       }}
                       className="w-full px-4 py-3 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
