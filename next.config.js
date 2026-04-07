@@ -5,18 +5,7 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  experimental: {
-    webpackBuildWorker: false,
-  },
-  webpack: (config) => {
-    if (config.optimization) {
-      config.optimization.minimize = false;
-    }
-    return config;
-  },
+  turbopack: {},
   images: {
     remotePatterns: [
       {
