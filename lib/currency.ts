@@ -1,6 +1,9 @@
 /**
  * Handles fixed decimal input logic for currency fields.
- * Example: typing "123" results in "1.23"
+ * Example:
+ * "2" -> "0.02"
+ * "25" -> "0.25"
+ * "254" -> "2.54"
  */
 export const handleFixedDecimalValueChange = (
   newValue: string | undefined,
@@ -11,23 +14,21 @@ export const handleFixedDecimalValueChange = (
     return;
   }
 
-  // Extract only digits
   const digits = newValue.replace(/\D/g, '');
-  
+
   if (!digits) {
     onChange(undefined);
     return;
   }
 
-  // Convert to number (cents)
-  const cents = parseInt(digits, 10);
-  const amount = cents / 100;
-  
-  if (isNaN(amount)) {
-    onChange(undefined);
-    return;
-  }
+  const normalizedDigits = digits.replace(/^0+(?=\d)/, '');
+  const safeDigits = normalizedDigits === '' ? '0' : normalizedDigits;
+  const integerPart = safeDigits.length > 2 ? safeDigits.slice(0, -2) : '0';
+  const decimalPart = safeDigits.length > 2
+    ? safeDigits.slice(-2)
+    : safeDigits.padStart(2, '0');
 
-  // Return formatted string with 2 decimal places
-  onChange(amount.toFixed(2));
+  onChange(`${integerPart}.${decimalPart}`);
 };
+
+export const transformRawCurrencyValue = (rawValue: string) => rawValue.replace(/\D/g, '');

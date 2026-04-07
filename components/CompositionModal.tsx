@@ -14,8 +14,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { Insumo, CompositionItem } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils';
-import CurrencyInput from 'react-currency-input-field';
-import { handleFixedDecimalValueChange } from '@/lib/currency';
+import CurrencyInput from '@/components/CurrencyInput';
+import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 
 interface CompositionModalProps {
   isOpen: boolean;
@@ -430,9 +430,14 @@ export default function CompositionModal({
                             value={item.p_unit}
                             onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => updatePrice(idx, Number(v || 0)))}
                             prefix="R$ "
+                            allowDecimals={false}
+                            disableAbbreviations
                             decimalSeparator=","
                             groupSeparator="."
                             decimalsLimit={2}
+                            fixedDecimalLength={2}
+                            formatValueOnBlur={false}
+                            transformRawValue={transformRawCurrencyValue}
                             className="w-full bg-transparent border-none p-0 text-[10px] text-white outline-none focus:ring-0 font-bold"
                           />
                         </div>

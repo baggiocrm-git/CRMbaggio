@@ -13,8 +13,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { CONSTRUCTION_STAGES } from '@/lib/constants';
-import CurrencyInput from 'react-currency-input-field';
-import { handleFixedDecimalValueChange } from '@/lib/currency';
+import CurrencyInput from '@/components/CurrencyInput';
+import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
 
 interface Project {
@@ -388,8 +388,14 @@ export default function BudgetEditor({ budgetId }: BudgetEditorProps) {
                             <div className="col-span-1">
                               <CurrencyInput
                                 prefix="R$ "
+                                allowDecimals={false}
+                                disableAbbreviations
                                 decimalSeparator=","
                                 groupSeparator="."
+                                decimalsLimit={2}
+                                fixedDecimalLength={2}
+                                formatValueOnBlur={false}
+                                transformRawValue={transformRawCurrencyValue}
                                 value={item.preco_unitario}
                                 onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => updateItem(item.id, 'preco_unitario', Number(v || 0)))}
                                 className="w-full bg-transparent border-none text-xs font-black text-[#d4ff3f] text-right outline-none"
