@@ -90,7 +90,7 @@ export default function CalendarPage() {
   const [view, setView] = useState<ViewType>('month');
   const [events, setEvents] = useState<Event[]>([]); // Start empty, will fill with mock if not connected
   const [calendars, setCalendars] = useState<GoogleCalendar[]>([]);
-  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>(['primary']);
+  const [selectedCalendarIds, setSelectedCalendarIds] = useState<string[]>([]);
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,12 +99,14 @@ export default function CalendarPage() {
   useEffect(() => {
     if (!isGoogleConnected) {
       setEvents(MOCK_EVENTS);
-      setCalendars([
+      const mockCalendars = [
         { id: 'pessoal', summary: 'Pessoal', backgroundColor: '#3b82f6' },
         { id: 'trabalho', summary: 'Trabalho', backgroundColor: '#d4ff3f' },
         { id: 'projetos', summary: 'Projetos', backgroundColor: '#f97316' },
         { id: 'feriados', summary: 'Feriados', backgroundColor: '#f43f5e' },
-      ]);
+      ];
+      setCalendars(mockCalendars);
+      setSelectedCalendarIds(mockCalendars.map((calendar) => calendar.id));
     }
   }, [isGoogleConnected]);
 
@@ -125,31 +127,30 @@ export default function CalendarPage() {
         }, []);
 
         setCalendars(uniqueCalendars);
-        const primary = uniqueCalendars.find((c: GoogleCalendar) => c.primary);
-        if (primary) {
-          setSelectedCalendarIds([primary.id]);
-        } else if (uniqueCalendars.length > 0) {
-          setSelectedCalendarIds([uniqueCalendars[0].id]);
-        }
+        setSelectedCalendarIds((prev) => {
+          const validSelectedIds = prev.filter((id) => uniqueCalendars.some((calendar) => calendar.id === id));
+          if (validSelectedIds.length > 0) return validSelectedIds;
+          return uniqueCalendars.map((calendar) => calendar.id);
+        });
       }
     } catch (err) {
       console.error('Error fetching calendar list:', err);
     }
   }, []);
 
-  const fetchGoogleEvents = React.useCallback(async () => {
+  const fetchGoogleEvents = React.useCallback(async (calendarIds: string[], availableCalendars: GoogleCalendar[]) => {
     try {
       setIsSyncing(true);
       setError(null);
       
-      if (selectedCalendarIds.length === 0) {
+      if (calendarIds.length === 0) {
         setEvents([]);
         setIsSyncing(false);
         return;
       }
 
       // Fetch from all selected calendars
-      const allEventsPromises = selectedCalendarIds.map(async (calendarId) => {
+      const allEventsPromises = calendarIds.map(async (calendarId) => {
         const response = await fetch(`/api/google/calendar/events?calendarId=${encodeURIComponent(calendarId)}`);
         if (!response.ok) {
           const errorData = await response.json();
@@ -158,7 +159,7 @@ export default function CalendarPage() {
         const data = await response.json();
         
         // Find calendar color
-        const calendar = calendars.find(c => c.id === calendarId);
+        const calendar = availableCalendars.find(c => c.id === calendarId);
         
         return data.map((e: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }) => ({
           id: e.id,
@@ -191,14 +192,21 @@ export default function CalendarPage() {
     } finally {
       setIsSyncing(false);
     }
-  }, [selectedCalendarIds, calendars]);
+  }, []);
 
   // Re-fetch events when selected calendars change
   useEffect(() => {
-    if (isGoogleConnected && selectedCalendarIds.length > 0) {
-      fetchGoogleEvents();
+    if (!isGoogleConnected) return;
+
+    if (selectedCalendarIds.length === 0) {
+      setEvents([]);
+      return;
     }
-  }, [isGoogleConnected, selectedCalendarIds, fetchGoogleEvents]);
+
+    if (calendars.length > 0) {
+      fetchGoogleEvents(selectedCalendarIds, calendars);
+    }
+  }, [isGoogleConnected, selectedCalendarIds, calendars, fetchGoogleEvents]);
 
   const next = () => {
     if (view === 'month') setCurrentDate(addMonths(currentDate, 1));
@@ -232,6 +240,7 @@ export default function CalendarPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user?.app_metadata?.provider === 'google') {
         setIsGoogleConnected(true);
+        fetchGoogleCalendars();
         return;
       }
 
@@ -245,7 +254,6 @@ export default function CalendarPage() {
       if (tokens) {
         setIsGoogleConnected(true);
         fetchGoogleCalendars();
-        fetchGoogleEvents();
       }
     };
 
@@ -255,14 +263,13 @@ export default function CalendarPage() {
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS' || event.data?.type === 'OAUTH_AUTH_SUCCESS') {
         setIsGoogleConnected(true);
         fetchGoogleCalendars();
-        fetchGoogleEvents();
       } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
         setError(`Erro na autenticação: ${event.data.message}`);
       }
     };
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [fetchGoogleCalendars, fetchGoogleEvents]);
+  }, [fetchGoogleCalendars]);
 
   const renderHeader = () => (
     <header className="p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/20">
@@ -298,7 +305,7 @@ export default function CalendarPage() {
         </div>
 
         <button 
-          onClick={fetchGoogleEvents}
+          onClick={() => fetchGoogleEvents(selectedCalendarIds, calendars)}
           disabled={isSyncing}
           className={cn(
             "flex items-center justify-center gap-2 px-4 py-2 w-[180px] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]",
@@ -641,7 +648,7 @@ export default function CalendarPage() {
                     checked={selectedCalendarIds.includes(cal.id)}
                     onChange={(e) => {
                       if (e.target.checked) {
-                        setSelectedCalendarIds(prev => [...prev, cal.id]);
+                        setSelectedCalendarIds(prev => prev.includes(cal.id) ? prev : [...prev, cal.id]);
                       } else {
                         setSelectedCalendarIds(prev => prev.filter(id => id !== cal.id));
                       }
