@@ -654,17 +654,23 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
                       <p className="text-sm font-black">Script SQL: R.H. (Equipe)</p>
                       <div className="relative group">
                         <pre className="p-4 bg-[#0a0a0a] border border-slate-800 rounded-xl text-[10px] font-mono text-slate-400 overflow-x-auto">
-                          {`-- Adicionar colunas para cursos e documentos na tabela equipe
+                          {`-- Adicionar colunas para cursos, documentos e dados complementares na tabela equipe
 ALTER TABLE public.equipe 
 ADD COLUMN IF NOT EXISTS cursos JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb;`}
+ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS funcao TEXT,
+ADD COLUMN IF NOT EXISTS data_admissao DATE,
+ADD COLUMN IF NOT EXISTS data_demissao DATE;`}
                         </pre>
                         <button 
                           onClick={() => {
-                            const sql = `-- Adicionar colunas para cursos e documentos na tabela equipe
+                            const sql = `-- Adicionar colunas para cursos, documentos e dados complementares na tabela equipe
 ALTER TABLE public.equipe 
 ADD COLUMN IF NOT EXISTS cursos JSONB DEFAULT '[]'::jsonb,
-ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb;`;
+ADD COLUMN IF NOT EXISTS documentos_anexos JSONB DEFAULT '[]'::jsonb,
+ADD COLUMN IF NOT EXISTS funcao TEXT,
+ADD COLUMN IF NOT EXISTS data_admissao DATE,
+ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                             navigator.clipboard.writeText(sql);
                             alert('Script SQL copiado para a área de transferência!');
                           }}
