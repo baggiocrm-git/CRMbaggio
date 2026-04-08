@@ -11,13 +11,14 @@ interface HeaderProps {
   onSearch?: (value: string) => void;
   onRefresh?: () => void;
   isRefreshing?: boolean;
+  extraAction?: React.ReactNode;
   action?: {
     label: string;
     onClick: () => void;
   };
 }
 
-const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, onRefresh, isRefreshing, action }: HeaderProps) {
+const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, onRefresh, isRefreshing, extraAction, action }: HeaderProps) {
   return (
     <header className="h-20 border-b border-slate-800/50 bg-[#0a0a0a] px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
       <div className="flex items-center gap-4">
@@ -40,22 +41,26 @@ const Header = React.memo(function Header({ title, subtitle, searchValue, onSear
       </div>
 
       <div className="flex items-center gap-6">
-        <div className="hidden md:flex items-center gap-3 bg-[#1a1a1a] rounded-2xl px-4 py-2 border border-slate-800/50 focus-within:border-[#d4ff3f]/50 transition-all">
-          <Search size={18} className="text-slate-500" />
-          <input 
-            type="text" 
-            placeholder="Pesquisar..." 
-            value={searchValue}
-            onChange={(e) => onSearch?.(e.target.value)}
-            className="bg-transparent border-none focus:ring-0 text-sm text-white w-64 placeholder:text-slate-700 font-bold"
-          />
-        </div>
+        {onSearch && (
+          <div className="hidden md:flex items-center gap-3 bg-[#1a1a1a] rounded-2xl px-4 py-2 border border-slate-800/50 focus-within:border-[#d4ff3f]/50 transition-all">
+            <Search size={18} className="text-slate-500" />
+            <input 
+              type="text" 
+              placeholder="Pesquisar..." 
+              value={searchValue ?? ''}
+              onChange={(e) => onSearch(e.target.value)}
+              className="bg-transparent border-none focus:ring-0 text-sm text-white w-64 placeholder:text-slate-700 font-bold"
+            />
+          </div>
+        )}
 
         <div className="flex items-center gap-3 border-l border-slate-800/50 pl-6">
           <button className="size-10 flex items-center justify-center rounded-2xl bg-[#1a1a1a] text-slate-500 hover:text-[#d4ff3f] hover:bg-[#2a2a2a] transition-all relative group">
             <Bell size={20} className="group-hover:scale-110 transition-transform" />
             <span className="absolute top-2.5 right-2.5 size-2 bg-rose-500 rounded-full border-2 border-[#0a0a0a]"></span>
           </button>
+
+          {extraAction}
           
           {action && (
             <button 
