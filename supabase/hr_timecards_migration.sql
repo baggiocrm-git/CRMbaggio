@@ -16,6 +16,9 @@ create table if not exists public.equipe_cartoes_ponto (
   horas_extras_50 numeric(8,2) not null default 0,
   horas_extras_100 numeric(8,2) not null default 0,
   adicional_noturno numeric(8,2) not null default 0,
+  adicional_noturno_inicio text,
+  adicional_noturno_fim text,
+  periculosidade_descricao text,
   falta_descricao text,
   atestado_descricao text,
   observacoes text,
@@ -26,7 +29,10 @@ create table if not exists public.equipe_cartoes_ponto (
 
 alter table public.equipe_cartoes_ponto
   add column if not exists falta_descricao text,
-  add column if not exists atestado_descricao text;
+  add column if not exists atestado_descricao text,
+  add column if not exists adicional_noturno_inicio text,
+  add column if not exists adicional_noturno_fim text,
+  add column if not exists periculosidade_descricao text;
 
 create index if not exists equipe_cartoes_ponto_competencia_idx
   on public.equipe_cartoes_ponto (competencia desc);

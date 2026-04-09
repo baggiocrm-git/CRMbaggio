@@ -82,16 +82,9 @@ export default function ClientRDOPage() {
     router.push('/login');
   };
 
-  const banner = (
-    <div className="fixed top-0 left-0 right-0 z-[99999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-2xl pointer-events-none">
-      VERSÃO: 20260326-2358 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a]">
-        {banner}
         <Loader2 className="animate-spin text-[#d4ff3f]" size={32} />
       </div>
     );
@@ -100,7 +93,6 @@ export default function ClientRDOPage() {
   if (!project) {
     return (
       <div className="p-8 text-center min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center">
-        {banner}
         <AlertCircle className="text-rose-500 mb-4" size={48} />
         <h2 className="text-xl font-black text-white">Acesso Negado</h2>
         <p className="text-slate-500 mt-2">Você não tem permissão para visualizar este projeto.</p>
@@ -110,8 +102,7 @@ export default function ClientRDOPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] pb-20 pt-6">
-      {banner}
+    <div className="min-h-screen bg-[#0a0a0a] pb-20">
       {/* Client Header */}
       <div className="bg-[#1a1a1a] border-b border-slate-800/50 px-6 py-4 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md bg-opacity-80">
         <div>

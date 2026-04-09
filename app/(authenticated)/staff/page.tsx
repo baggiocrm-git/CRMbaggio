@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Header from '@/components/Header';
+import CurrencyInput from '@/components/CurrencyInput';
 import { supabase } from '@/lib/supabase';
 import { 
   Users, 
@@ -17,7 +18,12 @@ import {
   Wallet,
   ReceiptText,
   Clock3,
-  Pencil
+  Pencil,
+  Moon,
+  AlertTriangle,
+  Settings,
+  Filter,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -78,7 +84,7 @@ interface StaffPayment {
   funcionario_id: string;
   funcionario_nome_snapshot: string;
   competencia: string;
-  tipo: 'adiantamento' | 'pagamento';
+  tipo?: 'adiantamento' | 'pagamento' | null;
   banco?: string | null;
   agencia?: string | null;
   conta?: string | null;
@@ -106,10 +112,24 @@ interface TimecardEntry {
   horas_extras_50: number;
   horas_extras_100: number;
   adicional_noturno: number;
+  adicional_noturno_inicio?: string | null;
+  adicional_noturno_fim?: string | null;
+  periculosidade_descricao?: string | null;
   falta_descricao?: string | null;
   atestado_descricao?: string | null;
   observacoes?: string | null;
   created_at: string;
+}
+
+interface ReceiptSelectionState {
+  movementId: string;
+  vt: boolean;
+  vc: boolean;
+  vm: boolean;
+  gratificacao: boolean;
+  outros: boolean;
+  outrosDescricao: string;
+  outrosValor: string;
 }
 
 interface StaffMember {
@@ -170,6 +190,18 @@ type AccordionSection =
   | 'cursos'
   | 'documentos'
   | 'desligamento';
+
+type StaffDirectoryFilterState = {
+  search: string;
+  status: 'todos' | StaffMember['status'];
+  category: string;
+};
+
+type PayrollFilterState = {
+  search: string;
+  situation: 'todas' | 'com-falta' | 'com-atestado' | 'em-experiencia' | 'em-ferias' | 'com-adiantamento' | 'regular';
+  local: string;
+};
 
 const predefinedDepartments = ['Administrativo', 'Externo'] as const;
 
@@ -265,7 +297,20 @@ const getOverlapMinutes = (start: number, end: number, rangeStart: number, range
   return Math.max(0, overlapEnd - overlapStart);
 };
 
-const calculateShiftMetrics = (dateReference: string, punches: string[]) => {
+const calculateSpanMinutes = (startRaw?: string | null, endRaw?: string | null) => {
+  const start = timeToMinutes(startRaw);
+  const end = timeToMinutes(endRaw);
+  if (start === null || end === null) return 0;
+  if (end > start) return end - start;
+  if (end < start) return 24 * 60 - start + end;
+  return 0;
+};
+
+const calculateShiftMetrics = (
+  dateReference: string,
+  punches: string[],
+  manualNightWindow?: { inicio?: string | null; fim?: string | null }
+) => {
   const pairs = [
     [punches[0], punches[1]],
     [punches[2], punches[3]],
@@ -302,11 +347,16 @@ const calculateShiftMetrics = (dateReference: string, punches: string[]) => {
     extra50Minutes = totalMinutes;
   }
 
+  const manualNightMinutes = calculateSpanMinutes(
+    manualNightWindow?.inicio || null,
+    manualNightWindow?.fim || null
+  );
+
   return {
     horas_trabalhadas: Number((totalMinutes / 60).toFixed(2)),
     horas_extras_50: Number((extra50Minutes / 60).toFixed(2)),
     horas_extras_100: Number((extra100Minutes / 60).toFixed(2)),
-    adicional_noturno: Number((nightMinutes / 60).toFixed(2)),
+    adicional_noturno: Number(((nightMinutes + manualNightMinutes) / 60).toFixed(2)),
   };
 };
 
@@ -316,6 +366,107 @@ const parseCompetenciaFromFileName = (fileName: string) => {
 
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const HAZARD_NOTES_HEADING = 'Periculosidade do cartão:';
+const STAFF_SETTINGS_STORAGE_KEY = 'staff-rh-settings';
+const COMPANY_SETTINGS_STORAGE_KEY = 'system-company-settings';
+const CBSL_LOGO_URL = 'https://raw.githubusercontent.com/baggiocrm-git/imagens/main/LOGO%20CBSL_sem%20escrita_Pequeno.png';
+const RECEIPT_CITY = 'São Paulo - SP';
+
+const stripGeneratedHazardNotes = (value?: string | null) =>
+  String(value || '')
+    .replace(new RegExp(`(?:\\n---\\n)?${HAZARD_NOTES_HEADING}[\\s\\S]*$`), '')
+    .trim();
+
+const mergePayrollNotes = (manualNotes?: string | null, generatedNotes?: string | null) => {
+  const manual = stripGeneratedHazardNotes(manualNotes);
+  const generated = String(generatedNotes || '').trim();
+  if (!manual && !generated) return null;
+  if (!generated) return manual || null;
+  if (!manual) return `${HAZARD_NOTES_HEADING}\n${generated}`;
+  return `${manual}\n---\n${HAZARD_NOTES_HEADING}\n${generated}`;
+};
+
+const parseNumericConfig = (value: string) => {
+  const parsed = parseCurrencyLike(value);
+  return parsed ?? 0;
+};
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const getBenefitTotal = (
+  movement: Pick<PayrollMovement, 'vale_transporte' | 'vale_cafe' | 'vale_mercado'>,
+  valeTransportePrice: number
+) => {
+  const qty = Number(String(movement.vale_transporte || '').replace(/[^\d]/g, ''));
+  return qty * valeTransportePrice + Number(movement.vale_cafe || 0) + Number(movement.vale_mercado || 0);
+};
+
+const numberToPortugueseWords = (value: number) => {
+  const units = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+  const teens = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+  const tens = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+  const hundreds = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+  const convertHundreds = (n: number): string => {
+    if (n === 0) return '';
+    if (n < 10) return units[n];
+    if (n < 20) return teens[n - 10];
+    if (n < 100) {
+      const ten = Math.floor(n / 10);
+      const unit = n % 10;
+      return unit ? `${tens[ten]} e ${units[unit]}` : tens[ten];
+    }
+    if (n === 100) return 'cem';
+    const hundred = Math.floor(n / 100);
+    const remainder = n % 100;
+    return remainder ? `${hundreds[hundred]} e ${convertHundreds(remainder)}` : hundreds[hundred];
+  };
+
+  const convertInteger = (n: number): string => {
+    if (n === 0) return 'zero';
+
+    const millions = Math.floor(n / 1000000);
+    const thousands = Math.floor((n % 1000000) / 1000);
+    const rest = n % 1000;
+    const parts: string[] = [];
+
+    if (millions) {
+      parts.push(`${convertHundreds(millions)} ${millions === 1 ? 'milhão' : 'milhões'}`);
+    }
+
+    if (thousands) {
+      if (thousands === 1) {
+        parts.push('mil');
+      } else {
+        parts.push(`${convertHundreds(thousands)} mil`);
+      }
+    }
+
+    if (rest) {
+      parts.push(convertHundreds(rest));
+    }
+
+    return parts
+      .filter(Boolean)
+      .join(parts.length > 1 ? ', ' : '')
+      .replace(/, ([^,]*)$/, ' e $1');
+  };
+
+  const integerPart = Math.floor(value);
+  const cents = Math.round((value - integerPart) * 100);
+  const integerWords = `${convertInteger(integerPart)} ${integerPart === 1 ? 'real' : 'reais'}`;
+
+  if (!cents) return integerWords;
+
+  return `${integerWords} e ${convertInteger(cents)} ${cents === 1 ? 'centavo' : 'centavos'}`;
 };
 
 const inferDepartmentFromImport = (localTrabalho: string, funcao: string) => {
@@ -389,10 +540,19 @@ export default function StaffPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTimecardPanelOpen, setIsTimecardPanelOpen] = useState(false);
+  const [isPaymentsPanelOpen, setIsPaymentsPanelOpen] = useState(false);
   const [isTimecardModalOpen, setIsTimecardModalOpen] = useState(false);
   const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
+  const [isStaffSettingsOpen, setIsStaffSettingsOpen] = useState(false);
+  const [isNightPopupOpen, setIsNightPopupOpen] = useState(false);
+  const [isDirectoryFilterOpen, setIsDirectoryFilterOpen] = useState(false);
+  const [isDirectoryExportOpen, setIsDirectoryExportOpen] = useState(false);
+  const [isPayrollFilterOpen, setIsPayrollFilterOpen] = useState(false);
+  const [isPayrollExportOpen, setIsPayrollExportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; nome: string } | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; content: string } | null>(null);
+  const [noteEditorPopup, setNoteEditorPopup] = useState<{ id: string; nome: string; value: string } | null>(null);
+  const [receiptSelectionPopup, setReceiptSelectionPopup] = useState<ReceiptSelectionState | null>(null);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [timecardModalEmployee, setTimecardModalEmployee] = useState<StaffMember | null>(null);
   const [financeModalEmployee, setFinanceModalEmployee] = useState<StaffMember | null>(null);
@@ -418,6 +578,8 @@ export default function StaffPage() {
     desligamento: false,
   });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const directoryHeaderRef = useRef<HTMLDivElement | null>(null);
+  const payrollHeaderRef = useRef<HTMLDivElement | null>(null);
   const [timecardForm, setTimecardForm] = useState({
     data_referencia: new Date().toISOString().slice(0, 10),
     entrada_1: '',
@@ -426,6 +588,9 @@ export default function StaffPage() {
     saida_2: '',
     entrada_3: '',
     saida_3: '',
+    adicional_noturno_inicio: '',
+    adicional_noturno_fim: '',
+    periculosidade_descricao: '',
     falta_descricao: '',
     atestado_descricao: '',
     observacoes: '',
@@ -436,6 +601,21 @@ export default function StaffPage() {
     quantidade_vt: '',
     valor_vc: '',
     valor_vm: '',
+  });
+  const [staffSettings, setStaffSettings] = useState({
+    valeTransportePreco: '0,00',
+    valeMercadoPreco: '0,00',
+  });
+  const [companyReceiptCity, setCompanyReceiptCity] = useState(RECEIPT_CITY);
+  const [directoryFilter, setDirectoryFilter] = useState<StaffDirectoryFilterState>({
+    search: '',
+    status: 'todos',
+    category: 'todas',
+  });
+  const [payrollFilter, setPayrollFilter] = useState<PayrollFilterState>({
+    search: '',
+    situation: 'todas',
+    local: 'todos',
   });
   const [formData, setFormData] = useState({
     nome: '',
@@ -598,6 +778,56 @@ export default function StaffPage() {
     void loadCurrentUser();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(STAFF_SETTINGS_STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as Partial<typeof staffSettings>;
+      setStaffSettings((current) => ({
+        valeTransportePreco: parsed.valeTransportePreco || current.valeTransportePreco,
+        valeMercadoPreco: parsed.valeMercadoPreco || current.valeMercadoPreco,
+      }));
+    } catch {
+      // ignore invalid local settings
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
+    if (!raw) return;
+
+    try {
+      const parsed = JSON.parse(raw) as { companyCity?: string };
+      if (parsed.companyCity?.trim()) {
+        setCompanyReceiptCity(parsed.companyCity.trim());
+      }
+    } catch {
+      // ignore invalid company settings
+    }
+  }, []);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+
+      if (directoryHeaderRef.current && !directoryHeaderRef.current.contains(target)) {
+        setIsDirectoryFilterOpen(false);
+        setIsDirectoryExportOpen(false);
+      }
+
+      if (payrollHeaderRef.current && !payrollHeaderRef.current.contains(target)) {
+        setIsPayrollFilterOpen(false);
+        setIsPayrollExportOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, []);
+
   const payrollCompetencias = useMemo(
     () => Array.from(new Set(payrollMovements.map((movement) => movement.competencia))),
     [payrollMovements]
@@ -613,6 +843,25 @@ export default function StaffPage() {
         )
       ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
     [staffList]
+  );
+
+  const configuredValeTransportePrice = useMemo(
+    () => parseNumericConfig(staffSettings.valeTransportePreco),
+    [staffSettings.valeTransportePreco]
+  );
+
+  const configuredValeMercadoPrice = useMemo(
+    () => parseNumericConfig(staffSettings.valeMercadoPreco),
+    [staffSettings.valeMercadoPreco]
+  );
+
+  const getValeTransporteAmount = useCallback(
+    (quantity?: string | null) => {
+      const qty = Number(String(quantity || '').replace(/[^\d]/g, ''));
+      if (!qty || !configuredValeTransportePrice) return 0;
+      return qty * configuredValeTransportePrice;
+    },
+    [configuredValeTransportePrice]
   );
 
   const currentPayrollMovements = useMemo(
@@ -667,13 +916,56 @@ export default function StaffPage() {
     [payrollMovements, selectedCompetencia, staffList]
   );
 
-  const currentPayments = useMemo(
-    () =>
-      paymentRecords.filter((payment) =>
-        selectedCompetencia ? payment.competencia === selectedCompetencia : true
-      ),
-    [paymentRecords, selectedCompetencia]
-  );
+  const currentPayments = useMemo(() => {
+    const competenciaBase = selectedCompetencia || new Date().toISOString().slice(0, 7);
+    const filteredPayments = paymentRecords.filter((payment) =>
+      selectedCompetencia ? payment.competencia === selectedCompetencia : payment.competencia === competenciaBase
+    );
+
+    const paymentsByEmployee = new Map<string, StaffPayment[]>();
+    filteredPayments.forEach((payment) => {
+      const current = paymentsByEmployee.get(payment.funcionario_id) || [];
+      current.push(payment);
+      paymentsByEmployee.set(payment.funcionario_id, current);
+    });
+
+    return [...staffList]
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+      .flatMap((member) => {
+        const memberPayments = paymentsByEmployee.get(member.id) || [];
+
+        if (memberPayments.length === 0) {
+          return [
+            {
+              id: `virtual-payment-${member.id}-${competenciaBase}`,
+              funcionario_id: member.id,
+              funcionario_nome_snapshot: member.nome,
+              competencia: competenciaBase,
+              tipo: null,
+              banco: member.banco || null,
+              agencia: member.agencia || null,
+              conta: member.conta_bancaria || null,
+              operacao: member.operacao_conta || null,
+              chave_pix: member.chave_pix || null,
+              valor: null,
+              referencia: null,
+              registrado_por: null,
+              created_at: member.created_at,
+            },
+          ];
+        }
+
+        return memberPayments.map((payment) => ({
+          ...payment,
+          funcionario_nome_snapshot: member.nome,
+          banco: member.banco || payment.banco || null,
+          agencia: member.agencia || payment.agencia || null,
+          conta: member.conta_bancaria || payment.conta || null,
+          operacao: member.operacao_conta || payment.operacao || null,
+          chave_pix: member.chave_pix || payment.chave_pix || null,
+        }));
+      });
+  }, [paymentRecords, selectedCompetencia, staffList]);
 
   const currentTimecards = useMemo(
     () =>
@@ -681,6 +973,18 @@ export default function StaffPage() {
         selectedCompetencia ? entry.competencia === selectedCompetencia : true
       ),
     [timecardEntries, selectedCompetencia]
+  );
+
+  const payrollLocationOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          staffList
+            .map((member) => (member.local_trabalho || member.unidade_obra || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [staffList]
   );
 
   const selectedTimecardEmployee = useMemo(
@@ -753,8 +1057,8 @@ export default function StaffPage() {
         sourceId: movement.id,
         kind: 'movement',
         tipo: 'Benefícios',
-        detalhe: `VT ${movement.vale_transporte || '-'} • VC ${formatCurrency(movement.vale_cafe)} • VM ${formatCurrency(movement.vale_mercado)}`,
-        valor: formatCurrency(movement.total_vales),
+        detalhe: `VT ${movement.vale_transporte || '-'} • VC ${formatCurrency(movement.vale_cafe)} • VM ${formatCurrency(movement.vale_mercado || configuredValeMercadoPrice)}`,
+        valor: formatCurrency(getBenefitTotal(movement, configuredValeTransportePrice)),
         autor: movement.financeiro_lancado_por || 'Sem identificação',
         data: formatDate(movement.financeiro_lancado_em?.slice(0, 10) || null),
         sortKey: movement.financeiro_lancado_em || '',
@@ -765,7 +1069,7 @@ export default function StaffPage() {
     }
 
     return history.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
-  }, [currentPayments, financeModalEmployee, payrollMovements, selectedCompetencia]);
+  }, [configuredValeMercadoPrice, currentPayments, financeModalEmployee, getValeTransporteAmount, payrollMovements, selectedCompetencia]);
 
   const selectedEmployeeTimecardSummary = useMemo(() => {
     return selectedEmployeeTimecards.reduce(
@@ -784,7 +1088,7 @@ export default function StaffPage() {
     return currentPayrollMovements.reduce(
       (acc, movement) => {
         acc.adiantamentos += Number(movement.adiantamento_valor || 0);
-        acc.vales += Number(movement.total_vales || 0);
+        acc.vales += getBenefitTotal(movement, configuredValeTransportePrice);
         acc.vc += Number(movement.vale_cafe || 0);
         acc.vm += Number(movement.vale_mercado || 0);
         acc.gratificacoes += Number(movement.gratificacao || 0);
@@ -794,7 +1098,7 @@ export default function StaffPage() {
       },
       { adiantamentos: 0, vales: 0, vc: 0, vm: 0, gratificacoes: 0, experiencia: 0, ferias: 0 }
     );
-  }, [currentPayrollMovements]);
+  }, [configuredValeTransportePrice, currentPayrollMovements]);
 
   const handleOpenImport = () => fileInputRef.current?.click();
 
@@ -818,6 +1122,9 @@ export default function StaffPage() {
       saida_2: '',
       entrada_3: '',
       saida_3: '',
+      adicional_noturno_inicio: '',
+      adicional_noturno_fim: '',
+      periculosidade_descricao: '',
       falta_descricao: '',
       atestado_descricao: '',
       observacoes: '',
@@ -922,6 +1229,8 @@ export default function StaffPage() {
       saida_2: '',
       entrada_3: '',
       saida_3: '',
+      adicional_noturno_inicio: '',
+      adicional_noturno_fim: '',
       falta_descricao: current.falta_descricao.trim() ? current.falta_descricao : 'Falta',
       atestado_descricao: '',
     }));
@@ -936,9 +1245,29 @@ export default function StaffPage() {
       saida_2: '',
       entrada_3: '',
       saida_3: '',
+      adicional_noturno_inicio: '',
+      adicional_noturno_fim: '',
       falta_descricao: '',
       atestado_descricao: current.atestado_descricao.trim() ? current.atestado_descricao : 'ATESTADO',
     }));
+  };
+
+  const applyHazardObservation = () => {
+    const hazardLabel = 'Adicional de Periculosidade';
+    setTimecardForm((current) => {
+      const currentObservation = current.observacoes.trim();
+      const nextObservation = currentObservation
+        ? currentObservation.includes(hazardLabel)
+          ? current.observacoes
+          : `${currentObservation} | ${hazardLabel}`
+        : hazardLabel;
+
+      return {
+        ...current,
+        observacoes: nextObservation,
+        periculosidade_descricao: current.periculosidade_descricao.trim() || hazardLabel,
+      };
+    });
   };
 
   const advanceTimecardDate = () => {
@@ -956,6 +1285,9 @@ export default function StaffPage() {
         saida_2: '',
         entrada_3: '',
         saida_3: '',
+        adicional_noturno_inicio: '',
+        adicional_noturno_fim: '',
+        periculosidade_descricao: '',
         falta_descricao: '',
         atestado_descricao: '',
         observacoes: '',
@@ -988,6 +1320,9 @@ export default function StaffPage() {
         saida_2: null,
         entrada_3: null,
         saida_3: null,
+        adicional_noturno_inicio: null,
+        adicional_noturno_fim: null,
+        periculosidade_descricao: null,
         falta_descricao: 'FALTA',
         atestado_descricao: null,
         observacoes: timecardForm.observacoes.trim() || null,
@@ -1015,6 +1350,9 @@ export default function StaffPage() {
         saida_2: '',
         entrada_3: '',
         saida_3: '',
+        adicional_noturno_inicio: '',
+        adicional_noturno_fim: '',
+        periculosidade_descricao: '',
         falta_descricao: 'FALTA',
         atestado_descricao: '',
         observacoes: '',
@@ -1036,7 +1374,7 @@ export default function StaffPage() {
     }
   };
 
-  const savePrintableReceipt = (title: string, bodyHtml: string) => {
+  const savePrintableReceipt = async (title: string, bodyHtml: string, extraStyles = '') => {
     const receiptWindow = window.open('', '_blank', 'width=900,height=700');
     if (!receiptWindow) {
       alert('Não foi possível abrir a janela de impressão.');
@@ -1049,13 +1387,18 @@ export default function StaffPage() {
           <title>${title}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 24px; color: #111; }
-            h1 { font-size: 22px; margin-bottom: 8px; }
+            .receipt-header { display:flex; align-items:flex-start; gap:16px; margin-bottom:20px; }
+            .receipt-logo { width:54px; height:54px; object-fit:contain; }
+            .receipt-headline { flex:1; text-align:center; padding-right:54px; }
+            .receipt-title { font-size:28px; font-weight:900; letter-spacing:0.08em; margin:0; }
+            .receipt-company { font-size:12px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; margin-top:6px; color:#444; }
             h2 { font-size: 16px; margin: 24px 0 8px; }
             table { width: 100%; border-collapse: collapse; margin-top: 12px; }
             th, td { border: 1px solid #ddd; padding: 10px; font-size: 13px; text-align: left; }
             th { background: #f2f2f2; }
             .signature { margin-top: 48px; display: flex; justify-content: space-between; gap: 24px; }
             .signature div { flex: 1; border-top: 1px solid #111; padding-top: 8px; font-size: 12px; text-align: center; }
+            ${extraStyles}
           </style>
         </head>
         <body>
@@ -1065,67 +1408,358 @@ export default function StaffPage() {
     `);
     receiptWindow.document.close();
     receiptWindow.focus();
+    await new Promise((resolve) => window.setTimeout(resolve, 1000));
     receiptWindow.print();
   };
 
-  const handlePrintIndividualReceipt = (movement: PayrollMovement) => {
+  const openReceiptSelection = (movement: PayrollMovement) => {
+    setReceiptSelectionPopup({
+      movementId: movement.id,
+      vt: Boolean(movement.vale_transporte),
+      vc: Number(movement.vale_cafe || 0) > 0,
+      vm: Number(movement.vale_mercado || 0) > 0,
+      gratificacao: Number(movement.gratificacao || 0) > 0,
+      outros: false,
+      outrosDescricao: '',
+      outrosValor: '',
+    });
+  };
+
+  const handlePrintIndividualReceipt = async (movement: PayrollMovement, selection: ReceiptSelectionState) => {
+    const receiptItems: Array<{ label: string; value: number }> = [];
+
+    if (selection.vt) {
+      receiptItems.push({
+        label: `Vale Transporte${movement.vale_transporte ? ` (${movement.vale_transporte})` : ''}`,
+        value: getValeTransporteAmount(movement.vale_transporte),
+      });
+    }
+    if (selection.vc) receiptItems.push({ label: 'Vale Café', value: Number(movement.vale_cafe || 0) });
+    if (selection.vm) receiptItems.push({ label: 'Vale Mercado', value: Number(movement.vale_mercado || 0) });
+    if (selection.gratificacao) receiptItems.push({ label: 'Gratificação', value: Number(movement.gratificacao || 0) });
+    if (selection.outros && selection.outrosDescricao.trim()) {
+      receiptItems.push({
+        label: selection.outrosDescricao.trim(),
+        value: parseCurrencyLike(selection.outrosValor) || 0,
+      });
+    }
+
+    if (receiptItems.length === 0) {
+      alert('Selecione pelo menos um item para gerar o recibo.');
+      return;
+    }
+
+    const rows = receiptItems
+      .map((item) => `<tr><td>${item.label}</td><td>${formatCurrency(item.value)}</td></tr>`)
+      .join('');
+    const total = receiptItems.reduce((sum, item) => sum + item.value, 0);
+    const totalPorExtenso = numberToPortugueseWords(total);
+    const printedDate = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date());
+
     const body = `
-      <h1>Recibo de Vales</h1>
-      <p><strong>Competência:</strong> ${movement.competencia}</p>
+      <div class="receipt-header">
+        <img src="${CBSL_LOGO_URL}" alt="Logo CBSL" class="receipt-logo" />
+        <div class="receipt-headline">
+          <h1 class="receipt-title">RECIBO</h1>
+          <div class="receipt-company">Construtora Baggio Silveira Ltda.</div>
+        </div>
+      </div>
       <p><strong>Funcionário:</strong> ${movement.funcionario_nome_snapshot}</p>
-      <p><strong>Função:</strong> ${movement.funcao || '-'}</p>
       <table>
         <thead>
           <tr><th>Benefício</th><th>Valor</th></tr>
         </thead>
         <tbody>
-          <tr><td>Vale Café</td><td>${formatCurrency(movement.vale_cafe)}</td></tr>
-          <tr><td>Vale Mercado</td><td>${formatCurrency(movement.vale_mercado)}</td></tr>
-          <tr><td>Total VM + VC</td><td>${formatCurrency(movement.total_vales)}</td></tr>
+          ${rows}
+          <tr><td><strong>Total</strong></td><td><strong>${formatCurrency(total)}</strong></td></tr>
         </tbody>
       </table>
+      <p style="margin-top:24px;">
+        Recebi da <strong>Construtora Baggio Silveira Ltda.</strong>, a importância de
+        <strong> ${formatCurrency(total)}</strong> (${totalPorExtenso}).
+      </p>
+      <p style="margin-top:28px;">${companyReceiptCity}, ${printedDate}</p>
       <div class="signature">
         <div>Assinatura do colaborador</div>
         <div>Responsável pelo pagamento</div>
       </div>
     `;
 
-    savePrintableReceipt(`Recibo ${movement.funcionario_nome_snapshot}`, body);
+    await savePrintableReceipt(`Recibo ${movement.funcionario_nome_snapshot}`, body);
   };
 
   const handlePrintCollectiveReceipt = () => {
-    const rows = currentPayrollMovements
+    const printedDate = new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date());
+
+    const cards = filteredPayrollMovements
+      .map((movement) => {
+        const receiptItems: Array<{ label: string; value: number }> = [];
+
+        if (movement.vale_transporte) {
+          receiptItems.push({
+            label: `Vale Transporte (${movement.vale_transporte})`,
+            value: getValeTransporteAmount(movement.vale_transporte),
+          });
+        }
+        if (Number(movement.vale_cafe || 0) > 0) {
+          receiptItems.push({ label: 'Vale Café', value: Number(movement.vale_cafe || 0) });
+        }
+        if (Number(movement.vale_mercado || 0) > 0) {
+          receiptItems.push({ label: 'Vale Mercado', value: Number(movement.vale_mercado || 0) });
+        }
+        if (Number(movement.gratificacao || 0) > 0) {
+          receiptItems.push({ label: 'Gratificação', value: Number(movement.gratificacao || 0) });
+        }
+
+        if (receiptItems.length === 0) return '';
+
+        const rows = receiptItems
+          .map((item) => `<tr><td>${escapeHtml(item.label)}</td><td>${escapeHtml(formatCurrency(item.value))}</td></tr>`)
+          .join('');
+        const total = receiptItems.reduce((sum, item) => sum + item.value, 0);
+
+        return `
+          <section class="collective-receipt-card">
+            <div class="collective-header">
+              <img src="${CBSL_LOGO_URL}" alt="Logo CBSL" class="collective-logo" />
+              <div class="collective-title-wrap">
+                <h2 class="collective-title">RECIBO</h2>
+                <div class="collective-company">Construtora Baggio Silveira Ltda.</div>
+              </div>
+            </div>
+            <div class="collective-name">${escapeHtml(movement.funcionario_nome_snapshot)}</div>
+            <table class="collective-table">
+              <thead>
+                <tr><th>Item</th><th>Valor</th></tr>
+              </thead>
+              <tbody>
+                ${rows}
+                <tr><td><strong>Total</strong></td><td><strong>${escapeHtml(formatCurrency(total))}</strong></td></tr>
+              </tbody>
+            </table>
+            <p class="collective-text">
+              Recebi da <strong>Construtora Baggio Silveira Ltda.</strong>, a importância de
+              <strong>${escapeHtml(formatCurrency(total))}</strong> (${escapeHtml(numberToPortugueseWords(total))}).
+            </p>
+            <p class="collective-city">${escapeHtml(companyReceiptCity)}, ${escapeHtml(printedDate)}</p>
+            <div class="collective-signature">Assinatura do colaborador</div>
+          </section>
+        `;
+      })
+      .filter(Boolean)
+      .join('');
+
+    if (!cards) {
+      alert('Não há benefícios lançados para gerar recibos coletivos nesta visualização.');
+      return;
+    }
+
+    const body = `<div class="collective-grid">${cards}</div>`;
+    const styles = `
+      @page { size: A4 portrait; margin: 8mm; }
+      body { background:#fff; padding:0; }
+      .collective-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+      .collective-receipt-card {
+        height: 90mm;
+        border: 1px solid #d4d4d8;
+        border-radius: 14px;
+        padding: 6mm;
+        box-sizing: border-box;
+        break-inside: avoid;
+        page-break-inside: avoid;
+        display:flex;
+        flex-direction:column;
+      }
+      .collective-header { display:flex; align-items:flex-start; gap:10px; }
+      .collective-logo { width:34px; height:34px; object-fit:contain; flex-shrink:0; }
+      .collective-title-wrap { flex:1; text-align:center; padding-right:34px; }
+      .collective-title { margin:0; font-size:18px; font-weight:900; letter-spacing:0.12em; }
+      .collective-company { margin-top:3px; font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#444; }
+      .collective-name { margin-top:8px; font-size:12px; font-weight:700; }
+      .collective-table { width:100%; border-collapse:collapse; margin-top:8px; }
+      .collective-table th, .collective-table td { border:1px solid #ddd; padding:4px 6px; font-size:9px; }
+      .collective-table th { background:#f5f5f5; }
+      .collective-text { margin-top:8px; font-size:9px; line-height:1.4; }
+      .collective-city { margin-top:auto; font-size:9px; }
+      .collective-signature { margin-top:10px; border-top:1px solid #111; padding-top:5px; text-align:center; font-size:9px; }
+    `;
+
+    savePrintableReceipt('Recibos coletivos de benefícios', body, styles);
+  };
+
+  const exportDirectoryToXlsx = () => {
+    const rows = sortedStaffExportList.map((person) => ({
+      Funcionário: person.nome,
+      Função: person.funcao || person.cargo || '-',
+      Status: person.status,
+      Departamento: person.departamento || '-',
+      Local: person.local_trabalho || person.unidade_obra || '-',
+      Admissão: formatDate(person.data_admissao),
+      Índice: person.indice_contabil || '-',
+    }));
+
+    if (rows.length === 0) {
+      alert('Não há funcionários nesta filtragem para exportar.');
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'DiretorioEquipe');
+    XLSX.writeFile(workbook, `diretorio-equipe-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    setIsDirectoryExportOpen(false);
+  };
+
+  const exportDirectoryToPdf = () => {
+    if (sortedStaffExportList.length === 0) {
+      alert('Não há funcionários nesta filtragem para exportar.');
+      return;
+    }
+
+    const rows = sortedStaffExportList
       .map(
-        (movement) => `
+        (person) => `
           <tr>
-            <td>${movement.funcionario_nome_snapshot}</td>
-            <td>${movement.funcao || '-'}</td>
-            <td>${formatCurrency(movement.vale_cafe)}</td>
-            <td>${formatCurrency(movement.vale_mercado)}</td>
-            <td>${formatCurrency(movement.total_vales)}</td>
+            <td>${escapeHtml(person.nome)}</td>
+            <td>${escapeHtml(person.funcao || person.cargo || '-')}</td>
+            <td>${escapeHtml(person.status)}</td>
+            <td>${escapeHtml(person.departamento || '-')}</td>
+            <td>${escapeHtml(person.local_trabalho || person.unidade_obra || '-')}</td>
           </tr>
         `
       )
       .join('');
 
     const body = `
-      <h1>Recibo Coletivo de Vales</h1>
-      <p><strong>Competência:</strong> ${selectedCompetencia || '-'}</p>
+      <h1>Diretório de Equipe</h1>
+      <p><strong>Total filtrado:</strong> ${sortedStaffExportList.length} funcionário(s)</p>
       <table>
         <thead>
           <tr>
             <th>Funcionário</th>
             <th>Função</th>
-            <th>Vale Café</th>
-            <th>Vale Mercado</th>
-            <th>Total</th>
+            <th>Status</th>
+            <th>Departamento</th>
+            <th>Local</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
       </table>
     `;
 
-    savePrintableReceipt('Recibo coletivo de vales', body);
+    setIsDirectoryExportOpen(false);
+    void savePrintableReceipt(
+      'Diretório de Equipe',
+      body,
+      `
+        @page { size: A4 portrait; margin: 8mm; }
+        body { padding: 10px; }
+        h1 { margin: 0 0 6px; font-size: 18px; }
+        p { margin: 0 0 8px; font-size: 10px; }
+        table { margin-top: 6px; table-layout: fixed; }
+        th, td { padding: 4px 5px; font-size: 9px; white-space: nowrap; }
+      `
+    );
+  };
+
+  const exportPayrollToXlsx = () => {
+    const rows = filteredPayrollMovements.map((movement) => ({
+      Funcionário: movement.funcionario_nome_snapshot,
+      Código: movement.indice_contabil || '-',
+      Admissão: formatDate(movement.data_admissao),
+      Função: movement.funcao || '-',
+      Local: movement.local_trabalho || '-',
+      Adiantamento: formatCurrency(movement.adiantamento_valor),
+      Faltas: movement.falta_descricao || '-',
+      Atestados: movement.atestado_descricao || '-',
+      Notas: movement.observacoes || '-',
+      'h/Trab': movement.horas_trabalhadas || '-',
+      Ex50: movement.horas_extras_50 || '-',
+      Ex100: movement.horas_extras_100 || '-',
+      '+Not': movement.adicional_noturno || '-',
+      VT: movement.vale_transporte || '-',
+      VC: formatCurrency(movement.vale_cafe),
+      VM: formatCurrency(movement.vale_mercado),
+      'VM+VC': formatCurrency(getBenefitTotal(movement, configuredValeTransportePrice)),
+      Gratificação: formatCurrency(movement.gratificacao),
+      Situação:
+        movement.experiencia_ativa
+          ? `Exp. ${movement.dias_experiencia || 45}d`
+          : movement.em_ferias
+            ? 'Férias'
+            : 'Regular',
+    }));
+
+    if (rows.length === 0) {
+      alert('Não há lançamentos nesta filtragem para exportar.');
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'PainelMensalRH');
+    XLSX.writeFile(workbook, `painel-mensal-rh-${selectedCompetencia || new Date().toISOString().slice(0, 7)}.xlsx`);
+    setIsPayrollExportOpen(false);
+  };
+
+  const exportPayrollToPdf = () => {
+    if (filteredPayrollMovements.length === 0) {
+      alert('Não há lançamentos nesta filtragem para exportar.');
+      return;
+    }
+
+    const rows = filteredPayrollMovements
+      .map(
+        (movement) => `
+          <tr>
+            <td>${escapeHtml(movement.funcionario_nome_snapshot)}</td>
+            <td>${escapeHtml(movement.funcao || '-')}</td>
+            <td>${escapeHtml(movement.local_trabalho || '-')}</td>
+            <td>${escapeHtml(formatCurrency(movement.adiantamento_valor))}</td>
+            <td>${escapeHtml(movement.horas_trabalhadas || '-')}</td>
+            <td>${escapeHtml(formatCurrency(getBenefitTotal(movement, configuredValeTransportePrice)))}</td>
+            <td>${escapeHtml(
+              movement.experiencia_ativa
+                ? `Exp. ${movement.dias_experiencia || 45}d`
+                : movement.em_ferias
+                  ? 'Férias'
+                  : 'Regular'
+            )}</td>
+          </tr>
+        `
+      )
+      .join('');
+
+    const body = `
+      <h1>Painel Mensal de RH</h1>
+      <p><strong>Competência:</strong> ${escapeHtml(selectedCompetencia || '-')}</p>
+      <p><strong>Total filtrado:</strong> ${filteredPayrollMovements.length} funcionário(s)</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Funcionário</th>
+            <th>Função</th>
+            <th>Local</th>
+            <th>Adiant.</th>
+            <th>h/Trab</th>
+            <th>Benefícios</th>
+            <th>Situação</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    `;
+
+    setIsPayrollExportOpen(false);
+    void savePrintableReceipt('Painel Mensal de RH', body);
   };
 
   const handleImportSpreadsheet = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1410,7 +2044,7 @@ export default function StaffPage() {
   const syncMovementFromTimecards = async (funcionarioId: string, competencia: string) => {
     const { data, error: fetchError } = await supabase
       .from('equipe_cartoes_ponto')
-      .select('horas_trabalhadas, horas_extras_50, horas_extras_100, adicional_noturno, data_referencia, falta_descricao, atestado_descricao')
+      .select('horas_trabalhadas, horas_extras_50, horas_extras_100, adicional_noturno, data_referencia, falta_descricao, atestado_descricao, periculosidade_descricao')
       .eq('funcionario_id', funcionarioId)
       .eq('competencia', competencia)
       .order('data_referencia', { ascending: true });
@@ -1422,7 +2056,7 @@ export default function StaffPage() {
 
     const relevantEntries = (data || []) as Pick<
       TimecardEntry,
-      'horas_trabalhadas' | 'horas_extras_50' | 'horas_extras_100' | 'adicional_noturno' | 'data_referencia'
+      'horas_trabalhadas' | 'horas_extras_50' | 'horas_extras_100' | 'adicional_noturno' | 'data_referencia' | 'falta_descricao' | 'atestado_descricao' | 'periculosidade_descricao'
     >[];
 
     const totalHoras = relevantEntries.reduce((sum, entry) => sum + Number(entry.horas_trabalhadas || 0), 0);
@@ -1437,6 +2071,15 @@ export default function StaffPage() {
       .filter((entry) => entry.atestado_descricao)
       .map((entry) => `${formatDate(entry.data_referencia)} ${String(entry.atestado_descricao).trim()}`.trim())
       .join(' | ');
+    const periculosidade = relevantEntries
+      .filter((entry) => entry.periculosidade_descricao)
+      .map((entry) => `${formatDate(entry.data_referencia)} ${String(entry.periculosidade_descricao).trim()}`.trim())
+      .join(' | ');
+
+    const currentMovement = payrollMovements.find(
+      (movement) => movement.funcionario_id === funcionarioId && movement.competencia === competencia
+    );
+    const mergedNotes = mergePayrollNotes(currentMovement?.observacoes || null, periculosidade || null);
 
     const { error } = await supabase
       .from('equipe_movimentos_mensais')
@@ -1447,6 +2090,7 @@ export default function StaffPage() {
         adicional_noturno: decimalHoursToLabel(totalNoturno),
         falta_descricao: faltas || null,
         atestado_descricao: atestados || null,
+        observacoes: mergedNotes,
       })
       .eq('funcionario_id', funcionarioId)
       .eq('competencia', competencia);
@@ -1459,6 +2103,38 @@ export default function StaffPage() {
   const handleSaveTimecard = async (event: React.FormEvent) => {
     event.preventDefault();
     await saveTimecardEntry(false);
+  };
+
+  const handleSavePayrollNote = async () => {
+    if (!noteEditorPopup) return;
+
+    try {
+      const baseMovement = payrollMovements.find((movement) => movement.id === noteEditorPopup.id);
+      const { error } = await supabase
+        .from('equipe_movimentos_mensais')
+        .update({ observacoes: noteEditorPopup.value.trim() || null })
+        .eq('id', noteEditorPopup.id);
+
+      if (error) throw error;
+
+      setNoteEditorPopup(null);
+      await fetchPayrollMovements();
+
+      if (baseMovement) {
+        await syncMovementFromTimecards(baseMovement.funcionario_id, baseMovement.competencia);
+        await fetchPayrollMovements();
+      }
+    } catch (error) {
+      const errorMessage =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      console.error('Erro ao salvar nota do RH:', error);
+      alert(`Falha ao salvar nota: ${errorMessage}`);
+    }
   };
 
   const saveTimecardEntry = async (advanceAfterSave: boolean) => {
@@ -1485,7 +2161,10 @@ export default function StaffPage() {
         timecardForm.saida_3,
       ];
 
-      const metrics = calculateShiftMetrics(timecardForm.data_referencia, punches);
+      const metrics = calculateShiftMetrics(timecardForm.data_referencia, punches, {
+        inicio: timecardForm.adicional_noturno_inicio,
+        fim: timecardForm.adicional_noturno_fim,
+      });
 
       const payload = {
         funcionario_id: selectedTimecardEmployeeId,
@@ -1498,6 +2177,9 @@ export default function StaffPage() {
         saida_2: timecardForm.saida_2 || null,
         entrada_3: timecardForm.entrada_3 || null,
         saida_3: timecardForm.saida_3 || null,
+        adicional_noturno_inicio: timecardForm.adicional_noturno_inicio || null,
+        adicional_noturno_fim: timecardForm.adicional_noturno_fim || null,
+        periculosidade_descricao: timecardForm.periculosidade_descricao.trim() || null,
         falta_descricao: timecardForm.falta_descricao.trim() || null,
         atestado_descricao: timecardForm.atestado_descricao.trim() || null,
         observacoes: timecardForm.observacoes.trim() || null,
@@ -1522,6 +2204,9 @@ export default function StaffPage() {
         saida_2: '',
         entrada_3: '',
         saida_3: '',
+        adicional_noturno_inicio: '',
+        adicional_noturno_fim: '',
+        periculosidade_descricao: '',
         falta_descricao: '',
         atestado_descricao: '',
         observacoes: '',
@@ -2134,11 +2819,78 @@ export default function StaffPage() {
       .map(([label, items]) => ({ label, items })),
   ];
 
+  const filteredCategorizedStaff = normalizedCategorizedStaff
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((person) => {
+        const matchesSearch =
+          !directoryFilter.search ||
+          normalizeText(
+            `${person.nome} ${person.funcao || person.cargo || ''} ${person.departamento || ''} ${person.local_trabalho || person.unidade_obra || ''}`
+          ).includes(normalizeText(directoryFilter.search));
+
+        const matchesStatus =
+          directoryFilter.status === 'todos' || person.status === directoryFilter.status;
+
+        const matchesCategory =
+          directoryFilter.category === 'todas' || group.label === directoryFilter.category;
+
+        return matchesSearch && matchesStatus && matchesCategory;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const filteredStaffFlat = filteredCategorizedStaff.flatMap((group) =>
+    group.items.map((person) => ({
+      ...person,
+      categoryLabel: group.label,
+    }))
+  );
+
+  const filteredPayrollMovements = currentPayrollMovements.filter((movement) => {
+    const matchesSearch =
+      !payrollFilter.search ||
+      normalizeText(
+        `${movement.funcionario_nome_snapshot} ${movement.funcao || ''} ${movement.local_trabalho || ''} ${movement.indice_contabil || ''}`
+      ).includes(normalizeText(payrollFilter.search));
+
+    const matchesLocation =
+      payrollFilter.local === 'todos' || (movement.local_trabalho || '-') === payrollFilter.local;
+
+    const matchesSituation =
+      payrollFilter.situation === 'todas' ||
+      (payrollFilter.situation === 'com-falta' && Boolean(movement.falta_descricao)) ||
+      (payrollFilter.situation === 'com-atestado' && Boolean(movement.atestado_descricao)) ||
+      (payrollFilter.situation === 'em-experiencia' && Boolean(movement.experiencia_ativa)) ||
+      (payrollFilter.situation === 'em-ferias' && Boolean(movement.em_ferias)) ||
+      (payrollFilter.situation === 'com-adiantamento' && Number(movement.adiantamento_valor || 0) > 0) ||
+      (payrollFilter.situation === 'regular' &&
+        !movement.falta_descricao &&
+        !movement.atestado_descricao &&
+        !movement.experiencia_ativa &&
+        !movement.em_ferias &&
+        Number(movement.adiantamento_valor || 0) === 0);
+
+    return matchesSearch && matchesLocation && matchesSituation;
+  });
+
+  const sortedStaffExportList = [...filteredStaffFlat].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
   return (
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
         title="R.H." 
         subtitle="Gestão centralizada de pessoal, cursos e conformidade."
+        extraAction={
+          <button
+            type="button"
+            onClick={() => setIsStaffSettingsOpen(true)}
+            className="size-10 flex items-center justify-center rounded-2xl bg-[#1a1a1a] text-slate-500 hover:text-[#d4ff3f] hover:bg-[#2a2a2a] transition-all"
+            title="Configurações do RH"
+          >
+            <Settings size={18} />
+          </button>
+        }
         action={{ label: 'Novo Membro', onClick: () => handleOpenModal() }}
       />
 
@@ -2178,8 +2930,8 @@ export default function StaffPage() {
         <div className="grid grid-cols-1 gap-8">
           {/* Staff Directory */}
           <div className="space-y-6">
-            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
+            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-visible shadow-sm">
+              <div ref={directoryHeaderRef} className="relative z-10 p-6 border-b border-slate-800/50 flex items-center justify-between">
                 <h3 className="font-black text-lg tracking-tight">Diretório de Equipe</h3>
                 <div className="flex gap-2">
                   <button
@@ -2190,11 +2942,88 @@ export default function StaffPage() {
                     {isImporting ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                     Importar Planilha
                   </button>
-                  <button className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border border-slate-800/50 hover:bg-[#2a2a2a] transition-all">Filtrar</button>
-                  <button className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border border-slate-800/50 hover:bg-[#2a2a2a] transition-all">Exportar</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDirectoryFilterOpen((current) => !current);
+                      setIsDirectoryExportOpen(false);
+                    }}
+                    className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border border-slate-800/50 hover:bg-[#2a2a2a] transition-all inline-flex items-center gap-2"
+                  >
+                    <Filter size={12} />
+                    Filtrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDirectoryExportOpen((current) => !current);
+                      setIsDirectoryFilterOpen(false);
+                    }}
+                    className="text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl border border-slate-800/50 hover:bg-[#2a2a2a] transition-all inline-flex items-center gap-2"
+                  >
+                    <Download size={12} />
+                    Exportar
+                  </button>
                 </div>
+                {isDirectoryFilterOpen && (
+                  <div className="absolute right-6 top-[calc(100%+8px)] z-50 w-[320px] rounded-2xl border border-slate-800 bg-[#111111] p-4 shadow-2xl">
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={directoryFilter.search}
+                        onChange={(e) => setDirectoryFilter((current) => ({ ...current, search: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        placeholder="Pesquisar funcionário, função, local..."
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          value={directoryFilter.status}
+                          onChange={(e) => setDirectoryFilter((current) => ({ ...current, status: e.target.value as StaffDirectoryFilterState['status'] }))}
+                          className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        >
+                          <option value="todos">Todos os status</option>
+                          <option value="Ativo">Ativo</option>
+                          <option value="Inativo">Inativo</option>
+                          <option value="Afastado">Afastado</option>
+                          <option value="Em Licença">Em Licença</option>
+                        </select>
+                        <select
+                          value={directoryFilter.category}
+                          onChange={(e) => setDirectoryFilter((current) => ({ ...current, category: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        >
+                          <option value="todas">Todas as categorias</option>
+                          {normalizedCategorizedStaff.map((group) => (
+                            <option key={group.label} value={group.label}>
+                              {group.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDirectoryFilter({ search: '', status: 'todos', category: 'todas' })}
+                        className="w-full rounded-xl border border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-[#1a1a1a]"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isDirectoryExportOpen && (
+                  <div className="absolute right-6 top-[calc(100%+8px)] z-50 w-[180px] rounded-2xl border border-slate-800 bg-[#111111] p-2 shadow-2xl">
+                    <button type="button" onClick={exportDirectoryToXlsx} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition-all hover:bg-[#1a1a1a]">
+                      <Download size={14} />
+                      XLSX
+                    </button>
+                    <button type="button" onClick={exportDirectoryToPdf} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition-all hover:bg-[#1a1a1a]">
+                      <FileText size={14} />
+                      PDF
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="overflow-x-auto">
+              <div className={`${filteredStaffFlat.length === 0 ? 'min-h-[260px]' : ''} overflow-x-auto`}>
                 <table className="w-full text-left">
                   <thead className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest">
                     <tr>
@@ -2207,7 +3036,7 @@ export default function StaffPage() {
                   <tbody className="divide-y divide-slate-800/50">
                     {isLoading ? (
                       <tr>
-                        <td colSpan={4} className="px-6 py-12 text-center">
+                        <td colSpan={4} className="px-6 py-14 text-center">
                           <div className="flex flex-col items-center gap-3">
                             <Loader2 size={24} className="text-[#d4ff3f] animate-spin" />
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando equipe...</p>
@@ -2215,7 +3044,7 @@ export default function StaffPage() {
                         </td>
                       </tr>
                     ) : (
-                      normalizedCategorizedStaff.flatMap((group) => {
+                      filteredCategorizedStaff.flatMap((group) => {
                         const groupRows: React.ReactNode[] = [
                           <tr key={`group-${group.label}`} className="bg-[#111111]">
                             <td colSpan={4} className="px-6 py-3">
@@ -2230,7 +3059,7 @@ export default function StaffPage() {
                         if (group.items.length === 0) {
                           groupRows.push(
                             <tr key={`empty-${group.label}`}>
-                              <td colSpan={4} className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                              <td colSpan={4} className="px-6 py-20 text-[10px] font-black uppercase tracking-widest text-slate-600">
                                 Nenhum funcionário nesta categoria
                               </td>
                             </tr>
@@ -2308,7 +3137,7 @@ export default function StaffPage() {
                 </table>
               </div>
               <div className="p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibindo {staffList.length} funcionários</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibindo {filteredStaffFlat.length} funcionários</span>
                 <div className="flex gap-2">
                   <button className="px-4 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:bg-[#2a2a2a] transition-all">Anterior</button>
                   <button className="px-4 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all">Próximo</button>
@@ -2322,8 +3151,8 @@ export default function StaffPage() {
               </div>
             )}
 
-            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-              <div className="p-4 border-b border-slate-800/50 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-visible shadow-sm">
+              <div ref={payrollHeaderRef} className="relative z-10 p-4 border-b border-slate-800/50 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h3 className="font-black text-base tracking-tight">Painel Mensal de RH</h3>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
@@ -2348,14 +3177,95 @@ export default function StaffPage() {
                   </select>
                   <button
                     type="button"
+                    onClick={() => {
+                      setIsPayrollFilterOpen((current) => !current);
+                      setIsPayrollExportOpen(false);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-200 transition-all hover:bg-[#2a2a2a]"
+                  >
+                    <Filter size={14} />
+                    Filtrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPayrollExportOpen((current) => !current);
+                      setIsPayrollFilterOpen(false);
+                    }}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-200 transition-all hover:bg-[#2a2a2a]"
+                  >
+                    <Download size={14} />
+                    Exportar
+                  </button>
+                  <button
+                    type="button"
                     onClick={handlePrintCollectiveReceipt}
-                    disabled={currentPayrollMovements.length === 0}
+                    disabled={filteredPayrollMovements.length === 0}
                     className="inline-flex items-center gap-2 rounded-xl border border-slate-800 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-slate-200 transition-all hover:bg-[#2a2a2a] disabled:opacity-50"
                   >
                     <ReceiptText size={14} />
                     Recibo Coletivo
                   </button>
                 </div>
+                {isPayrollFilterOpen && (
+                  <div className="absolute right-4 top-[calc(100%+8px)] z-50 w-[360px] rounded-2xl border border-slate-800 bg-[#111111] p-4 shadow-2xl">
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={payrollFilter.search}
+                        onChange={(e) => setPayrollFilter((current) => ({ ...current, search: e.target.value }))}
+                        className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        placeholder="Pesquisar funcionário, função, local..."
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          value={payrollFilter.situation}
+                          onChange={(e) => setPayrollFilter((current) => ({ ...current, situation: e.target.value as PayrollFilterState['situation'] }))}
+                          className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        >
+                          <option value="todas">Todas as situações</option>
+                          <option value="com-falta">Com falta</option>
+                          <option value="com-atestado">Com atestado</option>
+                          <option value="com-adiantamento">Com adiantamento</option>
+                          <option value="em-experiencia">Em experiência</option>
+                          <option value="em-ferias">Em férias</option>
+                          <option value="regular">Regular</option>
+                        </select>
+                        <select
+                          value={payrollFilter.local}
+                          onChange={(e) => setPayrollFilter((current) => ({ ...current, local: e.target.value }))}
+                          className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
+                        >
+                          <option value="todos">Todos os locais</option>
+                          {payrollLocationOptions.map((location) => (
+                            <option key={location} value={location}>
+                              {location}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPayrollFilter({ search: '', situation: 'todas', local: 'todos' })}
+                        className="w-full rounded-xl border border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-[#1a1a1a]"
+                      >
+                        Limpar filtros
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {isPayrollExportOpen && (
+                  <div className="absolute right-4 top-[calc(100%+8px)] z-50 w-[180px] rounded-2xl border border-slate-800 bg-[#111111] p-2 shadow-2xl">
+                    <button type="button" onClick={exportPayrollToXlsx} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition-all hover:bg-[#1a1a1a]">
+                      <Download size={14} />
+                      XLSX
+                    </button>
+                    <button type="button" onClick={exportPayrollToPdf} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-white transition-all hover:bg-[#1a1a1a]">
+                      <FileText size={14} />
+                      PDF
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-6 gap-3 p-4 border-b border-slate-800/50">
@@ -2385,53 +3295,53 @@ export default function StaffPage() {
                 </div>
               </div>
 
-              <div className="overflow-x-auto border-b border-slate-800/50">
+              <div className={`overflow-x-auto border-b border-slate-800/50 rh-panel-scrollbar ${filteredPayrollMovements.length === 0 ? 'min-h-[220px]' : ''}`}>
                 <table className="w-full min-w-[1320px] text-left">
                   <thead className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest">
                     <tr>
                       <th className="px-4 py-2">Funcionário</th>
                       <th className="px-3 py-2">Cód</th>
                       <th className="px-2 py-2">Admissão</th>
-                      <th className="px-4 py-2">Função</th>
-                      <th className="px-4 py-2">Local</th>
-                      <th className="px-4 py-2">Adiant.</th>
+                      <th className="px-3 py-2">Função</th>
+                      <th className="px-3 py-2">Local</th>
+                      <th className="px-3 py-2">Adiant.</th>
                       <th className="px-4 py-2">Faltas</th>
-                      <th className="px-4 py-2">Atestados</th>
-                      <th className="px-4 py-2">Notas</th>
-                      <th className="px-4 py-2">Horas Trab.</th>
-                      <th className="px-4 py-2">HE 50%</th>
-                      <th className="px-4 py-2">HE 100%</th>
-                      <th className="px-4 py-2">Adic. Not.</th>
-                      <th className="px-4 py-2">VT</th>
-                      <th className="px-4 py-2">VC</th>
-                      <th className="px-4 py-2">VM</th>
-                      <th className="px-4 py-2">VM + VC</th>
-                      <th className="px-4 py-2">Gratif.</th>
-                      <th className="px-4 py-2">Situação</th>
-                      <th className="px-4 py-2">Recibo</th>
+                      <th className="px-2 py-2 w-[48px] min-w-[48px]">Ates.</th>
+                      <th className="px-2 py-2 w-[48px] min-w-[48px]">Notas</th>
+                      <th className="px-3 py-2">h/Trab</th>
+                      <th className="px-4 py-2">Ex50%</th>
+                      <th className="px-4 py-2">Ex100%</th>
+                      <th className="px-3 py-2">+Not</th>
+                      <th className="px-2 py-2">VT</th>
+                      <th className="px-2 py-2">VC</th>
+                      <th className="px-2 py-2">VM</th>
+                      <th className="px-2 py-2">VM + VC</th>
+                      <th className="px-2 py-2">Gratif.</th>
+                      <th className="px-2 py-2">Situação</th>
+                      <th className="px-2 py-2 w-[44px] min-w-[44px] text-center">Recibo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/50">
-                    {currentPayrollMovements.length === 0 ? (
+                    {filteredPayrollMovements.length === 0 ? (
                       <tr>
-                        <td colSpan={20} className="px-6 py-8 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        <td colSpan={20} className="px-6 py-16 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
                           Importe a planilha para começar o controle mensal do RH.
                         </td>
                       </tr>
                     ) : (
-                      currentPayrollMovements.map((movement) => (
+                      filteredPayrollMovements.map((movement) => (
                         <tr key={movement.id} className="hover:bg-[#2a2a2a]/30 transition-colors">
-                          <td className="px-4 py-1.5 whitespace-nowrap">
+                          <td className="px-4 py-1 whitespace-nowrap">
                             <div>
-                              <p className="text-xs font-medium whitespace-nowrap">{movement.funcionario_nome_snapshot}</p>
+                              <p className="text-sm font-medium leading-tight whitespace-nowrap text-slate-100">{movement.funcionario_nome_snapshot}</p>
                             </div>
                           </td>
-                          <td className="px-3 py-1.5 text-xs text-slate-400">{movement.indice_contabil || '-'}</td>
-                          <td className="px-2 py-1.5 text-xs text-slate-400 whitespace-nowrap">{formatDate(movement.data_admissao)}</td>
-                          <td className="px-4 py-1.5 text-xs text-slate-400 min-w-[120px]">{movement.funcao || '-'}</td>
-                          <td className="px-4 py-1.5 text-xs text-slate-400">{movement.local_trabalho || '-'}</td>
-                          <td className="px-4 py-1.5 text-xs">{formatCurrency(movement.adiantamento_valor)}</td>
-                          <td className="px-4 py-1.5 text-xs">
+                          <td className="px-3 py-1 text-sm font-medium leading-tight text-slate-400">{movement.indice_contabil || '-'}</td>
+                          <td className="px-2 py-1 text-sm font-medium leading-tight text-slate-400 whitespace-nowrap">{formatDate(movement.data_admissao)}</td>
+                          <td className="px-3 py-1 text-sm font-medium leading-tight text-slate-400 min-w-[108px]">{movement.funcao || '-'}</td>
+                          <td className="px-3 py-1 text-sm font-medium leading-tight text-slate-400">{movement.local_trabalho || '-'}</td>
+                          <td className="px-3 py-1 text-sm font-medium leading-tight">{formatCurrency(movement.adiantamento_valor)}</td>
+                          <td className="px-2 py-1 text-sm font-medium leading-tight text-center">
                             {movement.falta_descricao ? (
                               <button
                                 type="button"
@@ -2442,7 +3352,7 @@ export default function StaffPage() {
                               </button>
                             ) : '-'}
                           </td>
-                          <td className="px-4 py-1.5 text-xs">
+                          <td className="px-2 py-1 text-sm font-medium leading-tight text-center">
                             {movement.atestado_descricao ? (
                               <button
                                 type="button"
@@ -2453,25 +3363,27 @@ export default function StaffPage() {
                               </button>
                             ) : '-'}
                           </td>
-                          <td className="px-4 py-1.5 text-xs">
-                            {movement.observacoes ? (
-                              <button
-                                type="button"
-                                onClick={() => setInfoPopup({ title: 'Notas do RH', content: movement.observacoes || '-' })}
-                                className="rounded-lg border border-slate-700 bg-[#0a0a0a] p-1.5 text-slate-300 transition-all hover:bg-[#151515]"
-                                title="Ver notas"
-                              >
-                                <FileText size={12} />
-                              </button>
-                            ) : (
-                              '-'
-                            )}
+                          <td className="px-4 py-1 text-sm font-medium leading-tight">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNoteEditorPopup({
+                                  id: movement.id,
+                                  nome: movement.funcionario_nome_snapshot,
+                                  value: movement.observacoes || '',
+                                })
+                              }
+                              className="rounded-lg border border-slate-700 bg-[#0a0a0a] p-1.5 text-slate-300 transition-all hover:bg-[#151515]"
+                              title={movement.observacoes ? 'Editar notas' : 'Adicionar notas'}
+                            >
+                              <FileText size={12} />
+                            </button>
                           </td>
-                          <td className="px-4 py-1.5 text-xs w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_trabalhadas || '-'}</td>
-                          <td className="px-4 py-1.5 text-xs w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_extras_50 || '-'}</td>
-                          <td className="px-4 py-1.5 text-xs w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_extras_100 || '-'}</td>
-                          <td className="px-4 py-1.5 text-xs w-[72px] min-w-[72px] whitespace-nowrap">{movement.adicional_noturno || '-'}</td>
-                          <td className="px-4 py-1.5">
+                          <td className="px-3 py-1 text-sm font-medium leading-tight w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_trabalhadas || '-'}</td>
+                          <td className="px-4 py-1 text-sm font-medium leading-tight w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_extras_50 || '-'}</td>
+                          <td className="px-4 py-1 text-sm font-medium leading-tight w-[72px] min-w-[72px] whitespace-nowrap">{movement.horas_extras_100 || '-'}</td>
+                          <td className="px-3 py-1 text-sm font-medium leading-tight w-[72px] min-w-[72px] whitespace-nowrap">{movement.adicional_noturno || '-'}</td>
+                          <td className="px-2 py-1">
                             <input
                               type="text"
                               defaultValue={movement.vale_transporte || ''}
@@ -2481,7 +3393,7 @@ export default function StaffPage() {
                               placeholder="VT"
                             />
                           </td>
-                          <td className="px-4 py-1.5">
+                          <td className="px-2 py-1">
                             <input
                               type="text"
                               defaultValue={movement.vale_cafe ? String(movement.vale_cafe).replace('.', ',') : ''}
@@ -2490,10 +3402,10 @@ export default function StaffPage() {
                               placeholder="VC"
                             />
                           </td>
-                          <td className="px-4 py-1.5 text-xs">{formatCurrency(movement.vale_mercado)}</td>
-                          <td className="px-4 py-1.5 text-xs">{formatCurrency(movement.total_vales)}</td>
-                          <td className="px-4 py-1.5 text-xs">{formatCurrency(movement.gratificacao)}</td>
-                          <td className="px-4 py-1.5">
+                          <td className="px-2 py-1 text-sm font-medium leading-tight">{formatCurrency(movement.vale_mercado)}</td>
+                          <td className="px-2 py-1 text-sm font-medium leading-tight">{formatCurrency(getBenefitTotal(movement, configuredValeTransportePrice))}</td>
+                          <td className="px-2 py-1 text-sm font-medium leading-tight">{formatCurrency(movement.gratificacao)}</td>
+                          <td className="px-2 py-1">
                             <div className="flex flex-wrap gap-2">
                               {movement.experiencia_ativa && (
                                 <span className="inline-flex rounded-lg bg-sky-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-sky-300">
@@ -2512,14 +3424,14 @@ export default function StaffPage() {
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-1.5">
+                          <td className="px-2 py-1 text-center">
                             <button
                               type="button"
-                              onClick={() => handlePrintIndividualReceipt(movement)}
-                              className="inline-flex items-center gap-2 rounded-xl border border-slate-800 px-2 py-1.5 text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all"
+                              onClick={() => openReceiptSelection(movement)}
+                              className="inline-flex items-center justify-center rounded-xl border border-slate-800 p-1.5 hover:bg-[#2a2a2a] transition-all"
+                              title="Recibo individual"
                             >
                               <ReceiptText size={13} />
-                              Individual
                             </button>
                           </td>
                         </tr>
@@ -2529,49 +3441,66 @@ export default function StaffPage() {
                 </table>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-left">
-                  <thead className="bg-[#0f0f0f] text-slate-500 text-[10px] font-black uppercase tracking-widest">
-                    <tr>
-                      <th className="px-4 py-3">Funcionário</th>
-                      <th className="px-4 py-3">Tipo</th>
-                      <th className="px-4 py-3">Banco</th>
-                      <th className="px-4 py-3">Agência</th>
-                      <th className="px-4 py-3">Conta</th>
-                      <th className="px-4 py-3">PIX</th>
-                      <th className="px-4 py-3">Valor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800/50">
-                    {currentPayments.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-6 py-6 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
-                          Nenhum pagamento bancário importado para esta competência.
-                        </td>
-                      </tr>
-                    ) : (
-                      currentPayments.map((payment) => (
-                        <tr key={payment.id}>
-                          <td className="px-4 py-3 text-sm">{payment.funcionario_nome_snapshot}</td>
-                          <td className="px-4 py-3">
-                            <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest ${
-                              payment.tipo === 'adiantamento'
-                                ? 'bg-orange-500/10 text-orange-400'
-                                : 'bg-emerald-500/10 text-emerald-300'
-                            }`}>
-                              {payment.tipo}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">{payment.banco || '-'}</td>
-                          <td className="px-4 py-3 text-sm">{payment.agencia || '-'}</td>
-                          <td className="px-4 py-3 text-sm">{payment.conta || '-'}</td>
-                          <td className="px-4 py-3 text-sm">{payment.chave_pix || '-'}</td>
-                          <td className="px-4 py-3 text-sm">{formatCurrency(payment.valor)}</td>
+              <div className="border-t border-slate-800/50">
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentsPanelOpen((current) => !current)}
+                  className="flex w-full items-center justify-between px-4 py-1.5 text-left transition-all hover:bg-[#151515]"
+                >
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Pagamentos Bancários</p>
+                    <p className="mt-1 text-xs text-slate-400">Funcionário, tipo, banco, agência, conta e PIX</p>
+                  </div>
+                  <ChevronDown size={16} className={`text-slate-500 transition-transform ${isPaymentsPanelOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {isPaymentsPanelOpen && (
+                  <div className="overflow-x-auto border-t border-slate-800/50">
+                    <table className="w-full min-w-[820px] text-left">
+                      <thead className="bg-[#0f0f0f] text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                        <tr>
+                          <th className="px-4 py-1.5">Funcionário</th>
+                          <th className="px-4 py-1.5">Tipo</th>
+                          <th className="px-4 py-1.5">Banco</th>
+                          <th className="px-4 py-1.5">Agência</th>
+                          <th className="px-4 py-1.5">Conta</th>
+                          <th className="px-4 py-1.5">PIX</th>
+                          <th className="px-4 py-1.5">Valor</th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/50">
+                        {currentPayments.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-3 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                              Nenhum pagamento bancário importado para esta competência.
+                            </td>
+                          </tr>
+                        ) : (
+                          currentPayments.map((payment) => (
+                            <tr key={payment.id}>
+                              <td className="px-4 py-1.5 text-sm">{payment.funcionario_nome_snapshot}</td>
+                              <td className="px-4 py-1.5">
+                                <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest ${
+                                  payment.tipo === 'adiantamento'
+                                    ? 'bg-orange-500/10 text-orange-400'
+                                    : payment.tipo === 'pagamento'
+                                      ? 'bg-emerald-500/10 text-emerald-300'
+                                      : 'bg-slate-700/50 text-slate-300'
+                                }`}>
+                                  {payment.tipo || 'Sem lançamento'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-1.5 text-sm">{payment.banco || '-'}</td>
+                              <td className="px-4 py-1.5 text-sm">{payment.agencia || '-'}</td>
+                              <td className="px-4 py-1.5 text-sm">{payment.conta || '-'}</td>
+                              <td className="px-4 py-1.5 text-sm">{payment.chave_pix || '-'}</td>
+                              <td className="px-4 py-1.5 text-sm">{payment.valor ? formatCurrency(payment.valor) : '-'}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2709,7 +3638,7 @@ export default function StaffPage() {
                         value={financeForm.valor_vm}
                         onChange={(e) => setFinanceForm({ ...financeForm, valor_vm: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                        placeholder="801,50"
+                        placeholder={staffSettings.valeMercadoPreco || '801,50'}
                       />
                     </div>
                   </div>
@@ -2802,6 +3731,235 @@ export default function StaffPage() {
             </motion.div>
           </div>
         )}
+        {noteEditorPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setNoteEditorPopup(null)}
+              className="absolute inset-0 bg-black/50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-[#1a1a1a] p-4 shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black">Notas do RH</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{noteEditorPopup.nome}</p>
+                </div>
+                <button onClick={() => setNoteEditorPopup(null)} className="text-slate-500 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <textarea
+                rows={8}
+                value={noteEditorPopup.value}
+                onChange={(e) => setNoteEditorPopup({ ...noteEditorPopup, value: e.target.value })}
+                className="mt-3 w-full resize-none rounded-xl border border-slate-800 bg-[#0a0a0a] p-3 text-sm leading-relaxed text-slate-200 outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                placeholder="Digite observações, lembretes ou anotações do funcionário"
+              />
+              <div className="mt-3 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNoteEditorPopup(null)}
+                  className="rounded-xl border border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSavePayrollNote()}
+                  className="rounded-xl bg-[#d4ff3f] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0a0a0a]"
+                >
+                  Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {receiptSelectionPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setReceiptSelectionPopup(null)}
+              className="absolute inset-0 bg-black/50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-sm rounded-2xl border border-slate-800 bg-[#1a1a1a] p-4 shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black">Gerar Recibo</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Selecione os itens do recibo</p>
+                </div>
+                <button onClick={() => setReceiptSelectionPopup(null)} className="text-slate-500 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="mt-4 space-y-3 text-sm">
+                {[
+                  { key: 'vt', label: 'Vale Transporte' },
+                  { key: 'vc', label: 'Vale Café' },
+                  { key: 'vm', label: 'Vale Mercado' },
+                  { key: 'gratificacao', label: 'Gratificação' },
+                ].map((item) => (
+                  <label key={item.key} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0f0f0f] px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(receiptSelectionPopup[item.key as keyof ReceiptSelectionState])}
+                      onChange={(e) =>
+                        setReceiptSelectionPopup({
+                          ...receiptSelectionPopup,
+                          [item.key]: e.target.checked,
+                        })
+                      }
+                    />
+                    <span>{item.label}</span>
+                  </label>
+                ))}
+                <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0f0f0f] px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={receiptSelectionPopup.outros}
+                    onChange={(e) => setReceiptSelectionPopup({ ...receiptSelectionPopup, outros: e.target.checked })}
+                  />
+                  <span>Outros</span>
+                </label>
+                {receiptSelectionPopup.outros && (
+                  <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-800 bg-[#0f0f0f] p-3">
+                    <input
+                      type="text"
+                      value={receiptSelectionPopup.outrosDescricao}
+                      onChange={(e) => setReceiptSelectionPopup({ ...receiptSelectionPopup, outrosDescricao: e.target.value })}
+                      className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                      placeholder="Descrição do item"
+                    />
+                    <input
+                      type="text"
+                      value={receiptSelectionPopup.outrosValor}
+                      onChange={(e) => setReceiptSelectionPopup({ ...receiptSelectionPopup, outrosValor: e.target.value })}
+                      className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                      placeholder="Valor"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReceiptSelectionPopup(null)}
+                  className="rounded-xl border border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const movement = currentPayrollMovements.find((item) => item.id === receiptSelectionPopup.movementId);
+                    if (!movement) {
+                      alert('Não foi possível localizar este lançamento.');
+                      return;
+                    }
+                    void handlePrintIndividualReceipt(movement, receiptSelectionPopup);
+                    setReceiptSelectionPopup(null);
+                  }}
+                  className="rounded-xl bg-[#d4ff3f] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0a0a0a]"
+                >
+                  Gerar Recibo
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {isStaffSettingsOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsStaffSettingsOpen(false)}
+              className="absolute inset-0 bg-black/50"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-[#1a1a1a] p-4 shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black">Configurações do RH</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Benefícios padrão</p>
+                </div>
+                <button onClick={() => setIsStaffSettingsOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-500">Preço do Vale Transporte</label>
+                  <CurrencyInput
+                    value={staffSettings.valeTransportePreco}
+                    onValueChange={(_, __, values) =>
+                      setStaffSettings((current) => ({
+                        ...current,
+                        valeTransportePreco: values?.formatted || '0,00',
+                      }))
+                    }
+                    prefix=""
+                    className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                    placeholder="0,00"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-widest text-slate-500">Preço do Vale Mercado</label>
+                  <CurrencyInput
+                    value={staffSettings.valeMercadoPreco}
+                    onValueChange={(_, __, values) =>
+                      setStaffSettings((current) => ({
+                        ...current,
+                        valeMercadoPreco: values?.formatted || '0,00',
+                      }))
+                    }
+                    prefix=""
+                    className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                    placeholder="0,00"
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsStaffSettingsOpen(false)}
+                  className="rounded-xl border border-slate-800 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.localStorage.setItem(STAFF_SETTINGS_STORAGE_KEY, JSON.stringify(staffSettings));
+                    }
+                    setIsStaffSettingsOpen(false);
+                  }}
+                  className="rounded-xl bg-[#d4ff3f] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0a0a0a]"
+                >
+                  Salvar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         {isTimecardModalOpen && timecardModalEmployee && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
@@ -2815,8 +3973,7 @@ export default function StaffPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-[10cm] max-w-full bg-[#1a1a1a] rounded-3xl shadow-2xl border border-slate-800/50 overflow-hidden"
-              style={{ minHeight: '20cm', maxHeight: '25cm' }}
+              className="relative flex h-[92vh] max-h-[25cm] w-[10cm] max-w-full flex-col overflow-hidden rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-2xl"
             >
               <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
                 <div>
@@ -2830,7 +3987,7 @@ export default function StaffPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleSaveTimecard} className="flex h-full flex-col">
+              <form onSubmit={handleSaveTimecard} className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="space-y-3 p-4">
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Competência</label>
@@ -2849,11 +4006,21 @@ export default function StaffPage() {
                       />
                       <button
                         type="button"
-                        onClick={() => void handleQuickAbsenceEntry()}
+                        onClick={() => setIsNightPopupOpen(true)}
                         disabled={isSavingTimecard}
-                        className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-300 transition-all hover:bg-rose-500/25 disabled:opacity-50"
+                        className="rounded-xl border border-indigo-500/30 bg-indigo-500/15 px-3 py-2 text-indigo-300 transition-all hover:bg-indigo-500/25 disabled:opacity-50"
+                        title="Adicional noturno"
                       >
-                        Falta
+                        <Moon size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={applyHazardObservation}
+                        disabled={isSavingTimecard}
+                        className="rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-amber-300 transition-all hover:bg-amber-500/25 disabled:opacity-50"
+                        title="Adicional de Periculosidade"
+                      >
+                        <AlertTriangle size={14} />
                       </button>
                       <button
                         type="button"
@@ -2874,15 +4041,25 @@ export default function StaffPage() {
                     <input type="time" value={timecardForm.entrada_3} onChange={(e) => setTimecardForm({ ...timecardForm, entrada_3: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                     <input type="time" value={timecardForm.saida_3} onChange={(e) => setTimecardForm({ ...timecardForm, saida_3: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                   </div>
-                  <input
-                    type="text"
-                    value={timecardForm.falta_descricao}
-                    onChange={(e) => setTimecardForm({ ...timecardForm, falta_descricao: e.target.value })}
-                    className={`w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all ${
-                      normalizeText(timecardForm.falta_descricao) === 'falta' ? 'text-rose-400' : 'text-white'
-                    }`}
-                    placeholder="Falta"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={timecardForm.falta_descricao}
+                      onChange={(e) => setTimecardForm({ ...timecardForm, falta_descricao: e.target.value })}
+                      className={`flex-1 bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all ${
+                        normalizeText(timecardForm.falta_descricao) === 'falta' ? 'text-rose-400' : 'text-white'
+                      }`}
+                      placeholder="Falta"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => void handleQuickAbsenceEntry()}
+                      disabled={isSavingTimecard}
+                      className="rounded-xl border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-rose-300 transition-all hover:bg-rose-500/25 disabled:opacity-50"
+                    >
+                      Falta
+                    </button>
+                  </div>
                   <div className="flex gap-2">
                     <input
                       type="text"
@@ -2963,6 +4140,41 @@ export default function StaffPage() {
                   </div>
                 </div>
               </form>
+              {isNightPopupOpen && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/40 p-4">
+                  <div className="w-full rounded-2xl border border-slate-800 bg-[#111111] p-4 shadow-2xl">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-xs font-black uppercase tracking-widest text-white">Adicional Noturno</p>
+                      <button type="button" onClick={() => setIsNightPopupOpen(false)} className="text-slate-500 hover:text-white">
+                        <X size={14} />
+                      </button>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <input
+                        type="time"
+                        value={timecardForm.adicional_noturno_inicio}
+                        onChange={(e) => setTimecardForm({ ...timecardForm, adicional_noturno_inicio: e.target.value })}
+                        className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                      />
+                      <input
+                        type="time"
+                        value={timecardForm.adicional_noturno_fim}
+                        onChange={(e) => setTimecardForm({ ...timecardForm, adicional_noturno_fim: e.target.value })}
+                        className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50"
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsNightPopupOpen(false)}
+                        className="rounded-xl bg-[#d4ff3f] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-[#0a0a0a]"
+                      >
+                        Aplicar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

@@ -15,12 +15,6 @@ export default function LoginPage() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const router = useRouter();
 
-  const banner = (
-    <div className="fixed top-0 left-0 right-0 z-[99999] bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest text-center py-1 shadow-2xl pointer-events-none">
-      VERSÃO: 20260326-2358 | REFRESH: F5 ESTÁVEL | CALLBACK: ATIVO
-    </div>
-  );
-
   useEffect(() => {
     // Check if localStorage is available
     try {
@@ -238,7 +232,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
-      {banner}
       <div className="w-full max-w-md bg-[#1a1a1a] border border-slate-800/50 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden">
         
         {!isSupabaseConfigured && (

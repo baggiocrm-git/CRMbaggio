@@ -285,9 +285,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f6f7f8] dark:bg-[#0a0a0a]">
+    <div className="flex min-h-screen bg-[#0a0a0a]">
       <Sidebar user={user} />
-      <main className="flex-1 flex flex-col overflow-hidden pt-6">
+      <main className="flex-1 flex flex-col overflow-hidden">
         {children}
       </main>
       <InternalChat />

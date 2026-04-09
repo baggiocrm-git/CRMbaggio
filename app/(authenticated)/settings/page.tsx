@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
 export default function SettingsPage() {
+  const COMPANY_SETTINGS_STORAGE_KEY = 'system-company-settings';
   const [activeTab, setActiveTab] = useState('profile');
   const [theme, setTheme] = useState('dark');
   const [fontSize, setFontSize] = useState('medium');
@@ -36,13 +37,29 @@ export default function SettingsPage() {
     role: 'Usuário',
     phone: ''
   });
+  const [companySettings, setCompanySettings] = useState({
+    companyAddress: '',
+    companyCity: '',
+  });
 
   // Load settings and user from Supabase
   useEffect(() => {
     const savedTheme = localStorage.getItem('app-theme') || 'dark';
     const savedFontSize = localStorage.getItem('app-font-size') || 'medium';
+    const savedCompanySettings = localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
     setTheme(savedTheme);
     setFontSize(savedFontSize);
+    if (savedCompanySettings) {
+      try {
+        const parsed = JSON.parse(savedCompanySettings) as Partial<typeof companySettings>;
+        setCompanySettings({
+          companyAddress: parsed.companyAddress || '',
+          companyCity: parsed.companyCity || '',
+        });
+      } catch {
+        // ignore invalid company settings
+      }
+    }
     
     // Apply theme to document
     if (savedTheme === 'dark') {
@@ -88,6 +105,7 @@ export default function SettingsPage() {
 
     localStorage.setItem('app-theme', theme);
     localStorage.setItem('app-font-size', fontSize);
+    localStorage.setItem(COMPANY_SETTINGS_STORAGE_KEY, JSON.stringify(companySettings));
     
     // Apply theme
     if (theme === 'dark') {
@@ -205,6 +223,26 @@ export default function SettingsPage() {
                         value={profile.phone}
                         onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Endereço da Empresa</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyAddress}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyAddress: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="Rua, número, bairro, cidade, UF"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cidade / UF da Empresa</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyCity}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyCity: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="São Paulo - SP"
                       />
                     </div>
                   </div>
