@@ -275,6 +275,7 @@ export default function LoginPage() {
               src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
               alt="Logo" 
               fill
+              sizes="112px"
               className="object-contain relative z-10"
               referrerPolicy="no-referrer"
             />

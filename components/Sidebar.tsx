@@ -149,6 +149,7 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
             src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
             alt="Logo" 
             fill
+            sizes="64px"
             priority
             className="object-contain"
             referrerPolicy="no-referrer"

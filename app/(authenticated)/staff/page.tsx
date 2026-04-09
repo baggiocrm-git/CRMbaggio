@@ -16,7 +16,8 @@ import {
   Upload,
   Wallet,
   ReceiptText,
-  Clock3
+  Clock3,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -62,6 +63,8 @@ interface PayrollMovement {
   total_vales?: number | null;
   gratificacao?: number | null;
   observacoes?: string | null;
+  financeiro_lancado_por?: string | null;
+  financeiro_lancado_em?: string | null;
   experiencia_ativa?: boolean | null;
   dias_experiencia?: number | null;
   em_ferias?: boolean | null;
@@ -83,6 +86,7 @@ interface StaffPayment {
   chave_pix?: string | null;
   valor?: number | null;
   referencia?: string | null;
+  registrado_por?: string | null;
   created_at: string;
 }
 
@@ -386,12 +390,21 @@ export default function StaffPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTimecardPanelOpen, setIsTimecardPanelOpen] = useState(false);
   const [isTimecardModalOpen, setIsTimecardModalOpen] = useState(false);
+  const [isFinanceModalOpen, setIsFinanceModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; nome: string } | null>(null);
   const [infoPopup, setInfoPopup] = useState<{ title: string; content: string } | null>(null);
   const [editingMember, setEditingMember] = useState<StaffMember | null>(null);
   const [timecardModalEmployee, setTimecardModalEmployee] = useState<StaffMember | null>(null);
+  const [financeModalEmployee, setFinanceModalEmployee] = useState<StaffMember | null>(null);
+  const [editingFinanceItem, setEditingFinanceItem] = useState<{
+    kind: 'payment' | 'movement';
+    id: string;
+  } | null>(null);
   const [isCustomDepartment, setIsCustomDepartment] = useState(false);
+  const [isCustomFunction, setIsCustomFunction] = useState(false);
   const [selectedCompetencia, setSelectedCompetencia] = useState('');
   const [selectedTimecardEmployeeId, setSelectedTimecardEmployeeId] = useState('');
+  const [currentUserLabel, setCurrentUserLabel] = useState('Usuário atual');
   const [importSummary, setImportSummary] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<AccordionSection, boolean>>({
     cargo: false,
@@ -416,6 +429,13 @@ export default function StaffPage() {
     falta_descricao: '',
     atestado_descricao: '',
     observacoes: '',
+  });
+  const [financeForm, setFinanceForm] = useState({
+    tipo_lancamento: 'adiantamento' as 'adiantamento' | 'pagamento',
+    valor_lancamento: '',
+    quantidade_vt: '',
+    valor_vc: '',
+    valor_vm: '',
   });
   const [formData, setFormData] = useState({
     nome: '',
@@ -566,17 +586,85 @@ export default function StaffPage() {
     }
   }, [staffList, selectedTimecardEmployeeId]);
 
+  useEffect(() => {
+    const loadCurrentUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      const email = data.user?.email?.trim();
+      if (email) {
+        setCurrentUserLabel(email);
+      }
+    };
+
+    void loadCurrentUser();
+  }, []);
+
   const payrollCompetencias = useMemo(
     () => Array.from(new Set(payrollMovements.map((movement) => movement.competencia))),
     [payrollMovements]
   );
 
-  const currentPayrollMovements = useMemo(
+  const functionOptions = useMemo(
     () =>
-      payrollMovements.filter((movement) =>
-        selectedCompetencia ? movement.competencia === selectedCompetencia : true
-      ),
-    [payrollMovements, selectedCompetencia]
+      Array.from(
+        new Set(
+          staffList
+            .map((member) => (member.funcao || member.cargo || '').trim())
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [staffList]
+  );
+
+  const currentPayrollMovements = useMemo(
+    () => {
+      const competenciaBase = selectedCompetencia || new Date().toISOString().slice(0, 7);
+      const filtered = payrollMovements.filter((movement) =>
+        selectedCompetencia ? movement.competencia === selectedCompetencia : movement.competencia === competenciaBase
+      );
+
+      const movementMap = new Map(filtered.map((movement) => [movement.funcionario_id, movement]));
+
+      return [...staffList]
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+        .map((member) => {
+          const existing = movementMap.get(member.id);
+
+          if (existing) return existing;
+
+          return {
+            id: `virtual-${member.id}-${competenciaBase}`,
+            funcionario_id: member.id,
+            funcionario_nome_snapshot: member.nome,
+            competencia: competenciaBase,
+            indice_contabil: member.indice_contabil || null,
+            data_admissao: member.data_admissao || null,
+            funcao: member.funcao || member.cargo || null,
+            local_trabalho: member.local_trabalho || member.unidade_obra || null,
+            adiantamento_valor: null,
+            falta_descricao: null,
+            atestado_descricao: null,
+            horas_trabalhadas: null,
+            horas_extras_50: null,
+            horas_extras_100: null,
+            adicional_noturno: null,
+            vale_transporte: null,
+            vale_cafe: null,
+            vale_mercado: null,
+            total_vales: null,
+            gratificacao: null,
+            observacoes: null,
+            financeiro_lancado_por: null,
+            financeiro_lancado_em: null,
+            experiencia_ativa: member.experiencia_ativa ?? null,
+            dias_experiencia: member.dias_experiencia ?? null,
+            em_ferias: member.em_ferias ?? null,
+            data_inicio_ferias: member.data_inicio_ferias || null,
+            data_fim_ferias: member.data_fim_ferias || null,
+            created_at: member.created_at,
+          } as PayrollMovement;
+        });
+    },
+    [payrollMovements, selectedCompetencia, staffList]
   );
 
   const currentPayments = useMemo(
@@ -611,6 +699,74 @@ export default function StaffPage() {
     [currentTimecards, timecardModalEmployee]
   );
 
+  const financeHistory = useMemo(() => {
+    if (!financeModalEmployee || !selectedCompetencia) return [];
+
+    const history: Array<{
+      id: string;
+      sourceId: string;
+      kind: 'payment' | 'movement';
+      paymentType?: 'adiantamento' | 'pagamento';
+      tipo: string;
+      detalhe: string;
+      valor: string;
+      autor: string;
+      data: string;
+      sortKey: string;
+      rawValor?: number | null;
+      rawVT?: string | null;
+      rawVC?: number | null;
+      rawVM?: number | null;
+    }> = [];
+
+    currentPayments
+      .filter(
+        (payment) =>
+          payment.funcionario_id === financeModalEmployee.id &&
+          payment.competencia === selectedCompetencia
+      )
+      .forEach((payment) => {
+        history.push({
+          id: `payment-${payment.id}`,
+          sourceId: payment.id,
+          kind: 'payment',
+          paymentType: payment.tipo,
+          tipo: payment.tipo === 'adiantamento' ? 'Adiantamento' : 'Pagamento',
+          detalhe: payment.referencia || '-',
+          valor: formatCurrency(payment.valor),
+          autor: payment.registrado_por || 'Sem identificação',
+          data: formatDate(payment.created_at?.slice(0, 10) || null),
+          sortKey: payment.created_at || '',
+          rawValor: payment.valor,
+        });
+      });
+
+    const movement = payrollMovements.find(
+      (item) =>
+        item.funcionario_id === financeModalEmployee.id &&
+        item.competencia === selectedCompetencia
+    );
+
+    if (movement && (movement.vale_transporte || movement.vale_cafe || movement.vale_mercado)) {
+      history.push({
+        id: `movement-${movement.id}`,
+        sourceId: movement.id,
+        kind: 'movement',
+        tipo: 'Benefícios',
+        detalhe: `VT ${movement.vale_transporte || '-'} • VC ${formatCurrency(movement.vale_cafe)} • VM ${formatCurrency(movement.vale_mercado)}`,
+        valor: formatCurrency(movement.total_vales),
+        autor: movement.financeiro_lancado_por || 'Sem identificação',
+        data: formatDate(movement.financeiro_lancado_em?.slice(0, 10) || null),
+        sortKey: movement.financeiro_lancado_em || '',
+        rawVT: movement.vale_transporte,
+        rawVC: movement.vale_cafe,
+        rawVM: movement.vale_mercado,
+      });
+    }
+
+    return history.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
+  }, [currentPayments, financeModalEmployee, payrollMovements, selectedCompetencia]);
+
   const selectedEmployeeTimecardSummary = useMemo(() => {
     return selectedEmployeeTimecards.reduce(
       (acc, entry) => {
@@ -642,6 +798,17 @@ export default function StaffPage() {
 
   const handleOpenImport = () => fileInputRef.current?.click();
 
+  const resetFinanceForm = () => {
+    setFinanceForm({
+      tipo_lancamento: 'adiantamento',
+      valor_lancamento: '',
+      quantidade_vt: '',
+      valor_vc: '',
+      valor_vm: '',
+    });
+    setEditingFinanceItem(null);
+  };
+
   const resetTimecardForm = () => {
     setTimecardForm({
       data_referencia: new Date().toISOString().slice(0, 10),
@@ -664,6 +831,88 @@ export default function StaffPage() {
     setIsTimecardModalOpen(true);
   };
 
+  const openFinanceModal = (member: StaffMember) => {
+    setFinanceModalEmployee(member);
+    resetFinanceForm();
+    setIsFinanceModalOpen(true);
+  };
+
+  const handleEditFinanceItem = (item: (typeof financeHistory)[number]) => {
+    if (item.kind === 'payment') {
+      setFinanceForm({
+        tipo_lancamento: item.paymentType || 'adiantamento',
+        valor_lancamento: item.rawValor != null ? String(item.rawValor).replace('.', ',') : '',
+        quantidade_vt: '',
+        valor_vc: '',
+        valor_vm: '',
+      });
+    } else {
+      setFinanceForm({
+        tipo_lancamento: 'adiantamento',
+        valor_lancamento: '',
+        quantidade_vt: item.rawVT || '',
+        valor_vc: item.rawVC != null ? String(item.rawVC).replace('.', ',') : '',
+        valor_vm: item.rawVM != null ? String(item.rawVM).replace('.', ',') : '',
+      });
+    }
+
+    setEditingFinanceItem({
+      kind: item.kind,
+      id: item.sourceId,
+    });
+  };
+
+  const handleDeleteFinanceItem = async (item: (typeof financeHistory)[number]) => {
+    if (!window.confirm('Deseja apagar este lançamento financeiro?')) return;
+
+    try {
+      if (item.kind === 'payment') {
+        const { error } = await supabase.from('equipe_pagamentos').delete().eq('id', item.sourceId);
+        if (error) throw error;
+
+        if (item.paymentType === 'adiantamento' && financeModalEmployee && selectedCompetencia) {
+          const { error: movementError } = await supabase
+            .from('equipe_movimentos_mensais')
+            .update({ adiantamento_valor: null })
+            .eq('funcionario_id', financeModalEmployee.id)
+            .eq('competencia', selectedCompetencia);
+
+          if (movementError) throw movementError;
+        }
+      } else {
+        const { error } = await supabase
+          .from('equipe_movimentos_mensais')
+          .update({
+            vale_transporte: null,
+            vale_cafe: null,
+            vale_mercado: null,
+            total_vales: null,
+            financeiro_lancado_por: null,
+            financeiro_lancado_em: null,
+          })
+          .eq('id', item.sourceId);
+
+        if (error) throw error;
+      }
+
+      if (editingFinanceItem?.kind === item.kind && editingFinanceItem.id === item.sourceId) {
+        resetFinanceForm();
+      }
+
+      await Promise.all([fetchPayrollMovements(), fetchPaymentRecords()]);
+    } catch (error) {
+      const errorMessage =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      console.error('Erro ao apagar lançamento financeiro do RH:', error);
+      alert(`Falha ao apagar lançamento financeiro: ${errorMessage}`);
+    }
+  };
+
   const markTimecardAsAbsence = () => {
     setTimecardForm((current) => ({
       ...current,
@@ -675,6 +924,20 @@ export default function StaffPage() {
       saida_3: '',
       falta_descricao: current.falta_descricao.trim() ? current.falta_descricao : 'Falta',
       atestado_descricao: '',
+    }));
+  };
+
+  const markTimecardAsCertificate = () => {
+    setTimecardForm((current) => ({
+      ...current,
+      entrada_1: '',
+      saida_1: '',
+      entrada_2: '',
+      saida_2: '',
+      entrada_3: '',
+      saida_3: '',
+      falta_descricao: '',
+      atestado_descricao: current.atestado_descricao.trim() ? current.atestado_descricao : 'ATESTADO',
     }));
   };
 
@@ -1314,6 +1577,157 @@ export default function StaffPage() {
     }
   };
 
+  const ensureMonthlyMovement = async (member: StaffMember, competencia: string) => {
+    const existing = payrollMovements.find(
+      (movement) => movement.funcionario_id === member.id && movement.competencia === competencia
+    );
+
+    if (existing) return existing;
+
+    const payload = {
+      funcionario_id: member.id,
+      funcionario_nome_snapshot: member.nome,
+      competencia,
+      indice_contabil: member.indice_contabil || null,
+      data_admissao: member.data_admissao || null,
+      funcao: member.funcao || member.cargo || null,
+      local_trabalho: member.local_trabalho || member.unidade_obra || null,
+      adiantamento_valor: null,
+      falta_descricao: null,
+      atestado_descricao: null,
+      horas_trabalhadas: null,
+      horas_extras_50: null,
+      horas_extras_100: null,
+      adicional_noturno: null,
+      vale_transporte: null,
+      vale_cafe: null,
+      vale_mercado: null,
+      total_vales: null,
+      gratificacao: null,
+      observacoes: null,
+      experiencia_ativa: Boolean(member.experiencia_ativa),
+      dias_experiencia: member.dias_experiencia || null,
+      em_ferias: Boolean(member.em_ferias),
+      data_inicio_ferias: member.data_inicio_ferias || null,
+      data_fim_ferias: member.data_fim_ferias || null,
+    };
+
+    const { data, error } = await supabase
+      .from('equipe_movimentos_mensais')
+      .insert([payload])
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as PayrollMovement;
+  };
+
+  const handleSaveFinanceEntry = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!financeModalEmployee) return;
+    if (!selectedCompetencia) {
+      alert('Selecione uma competência no Painel Mensal de RH antes do lançamento.');
+      return;
+    }
+
+    try {
+      const movement = await ensureMonthlyMovement(financeModalEmployee, selectedCompetencia);
+      const valorLancamento = parseCurrencyLike(financeForm.valor_lancamento);
+      const valorVc = parseCurrencyLike(financeForm.valor_vc);
+      const valorVm = parseCurrencyLike(financeForm.valor_vm);
+      const totalVales = Number(valorVc || 0) + Number(valorVm || 0);
+
+      const movementUpdate: Record<string, unknown> = {
+        vale_transporte: financeForm.quantidade_vt.trim() || movement.vale_transporte || null,
+        vale_cafe: valorVc ?? movement.vale_cafe ?? null,
+        vale_mercado: valorVm ?? movement.vale_mercado ?? null,
+        total_vales:
+          (valorVc !== null || valorVm !== null)
+            ? totalVales
+            : movement.total_vales ?? null,
+        financeiro_lancado_por: currentUserLabel,
+        financeiro_lancado_em: new Date().toISOString(),
+      };
+
+      if (financeForm.tipo_lancamento === 'adiantamento') {
+        movementUpdate.adiantamento_valor = valorLancamento ?? movement.adiantamento_valor ?? null;
+      }
+
+      if (editingFinanceItem?.kind === 'movement') {
+        const { error: movementError } = await supabase
+          .from('equipe_movimentos_mensais')
+          .update({
+            vale_transporte: financeForm.quantidade_vt.trim() || null,
+            vale_cafe: valorVc,
+            vale_mercado: valorVm,
+            total_vales,
+            financeiro_lancado_por: currentUserLabel,
+            financeiro_lancado_em: new Date().toISOString(),
+          })
+          .eq('id', editingFinanceItem.id);
+
+        if (movementError) throw movementError;
+      } else {
+        const { error: movementError } = await supabase
+          .from('equipe_movimentos_mensais')
+          .update(movementUpdate)
+          .eq('id', movement.id);
+
+        if (movementError) throw movementError;
+      }
+
+      if (valorLancamento !== null) {
+        const paymentPayload = {
+          funcionario_id: financeModalEmployee.id,
+          funcionario_nome_snapshot: financeModalEmployee.nome,
+          competencia: selectedCompetencia,
+          tipo: financeForm.tipo_lancamento,
+          banco: financeModalEmployee.banco || null,
+          agencia: financeModalEmployee.agencia || null,
+          conta: financeModalEmployee.conta_bancaria || null,
+          operacao: financeModalEmployee.operacao_conta || null,
+          chave_pix: financeModalEmployee.chave_pix || null,
+          valor: valorLancamento,
+          registrado_por: currentUserLabel,
+          referencia:
+            financeForm.tipo_lancamento === 'adiantamento'
+              ? 'Lançamento manual de adiantamento'
+              : 'Lançamento manual de pagamento',
+        };
+
+        if (editingFinanceItem?.kind === 'payment') {
+          const { error: paymentError } = await supabase
+            .from('equipe_pagamentos')
+            .update(paymentPayload)
+            .eq('id', editingFinanceItem.id);
+
+          if (paymentError) throw paymentError;
+        } else {
+          const { error: paymentError } = await supabase
+            .from('equipe_pagamentos')
+            .upsert([paymentPayload], { onConflict: 'funcionario_id,competencia,tipo' });
+
+          if (paymentError) throw paymentError;
+        }
+      }
+
+      await Promise.all([fetchPayrollMovements(), fetchPaymentRecords()]);
+      resetFinanceForm();
+      setIsFinanceModalOpen(false);
+    } catch (error) {
+      const errorMessage =
+        error && typeof error === 'object' && 'message' in error
+          ? String((error as { message?: unknown }).message)
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      console.error('Erro ao salvar lançamento financeiro do RH:', error);
+      alert(`Falha ao salvar lançamento financeiro: ${errorMessage}`);
+    }
+  };
+
   if (!isMounted) return null;
 
   const stats = [
@@ -1358,6 +1772,7 @@ export default function StaffPage() {
 
     if (member) {
       setIsCustomDepartment(!departmentOptions.includes(member.departamento));
+      setIsCustomFunction(Boolean(member.funcao) && !functionOptions.includes(member.funcao));
       setEditingMember(member);
       setFormData({
         nome: member.nome,
@@ -1406,6 +1821,7 @@ export default function StaffPage() {
       });
     } else {
       setIsCustomDepartment(false);
+      setIsCustomFunction(false);
       setEditingMember(null);
       setFormData({
         nome: '',
@@ -1460,6 +1876,7 @@ export default function StaffPage() {
     setIsModalOpen(false);
     setEditingMember(null);
     setIsCustomDepartment(false);
+    setIsCustomFunction(false);
     setOpenSections({
       cargo: false,
       vinculo: false,
@@ -1563,6 +1980,13 @@ export default function StaffPage() {
         }
       }
 
+      if (payload.funcao && typeof payload.funcao === 'string') {
+        const normalizedFunction = payload.funcao.trim();
+        if (normalizedFunction !== '') {
+          setIsCustomFunction(false);
+        }
+      }
+
       const syncRelatedRecords = async (memberId: string, memberName: string) => {
         const syncPayload = {
           funcionario_nome_snapshot: memberName,
@@ -1621,18 +2045,18 @@ export default function StaffPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza que deseja excluir este membro da equipe?')) {
-      try {
-        const { error } = await supabase
-          .from('equipe')
-          .delete()
-          .eq('id', id);
-        if (error) throw error;
-        await fetchData();
-      } catch (error) {
-        console.error('Erro ao excluir membro da equipe:', error instanceof Error ? error.message : String(error));
-        alert('Falha ao excluir membro da equipe.');
-      }
+    try {
+      const { error } = await supabase
+        .from('equipe')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      await fetchData();
+      handleCloseModal();
+      setDeleteTarget(null);
+    } catch (error) {
+      console.error('Erro ao excluir membro da equipe:', error instanceof Error ? error.message : String(error));
+      alert('Falha ao excluir membro da equipe.');
     }
   };
   const getCourseStatus = (cursos?: Curso[]) => {
@@ -1787,7 +2211,7 @@ export default function StaffPage() {
                           <div className="flex flex-col items-center gap-3">
                             <Loader2 size={24} className="text-[#d4ff3f] animate-spin" />
                             <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando equipe...</p>
-                          </div>
+                              </div>
                         </td>
                       </tr>
                     ) : (
@@ -1851,6 +2275,17 @@ export default function StaffPage() {
                                       title="Cartão ponto individual"
                                     >
                                       <Clock3 size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openFinanceModal(person);
+                                      }}
+                                      className="inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 p-1.5 text-amber-300 transition-all hover:bg-amber-500/20"
+                                      title="Lançamentos financeiros"
+                                    >
+                                      <Wallet size={13} />
                                     </button>
                                   </div>
                                 </td>
@@ -2145,6 +2580,201 @@ export default function StaffPage() {
       </div>
       {/* Modal */}
       <AnimatePresence>
+        {deleteTarget && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDeleteTarget(null)}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="relative w-full max-w-sm rounded-3xl border border-slate-800/50 bg-[#1a1a1a] p-5 shadow-2xl"
+            >
+              <h3 className="text-base font-black tracking-tight">Confirmar exclusão</h3>
+              <p className="mt-2 text-sm text-slate-300">
+                Deseja realmente excluir <span className="font-bold text-white">{deleteTarget.nome}</span>?
+              </p>
+              <div className="mt-5 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 rounded-xl border border-slate-800 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-[#2a2a2a]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(deleteTarget.id)}
+                  className="flex-1 rounded-xl bg-rose-500 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-rose-600"
+                >
+                  Excluir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        {isFinanceModalOpen && financeModalEmployee && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                resetFinanceForm();
+                setIsFinanceModalOpen(false);
+              }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-md rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-2xl overflow-hidden"
+            >
+              <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
+                <div>
+                  <p className="text-base font-black tracking-tight">Lançamentos Financeiros</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {financeModalEmployee.nome} • {selectedCompetencia || 'Sem competência'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    resetFinanceForm();
+                    setIsFinanceModalOpen(false);
+                  }}
+                  className="text-slate-500 hover:text-white transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-[0.84fr,8px,1.16fr] gap-0">
+                <form onSubmit={handleSaveFinanceEntry} className="p-4 space-y-3 border-r border-slate-800/50">
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Tipo</label>
+                    <select
+                      value={financeForm.tipo_lancamento}
+                      onChange={(e) => setFinanceForm({ ...financeForm, tipo_lancamento: e.target.value as 'adiantamento' | 'pagamento' })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                    >
+                      <option value="adiantamento">Adiantamento</option>
+                      <option value="pagamento">Pagamento</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Valor</label>
+                    <input
+                      type="text"
+                      value={financeForm.valor_lancamento}
+                      onChange={(e) => setFinanceForm({ ...financeForm, valor_lancamento: e.target.value })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="1500,00"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">VT</label>
+                    <input
+                      type="text"
+                      maxLength={3}
+                      value={financeForm.quantidade_vt}
+                      onChange={(e) => setFinanceForm({ ...financeForm, quantidade_vt: e.target.value })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="Qtd"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">VC</label>
+                      <input
+                        type="text"
+                        value={financeForm.valor_vc}
+                        onChange={(e) => setFinanceForm({ ...financeForm, valor_vc: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        placeholder="120,00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">VM</label>
+                      <input
+                        type="text"
+                        value={financeForm.valor_vm}
+                        onChange={(e) => setFinanceForm({ ...financeForm, valor_vm: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-2.5 py-2 text-xs text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                        placeholder="801,50"
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-[#d4ff3f] px-3 py-2.5 text-[10px] font-black uppercase tracking-widest text-[#0a0a0a] transition-all hover:bg-[#c4ef2f]"
+                  >
+                    <Wallet size={13} />
+                    {editingFinanceItem ? 'Salvar edição' : 'Salvar'}
+                  </button>
+                </form>
+
+                <div className="my-4 rounded-full bg-[#d4ff3f]" />
+
+                <div className="p-4">
+                  <div className="mb-3">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Inclusões feitas</p>
+                  </div>
+                  <div className="max-h-[300px] space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                    {financeHistory.length === 0 ? (
+                      <div className="rounded-2xl border border-slate-800 bg-[#0f0f0f] px-3 py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-500">
+                        Nenhum lançamento ainda
+                      </div>
+                    ) : (
+                      financeHistory.map((item) => (
+                        <div key={item.id} className="rounded-2xl border border-slate-800 bg-[#0f0f0f] px-3 py-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <p className="text-xs font-black text-white">{item.tipo}</p>
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{item.data}</span>
+                                <span className="text-xs font-black text-[#d4ff3f]">{item.valor}</span>
+                                <span className="text-[10px] text-slate-500">por {item.autor}</span>
+                              </div>
+                              <p className="mt-1 text-[11px] text-slate-300">{item.detalhe}</p>
+                            </div>
+                            <div className="flex items-center gap-1 pl-2">
+                              <button
+                                type="button"
+                                onClick={() => handleEditFinanceItem(item)}
+                                className="rounded-lg border border-slate-700 p-1.5 text-slate-400 transition-colors hover:border-[#d4ff3f] hover:text-[#d4ff3f]"
+                                title="Editar lançamento"
+                              >
+                                <Pencil size={12} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFinanceItem(item)}
+                                className="rounded-lg border border-slate-700 p-1.5 text-slate-400 transition-colors hover:border-red-500 hover:text-red-400"
+                                title="Apagar lançamento"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                        </div>
+                      </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
         {infoPopup && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
@@ -2227,8 +2857,9 @@ export default function StaffPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={advanceTimecardDate}
-                        className="rounded-xl border border-slate-700 bg-[#0f0f0f] px-3 py-2 text-slate-300 transition-all hover:bg-[#181818]"
+                        onClick={() => void saveTimecardEntry(true)}
+                        disabled={isSavingTimecard}
+                        className="rounded-xl border border-slate-700 bg-[#0f0f0f] px-3 py-2 text-slate-300 transition-all hover:bg-[#181818] disabled:opacity-50"
                         title="Avançar para o próximo dia"
                       >
                         <ChevronRight size={14} />
@@ -2252,13 +2883,23 @@ export default function StaffPage() {
                     }`}
                     placeholder="Falta"
                   />
-                  <input
-                    type="text"
-                    value={timecardForm.atestado_descricao}
-                    onChange={(e) => setTimecardForm({ ...timecardForm, atestado_descricao: e.target.value })}
-                    className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
-                    placeholder="Atestado"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={timecardForm.atestado_descricao}
+                      onChange={(e) => setTimecardForm({ ...timecardForm, atestado_descricao: e.target.value })}
+                      className="flex-1 bg-[#0a0a0a] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                      placeholder="Atestado"
+                    />
+                    <button
+                      type="button"
+                      onClick={markTimecardAsCertificate}
+                      disabled={isSavingTimecard}
+                      className="rounded-xl border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-300 transition-all hover:bg-amber-500/25 disabled:opacity-50"
+                    >
+                      Atestado
+                    </button>
+                  </div>
                   <textarea
                     rows={2}
                     value={timecardForm.observacoes}
@@ -2348,7 +2989,7 @@ export default function StaffPage() {
                   {editingMember && (
                     <button 
                       type="button"
-                      onClick={() => handleDelete(editingMember.id)}
+                      onClick={() => setDeleteTarget({ id: editingMember.id, nome: editingMember.nome })}
                       className="p-2 text-rose-500 hover:bg-rose-500/10 rounded-xl transition-all"
                       title="Excluir Funcionário"
                     >
@@ -2414,7 +3055,48 @@ export default function StaffPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl border border-slate-800 bg-[#0f0f0f] p-4">
                       <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Função</label>
-                        <input type="text" value={formData.funcao} onChange={(e) => setFormData({ ...formData, funcao: e.target.value, cargo: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" placeholder="ex: Mestre de Obras" />
+                        <div className="space-y-2">
+                          <select
+                            value={isCustomFunction ? '__nova__' : formData.funcao}
+                            onChange={(e) => {
+                              const nextValue = e.target.value;
+                              if (nextValue === '__nova__') {
+                                setIsCustomFunction(true);
+                                setFormData({
+                                  ...formData,
+                                  funcao: functionOptions.includes(formData.funcao) ? '' : formData.funcao,
+                                  cargo: functionOptions.includes(formData.funcao) ? '' : formData.funcao,
+                                });
+                                return;
+                              }
+
+                              setIsCustomFunction(false);
+                              setFormData({
+                                ...formData,
+                                funcao: nextValue,
+                                cargo: nextValue,
+                              });
+                            }}
+                            className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                          >
+                            <option value="">Selecione</option>
+                            {functionOptions.map((funcao) => (
+                              <option key={funcao} value={funcao}>
+                                {funcao}
+                              </option>
+                            ))}
+                            <option value="__nova__">Nova Função</option>
+                          </select>
+                          {isCustomFunction && (
+                            <input
+                              type="text"
+                              value={formData.funcao}
+                              onChange={(e) => setFormData({ ...formData, funcao: e.target.value, cargo: e.target.value })}
+                              className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
+                              placeholder="Digite a nova função"
+                            />
+                          )}
+                        </div>
                       </div>
                       <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Índice Contábil</label>
@@ -2577,10 +3259,6 @@ export default function StaffPage() {
                         <input type="text" value={formData.salario_base} onChange={(e) => setFormData({ ...formData, salario_base: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" placeholder="ex: R$ 2.500,00" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Conta Bancária</label>
-                        <input type="text" value={formData.conta_bancaria} onChange={(e) => setFormData({ ...formData, conta_bancaria: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
-                      </div>
-                      <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Insalubridade (%)</label>
                         <input type="text" value={formData.adicional_insalubridade} onChange={(e) => setFormData({ ...formData, adicional_insalubridade: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                       </div>
@@ -2588,22 +3266,6 @@ export default function StaffPage() {
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Periculosidade (%)</label>
                         <input type="text" value={formData.adicional_periculosidade} onChange={(e) => setFormData({ ...formData, adicional_periculosidade: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                       </div>
-                    </div>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => toggleSection('bancario')}
-                    className="w-full flex items-center justify-between px-4 py-3 bg-[#111111] border border-slate-800 rounded-2xl text-left hover:border-[#d4ff3f]/30 transition-all"
-                  >
-                    <div>
-                      <p className="text-sm font-black tracking-tight">Bancário e PIX</p>
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Banco, agência, conta, operação e chave PIX</p>
-                    </div>
-                    <ChevronDown size={18} className={`text-slate-500 transition-transform ${openSections.bancario ? 'rotate-180' : ''}`} />
-                  </button>
-                  {openSections.bancario && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-2xl border border-slate-800 bg-[#0f0f0f] p-4">
                       <div>
                         <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Banco</label>
                         <input type="text" value={formData.banco} onChange={(e) => setFormData({ ...formData, banco: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
@@ -2613,7 +3275,7 @@ export default function StaffPage() {
                         <input type="text" value={formData.agencia} onChange={(e) => setFormData({ ...formData, agencia: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                       </div>
                       <div>
-                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Conta</label>
+                        <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Conta Bancária</label>
                         <input type="text" value={formData.conta_bancaria} onChange={(e) => setFormData({ ...formData, conta_bancaria: e.target.value })} className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all" />
                       </div>
                       <div>

@@ -816,6 +816,7 @@ export default function ChatPage() {
                   src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
                   alt="Logo" 
                   fill
+                  sizes="128px"
                   className="object-contain opacity-20 grayscale"
                   referrerPolicy="no-referrer"
                 />

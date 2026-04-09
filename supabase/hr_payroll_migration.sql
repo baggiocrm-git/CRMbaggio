@@ -38,6 +38,8 @@ create table if not exists public.equipe_movimentos_mensais (
   total_vales numeric(12,2),
   gratificacao numeric(12,2),
   observacoes text,
+  financeiro_lancado_por text,
+  financeiro_lancado_em timestamptz,
   experiencia_ativa boolean not null default false,
   dias_experiencia integer,
   em_ferias boolean not null default false,
@@ -47,6 +49,10 @@ create table if not exists public.equipe_movimentos_mensais (
   updated_at timestamptz not null default timezone('utc'::text, now()),
   constraint equipe_movimentos_mensais_unq unique (funcionario_id, competencia)
 );
+
+alter table public.equipe_movimentos_mensais
+  add column if not exists financeiro_lancado_por text,
+  add column if not exists financeiro_lancado_em timestamptz;
 
 create index if not exists equipe_movimentos_mensais_competencia_idx
   on public.equipe_movimentos_mensais (competencia desc);
@@ -67,10 +73,14 @@ create table if not exists public.equipe_pagamentos (
   chave_pix text,
   valor numeric(12,2),
   referencia text,
+  registrado_por text,
   created_at timestamptz not null default timezone('utc'::text, now()),
   updated_at timestamptz not null default timezone('utc'::text, now()),
   constraint equipe_pagamentos_unq unique (funcionario_id, competencia, tipo)
 );
+
+alter table public.equipe_pagamentos
+  add column if not exists registrado_por text;
 
 create index if not exists equipe_pagamentos_competencia_idx
   on public.equipe_pagamentos (competencia desc);
