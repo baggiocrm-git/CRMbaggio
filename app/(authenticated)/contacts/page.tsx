@@ -155,9 +155,9 @@ function CustomSelect({
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          {options.map((option) => (
+          {options.map((option, index) => (
             <button
-              key={option.value}
+              key={`${option.value || 'option'}-${index}`}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -302,11 +302,12 @@ export default function ContactsPage() {
   }, [customCategories]);
 
   const categoryOptions = Array.from(
-    new Set(
-      [...BASE_CONTACT_CATEGORIES, ...customCategories, ...contacts.map((contact) => contact.category).filter(Boolean)].map((item) =>
-        decodeMojibake(item).trim()
-      )
-    )
+    new Map(
+      [...BASE_CONTACT_CATEGORIES, ...customCategories, ...contacts.map((contact) => contact.category)]
+        .map((item) => decodeMojibake(String(item || '')).trim())
+        .filter((item) => item !== '')
+        .map((item) => [item.toLowerCase(), item] as const)
+    ).values()
   );
 
   const filterOptions: DropdownOption[] = [
@@ -831,8 +832,11 @@ export default function ContactsPage() {
                     </td>
                   </tr>
                 ) : (
-                  paginatedContacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-[#2a2a2a]/30 transition-colors group leading-none">
+                  paginatedContacts.map((contact, index) => (
+                    <tr
+                      key={`${contact.id || 'contact'}-${contact.email || contact.name || contact.company || 'row'}-${index}`}
+                      className="hover:bg-[#2a2a2a]/30 transition-colors group leading-none"
+                    >
                       <td className="px-4 py-1.5 text-sm text-[#d4ff3f] tracking-tight">{contact.company || '-'}</td>
                       <td className="px-4 py-1.5 text-sm text-white tracking-tight">{contact.name || '-'}</td>
                       <td className="px-4 py-1.5 text-xs text-slate-300">{contact.phone || '-'}</td>
@@ -959,7 +963,7 @@ export default function ContactsPage() {
       {/* Modal */}
       <AnimatePresence>
         {isAiModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="ai-search-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1056,7 +1060,7 @@ export default function ContactsPage() {
         )}
 
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="contact-form-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -1109,8 +1113,8 @@ export default function ContactsPage() {
                       onChange={(e) => setFormData({...formData, categoria: e.target.value})}
                       className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                     >
-                      {categoryOptions.map((category) => (
-                        <option key={category} value={category}>{category}</option>
+                      {categoryOptions.map((category, index) => (
+                        <option key={`${category || 'categoria'}-${index}`} value={category}>{category}</option>
                       ))}
                     </select>
                   </div>

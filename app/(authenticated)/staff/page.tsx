@@ -1027,7 +1027,9 @@ export default function StaffPage() {
       .filter(
         (payment) =>
           payment.funcionario_id === financeModalEmployee.id &&
-          payment.competencia === selectedCompetencia
+          payment.competencia === selectedCompetencia &&
+          !String(payment.id).startsWith('virtual-payment-') &&
+          Boolean(payment.tipo)
       )
       .forEach((payment) => {
         history.push({
@@ -1174,6 +1176,10 @@ export default function StaffPage() {
 
     try {
       if (item.kind === 'payment') {
+        if (item.sourceId.startsWith('virtual-payment-')) {
+          return;
+        }
+
         const { error } = await supabase.from('equipe_pagamentos').delete().eq('id', item.sourceId);
         if (error) throw error;
 
@@ -1566,12 +1572,12 @@ export default function StaffPage() {
     const styles = `
       @page { size: A4 portrait; margin: 8mm; }
       body { background:#fff; padding:0; }
-      .collective-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 6mm; }
+      .collective-grid { display:grid; grid-template-columns: repeat(2, 1fr); gap: 4mm; }
       .collective-receipt-card {
-        height: 90mm;
+        height: 84mm;
         border: 1px solid #d4d4d8;
         border-radius: 14px;
-        padding: 6mm;
+        padding: 4.5mm;
         box-sizing: border-box;
         break-inside: avoid;
         page-break-inside: avoid;
@@ -1583,13 +1589,13 @@ export default function StaffPage() {
       .collective-title-wrap { flex:1; text-align:center; padding-right:34px; }
       .collective-title { margin:0; font-size:18px; font-weight:900; letter-spacing:0.12em; }
       .collective-company { margin-top:3px; font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#444; }
-      .collective-name { margin-top:8px; font-size:12px; font-weight:700; }
-      .collective-table { width:100%; border-collapse:collapse; margin-top:8px; }
-      .collective-table th, .collective-table td { border:1px solid #ddd; padding:4px 6px; font-size:9px; }
+      .collective-name { margin-top:6px; font-size:12px; font-weight:700; }
+      .collective-table { width:100%; border-collapse:collapse; margin-top:6px; }
+      .collective-table th, .collective-table td { border:1px solid #ddd; padding:3px 5px; font-size:8.5px; }
       .collective-table th { background:#f5f5f5; }
-      .collective-text { margin-top:8px; font-size:9px; line-height:1.4; }
-      .collective-city { margin-top:auto; font-size:9px; }
-      .collective-signature { margin-top:10px; border-top:1px solid #111; padding-top:5px; text-align:center; font-size:9px; }
+      .collective-text { margin-top:6px; margin-bottom:3px; font-size:8.5px; line-height:1.3; }
+      .collective-city { margin-top:8px; font-size:9px; text-align:center; }
+      .collective-signature { margin-top:22px; width:50%; align-self:center; border-top:1px solid #111; padding-top:4px; text-align:center; font-size:8.5px; }
     `;
 
     savePrintableReceipt('Recibos coletivos de benefícios', body, styles);
@@ -2907,7 +2913,7 @@ export default function StaffPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {stats.map((stat, idx) => (
             <motion.div 
-              key={stat.label}
+              key={`${stat.label || 'stat'}-${idx}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
@@ -2993,8 +2999,8 @@ export default function StaffPage() {
                           className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
                         >
                           <option value="todas">Todas as categorias</option>
-                          {normalizedCategorizedStaff.map((group) => (
-                            <option key={group.label} value={group.label}>
+                          {normalizedCategorizedStaff.map((group, index) => (
+                            <option key={`${group.label || 'grupo'}-${index}`} value={group.label}>
                               {group.label}
                             </option>
                           ))}
@@ -3068,11 +3074,11 @@ export default function StaffPage() {
                         }
 
                         return groupRows.concat(
-                          group.items.map((person) => {
+                          group.items.map((person, index) => {
                             const courseStatus = getCourseStatus(person.cursos);
                             return (
                               <tr
-                                key={person.id}
+                                key={`${person.id || 'staff'}-${person.nome || 'pessoa'}-${index}`}
                                 onClick={() => handleOpenModal(person)}
                                 className="hover:bg-[#2a2a2a]/30 transition-colors group cursor-pointer"
                               >
@@ -3168,8 +3174,8 @@ export default function StaffPage() {
                     {payrollCompetencias.length === 0 ? (
                       <option value="">Sem competência importada</option>
                     ) : (
-                      payrollCompetencias.map((competencia) => (
-                        <option key={competencia} value={competencia}>
+                      payrollCompetencias.map((competencia, index) => (
+                        <option key={`${competencia || 'competencia'}-${index}`} value={competencia}>
                           {competencia}
                         </option>
                       ))
@@ -3237,8 +3243,8 @@ export default function StaffPage() {
                           className="w-full rounded-xl border border-slate-800 bg-[#0a0a0a] px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/40"
                         >
                           <option value="todos">Todos os locais</option>
-                          {payrollLocationOptions.map((location) => (
-                            <option key={location} value={location}>
+                          {payrollLocationOptions.map((location, index) => (
+                            <option key={`${location || 'local'}-${index}`} value={location}>
                               {location}
                             </option>
                           ))}
@@ -3329,8 +3335,8 @@ export default function StaffPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredPayrollMovements.map((movement) => (
-                        <tr key={movement.id} className="hover:bg-[#2a2a2a]/30 transition-colors">
+                      filteredPayrollMovements.map((movement, index) => (
+                        <tr key={`${movement.id || 'movement'}-${movement.funcionario_id || movement.funcionario_nome_snapshot || 'row'}-${index}`} className="hover:bg-[#2a2a2a]/30 transition-colors">
                           <td className="px-4 py-1 whitespace-nowrap">
                             <div>
                               <p className="text-sm font-medium leading-tight whitespace-nowrap text-slate-100">{movement.funcionario_nome_snapshot}</p>
@@ -3475,8 +3481,8 @@ export default function StaffPage() {
                             </td>
                           </tr>
                         ) : (
-                          currentPayments.map((payment) => (
-                            <tr key={payment.id}>
+                          currentPayments.map((payment, index) => (
+                            <tr key={`${payment.id || 'payment'}-${payment.funcionario_id || payment.funcionario_nome_snapshot || 'row'}-${index}`}>
                               <td className="px-4 py-1.5 text-sm">{payment.funcionario_nome_snapshot}</td>
                               <td className="px-4 py-1.5">
                                 <span className={`inline-flex rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-widest ${
@@ -3510,7 +3516,7 @@ export default function StaffPage() {
       {/* Modal */}
       <AnimatePresence>
         {deleteTarget && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div key="staff-delete-modal" className="fixed inset-0 z-[60] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3548,7 +3554,7 @@ export default function StaffPage() {
           </div>
         )}
         {isFinanceModalOpen && financeModalEmployee && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-finance-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3664,8 +3670,8 @@ export default function StaffPage() {
                         Nenhum lançamento ainda
                       </div>
                     ) : (
-                      financeHistory.map((item) => (
-                        <div key={item.id} className="rounded-2xl border border-slate-800 bg-[#0f0f0f] px-3 py-2.5">
+                      financeHistory.map((item, index) => (
+                        <div key={`${item.id || 'finance'}-${item.autor || item.tipo || 'item'}-${index}`} className="rounded-2xl border border-slate-800 bg-[#0f0f0f] px-3 py-2.5">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -3705,7 +3711,7 @@ export default function StaffPage() {
           </div>
         )}
         {infoPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-info-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3732,7 +3738,7 @@ export default function StaffPage() {
           </div>
         )}
         {noteEditorPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-note-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3782,7 +3788,7 @@ export default function StaffPage() {
           </div>
         )}
         {receiptSelectionPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-receipt-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3811,8 +3817,8 @@ export default function StaffPage() {
                   { key: 'vc', label: 'Vale Café' },
                   { key: 'vm', label: 'Vale Mercado' },
                   { key: 'gratificacao', label: 'Gratificação' },
-                ].map((item) => (
-                  <label key={item.key} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0f0f0f] px-3 py-2">
+                ].map((item, index) => (
+                  <label key={`${item.key || 'receipt-item'}-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-800 bg-[#0f0f0f] px-3 py-2">
                     <input
                       type="checkbox"
                       checked={Boolean(receiptSelectionPopup[item.key as keyof ReceiptSelectionState])}
@@ -3881,7 +3887,7 @@ export default function StaffPage() {
           </div>
         )}
         {isStaffSettingsOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-settings-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -3961,7 +3967,7 @@ export default function StaffPage() {
           </div>
         )}
         {isTimecardModalOpen && timecardModalEmployee && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-timecard-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -4113,8 +4119,8 @@ export default function StaffPage() {
                         Nenhum lançamento nesta competência
                       </div>
                     ) : (
-                      modalEmployeeTimecards.slice(0, 12).map((entry) => (
-                        <div key={entry.id} className="rounded-2xl border border-slate-800 bg-[#0f0f0f] p-3">
+                      modalEmployeeTimecards.slice(0, 12).map((entry, index) => (
+                        <div key={`${entry.id || 'timecard'}-${entry.data_referencia || 'data'}-${index}`} className="rounded-2xl border border-slate-800 bg-[#0f0f0f] p-3">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-black">{formatDate(entry.data_referencia)}</span>
                             <div className="flex items-center gap-2">
@@ -4179,7 +4185,7 @@ export default function StaffPage() {
           </div>
         )}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div key="staff-member-modal" className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -4292,8 +4298,8 @@ export default function StaffPage() {
                             className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                           >
                             <option value="">Selecione</option>
-                            {functionOptions.map((funcao) => (
-                              <option key={funcao} value={funcao}>
+                            {functionOptions.filter(Boolean).map((funcao, index) => (
+                              <option key={`${funcao || 'funcao'}-${index}`} value={funcao}>
                                 {funcao}
                               </option>
                             ))}
@@ -4343,8 +4349,8 @@ export default function StaffPage() {
                             className="w-full bg-[#0a0a0a] border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/50 transition-all"
                           >
                             <option value="">Selecione</option>
-                            {departmentOptions.map((department) => (
-                              <option key={department} value={department}>
+                            {departmentOptions.filter(Boolean).map((department, index) => (
+                              <option key={`${department || 'departamento'}-${index}`} value={department}>
                                 {department}
                               </option>
                             ))}
