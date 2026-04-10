@@ -198,7 +198,7 @@ export default function FinanceDashboard() {
 
       <div className="px-8 pb-8 space-y-8">
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {[
             { label: 'RECEITA DO MÊS', value: formatCurrency(monthlyRevenue), change: 'Real', trend: 'up', icon: TrendingUp, color: '#d4ff3f' },
             { label: 'DESPESAS DO MÊS', value: formatCurrency(monthlyExpenses), change: 'Real', trend: 'down', icon: TrendingDown, color: '#ff4d4d' },
@@ -210,13 +210,13 @@ export default function FinanceDashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.1 }}
-              className="bg-[#1a1a1a] p-6 rounded-2xl border border-slate-800/50 relative overflow-hidden group"
+              className="bg-[#1a1a1a] p-4 rounded-2xl border border-slate-800/50 relative overflow-hidden group"
             >
-              <div className="absolute right-4 top-4 size-12 bg-slate-800/30 rounded-full flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform">
-                <card.icon size={20} />
+              <div className="absolute right-3 top-3 size-9 bg-slate-800/30 rounded-full flex items-center justify-center text-slate-500 group-hover:scale-110 transition-transform">
+                <card.icon size={16} />
               </div>
-              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-2">{card.label}</p>
-              <p className="text-2xl font-black tracking-tight mb-4">{card.value}</p>
+              <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5">{card.label}</p>
+              <p className="text-xl font-black tracking-tight leading-none mb-3">{card.value}</p>
               <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg w-fit ${card.trend === 'up' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-[#ff4d4d]/10 text-[#ff4d4d]'}`}>
                 {card.trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                 {card.change}
@@ -225,13 +225,13 @@ export default function FinanceDashboard() {
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Chart */}
-          <div className="lg:col-span-2 bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50">
-            <div className="flex justify-between items-center mb-8">
+          <div className="lg:col-span-2 bg-[#1a1a1a] p-6 rounded-3xl border border-slate-800/50">
+            <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-black tracking-tight">Receitas vs Despesas</h3>
             </div>
-            <div className="h-80 w-full">
+            <div className="h-52 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={last6Months} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
@@ -251,12 +251,12 @@ export default function FinanceDashboard() {
                     contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
                     formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
                   />
-                  <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={40}>
+                  <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={28}>
                     {last6Months.map((entry, index) => (
                       <Cell key={`cell-rec-${index}`} fill={index === last6Months.length - 1 ? '#d4ff3f' : '#88ab00'} />
                     ))}
                   </Bar>
-                  <Bar dataKey="despesas" radius={[4, 4, 0, 0]} barSize={40}>
+                  <Bar dataKey="despesas" radius={[4, 4, 0, 0]} barSize={28}>
                     {last6Months.map((entry, index) => (
                       <Cell key={`cell-des-${index}`} fill={index === last6Months.length - 1 ? '#ff4d4d' : '#993333'} />
                     ))}
@@ -264,7 +264,7 @@ export default function FinanceDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex gap-6 mt-6">
+            <div className="flex gap-5 mt-4">
               <div className="flex items-center gap-2">
                 <div className="size-3 rounded-sm bg-[#d4ff3f]"></div>
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Receitas</span>
@@ -277,18 +277,18 @@ export default function FinanceDashboard() {
           </div>
 
           {/* Indicators */}
-          <div className="bg-[#1a1a1a] p-8 rounded-3xl border border-slate-800/50 flex flex-col">
-            <h3 className="text-lg font-black tracking-tight mb-8">Indicadores</h3>
-            <div className="grid grid-cols-2 gap-4 flex-1">
+          <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-slate-800/50 flex flex-col">
+            <h3 className="text-lg font-black tracking-tight mb-5">Indicadores</h3>
+            <div className="grid grid-cols-2 gap-3 flex-1">
               {[
                 { label: 'MARGEM BRUTA', value: monthlyRevenue > 0 ? `${((netProfit / monthlyRevenue) * 100).toFixed(1)}%` : '0%', color: 'text-[#d4ff3f]' },
                 { label: 'RECEBIDO/TOTAL', value: monthlyRevenue > 0 ? `${((currentMonthReceivables.reduce((a, c) => a + c.valor_recebido, 0) / monthlyRevenue) * 100).toFixed(1)}%` : '0%', color: 'text-[#d4ff3f]' },
                 { label: 'PAGO/TOTAL', value: monthlyExpenses > 0 ? `${((currentMonthPayables.reduce((a, c) => a + c.valor_pago, 0) / monthlyExpenses) * 100).toFixed(1)}%` : '0%', color: 'text-blue-400' },
                 { label: 'INADIMPLÊNCIA', value: overdueReceivables.length > 0 ? `${overdueReceivables.length}` : '0', color: 'text-orange-400' },
               ].map((ind) => (
-                <div key={ind.label} className="bg-[#0a0a0a] p-4 rounded-2xl border border-slate-800/30">
-                  <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest mb-2">{ind.label}</p>
-                  <p className={`text-xl font-black ${ind.color}`}>{ind.value}</p>
+                <div key={ind.label} className="bg-[#0a0a0a] p-3 rounded-2xl border border-slate-800/30">
+                  <p className="text-slate-500 text-[8px] font-black uppercase tracking-widest mb-1.5">{ind.label}</p>
+                  <p className={`text-lg font-black leading-none ${ind.color}`}>{ind.value}</p>
                 </div>
               ))}
             </div>

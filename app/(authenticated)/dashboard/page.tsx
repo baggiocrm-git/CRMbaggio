@@ -232,10 +232,10 @@ export default function DashboardPage() {
       
       <div className="p-8 space-y-8">
         {/* KPI Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {isLoading ? (
             Array(4).fill(0).map((_, i) => (
-              <div key={i} className="h-32 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] animate-pulse flex items-center justify-center">
+              <div key={i} className="h-24 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] animate-pulse flex items-center justify-center">
                 <Loader2 size={24} className="text-[#d4ff3f]/20 animate-spin" />
               </div>
             ))
@@ -246,21 +246,21 @@ export default function DashboardPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.1 }}
-                className="p-6 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm group hover:border-[#d4ff3f]/30 transition-all"
+                className="p-4 rounded-2xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm group hover:border-[#d4ff3f]/30 transition-all"
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start mb-2.5">
                   <span className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{kpi.label}</span>
-                  <div className={`p-2 rounded-xl bg-slate-800/50 text-slate-400 group-hover:text-[#d4ff3f] transition-colors`}>
-                    <kpi.icon size={20} />
+                  <div className={`p-1.5 rounded-lg bg-slate-800/50 text-slate-400 group-hover:text-[#d4ff3f] transition-colors`}>
+                    <kpi.icon size={16} />
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black tracking-tight">{kpi.value}</span>
+                  <span className="text-2xl font-black tracking-tight leading-none">{kpi.value}</span>
                   <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${kpi.change.startsWith('+') ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-rose-500/10 text-rose-500'}`}>
                     {kpi.change}
                   </span>
                 </div>
-                <div className="mt-4 h-1 bg-[#0a0a0a] rounded-full overflow-hidden">
+                <div className="mt-3 h-1 bg-[#0a0a0a] rounded-full overflow-hidden">
                   <div className={`h-full bg-[#d4ff3f] w-3/4 opacity-80`}></div>
                 </div>
               </motion.div>
@@ -275,9 +275,9 @@ export default function DashboardPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
-              className="lg:col-span-2 p-8 rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm"
+              className="lg:col-span-2 p-6 rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm"
             >
-              <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-black tracking-tight">Desempenho (RDOs por dia)</h3>
                 <div className="flex bg-[#0a0a0a] p-1 rounded-xl">
                   {['Mensal', 'Semanal'].map((t) => (
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                   ))}
                 </div>
               </div>
-              <div className="h-64 w-full min-w-0">
+              <div className="h-40 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <BarChart data={performanceData}>
                     <XAxis 
@@ -310,7 +310,7 @@ export default function DashboardPage() {
                         fontWeight: 'bold'
                       }}
                     />
-                    <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={32}>
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={24}>
                       {performanceData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#d4ff3f' : '#1e293b'} />
                       ))}
