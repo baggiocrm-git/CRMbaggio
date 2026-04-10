@@ -18,7 +18,9 @@ import {
   Copy,
   ExternalLink,
   AlertCircle,
-  Building2
+  Building2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -55,12 +57,19 @@ export default function SettingsPage() {
   const [fontSize, setFontSize] = useState<FontSizeOption>('medium');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [isPasswordCardOpen, setIsPasswordCardOpen] = useState(true);
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
     confirmNewPassword: '',
   });
   const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState({
+    current: false,
+    next: false,
+    confirm: false,
+  });
   const [, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState({
     fullName: '',
@@ -155,7 +164,7 @@ export default function SettingsPage() {
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
-  const handlePasswordUpdate = () => {
+  const handlePasswordUpdate = async () => {
     if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
       setPasswordFeedback('Preencha a senha atual, a nova senha e a confirmação.');
       return;
@@ -166,7 +175,52 @@ export default function SettingsPage() {
       return;
     }
 
-    setPasswordFeedback('Confirmação de senha validada. Integração de troca pode seguir para o próximo passo.');
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordFeedback('A nova senha deve ter pelo menos 6 caracteres.');
+      return;
+    }
+
+    try {
+      setIsUpdatingPassword(true);
+      setPasswordFeedback(null);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email || profile.email;
+
+      if (!userEmail) {
+        throw new Error('Não foi possível identificar o e-mail da conta atual.');
+      }
+
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: passwordForm.currentPassword,
+      });
+
+      if (verifyError) {
+        throw new Error('A senha atual informada está incorreta.');
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword,
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmNewPassword: '',
+      });
+      setPasswordFeedback(null);
+      setIsPasswordCardOpen(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Não foi possível atualizar a senha.';
+      setPasswordFeedback(message);
+    } finally {
+      setIsUpdatingPassword(false);
+    }
   };
 
   const tabs = [
@@ -489,39 +543,70 @@ export default function SettingsPage() {
                   </h3>
                   
                   <div className="space-y-4">
+                    {isPasswordCardOpen && (
                     <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 space-y-4">
                       <p className="text-sm font-black">Alterar Senha</p>
                       <div className="space-y-4">
-                        <input 
-                          type="password"
-                          placeholder="Senha Atual"
-                          value={passwordForm.currentPassword}
-                          onChange={(e) => {
-                            setPasswordForm({ ...passwordForm, currentPassword: e.target.value });
-                            setPasswordFeedback(null);
-                          }}
-                          className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                        />
-                        <input 
-                          type="password"
-                          placeholder="Nova Senha"
-                          value={passwordForm.newPassword}
-                          onChange={(e) => {
-                            setPasswordForm({ ...passwordForm, newPassword: e.target.value });
-                            setPasswordFeedback(null);
-                          }}
-                          className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                        />
-                        <input 
-                          type="password"
-                          placeholder="Repetir Nova Senha"
-                          value={passwordForm.confirmNewPassword}
-                          onChange={(e) => {
-                            setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value });
-                            setPasswordFeedback(null);
-                          }}
-                          className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
-                        />
+                        <div className="relative">
+                          <input 
+                            type={showPassword.current ? 'text' : 'password'}
+                            placeholder="Senha Atual"
+                            value={passwordForm.currentPassword}
+                            onChange={(e) => {
+                              setPasswordForm({ ...passwordForm, currentPassword: e.target.value });
+                              setPasswordFeedback(null);
+                            }}
+                            className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 pr-12 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((current) => ({ ...current, current: !current.current }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                            title={showPassword.current ? 'Ocultar senha' : 'Mostrar senha'}
+                          >
+                            {showPassword.current ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input 
+                            type={showPassword.next ? 'text' : 'password'}
+                            placeholder="Nova Senha"
+                            value={passwordForm.newPassword}
+                            onChange={(e) => {
+                              setPasswordForm({ ...passwordForm, newPassword: e.target.value });
+                              setPasswordFeedback(null);
+                            }}
+                            className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 pr-12 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((current) => ({ ...current, next: !current.next }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                            title={showPassword.next ? 'Ocultar senha' : 'Mostrar senha'}
+                          >
+                            {showPassword.next ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                        <div className="relative">
+                          <input 
+                            type={showPassword.confirm ? 'text' : 'password'}
+                            placeholder="Repetir Nova Senha"
+                            value={passwordForm.confirmNewPassword}
+                            onChange={(e) => {
+                              setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value });
+                              setPasswordFeedback(null);
+                            }}
+                            className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 pr-12 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((current) => ({ ...current, confirm: !current.confirm }))}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                            title={showPassword.confirm ? 'Ocultar senha' : 'Mostrar senha'}
+                          >
+                            {showPassword.confirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
                         {passwordFeedback && (
                           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
                             {passwordFeedback}
@@ -530,12 +615,14 @@ export default function SettingsPage() {
                         <button
                           type="button"
                           onClick={handlePasswordUpdate}
+                          disabled={isUpdatingPassword}
                           className="px-6 py-2.5 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
                         >
-                          Atualizar Senha
+                          {isUpdatingPassword ? 'Atualizando...' : 'Atualizar Senha'}
                         </button>
                       </div>
                     </div>
+                    )}
 
                     <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 flex items-center justify-between">
                       <div>
