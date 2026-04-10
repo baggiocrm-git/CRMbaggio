@@ -371,6 +371,7 @@ const parseCompetenciaFromFileName = (fileName: string) => {
 const HAZARD_NOTES_HEADING = 'Periculosidade do cartão:';
 const STAFF_SETTINGS_STORAGE_KEY = 'staff-rh-settings';
 const COMPANY_SETTINGS_STORAGE_KEY = 'system-company-settings';
+const SYSTEM_SETTINGS_COMPANY_KEY = 'company_profile';
 const CBSL_LOGO_URL = 'https://raw.githubusercontent.com/baggiocrm-git/imagens/main/LOGO%20CBSL_sem%20escrita_Pequeno.png';
 const RECEIPT_CITY = 'São Paulo - SP';
 
@@ -795,18 +796,36 @@ export default function StaffPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const raw = window.localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
-    if (!raw) return;
+    const loadCompanyReceiptCity = async () => {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', SYSTEM_SETTINGS_COMPANY_KEY)
+        .maybeSingle();
 
-    try {
-      const parsed = JSON.parse(raw) as { companyCity?: string };
-      if (parsed.companyCity?.trim()) {
-        setCompanyReceiptCity(parsed.companyCity.trim());
+      if (!error) {
+        const value = data?.value as { companyCity?: string } | null;
+        if (value?.companyCity?.trim()) {
+          setCompanyReceiptCity(value.companyCity.trim());
+          return;
+        }
       }
-    } catch {
-      // ignore invalid company settings
-    }
+
+      if (typeof window === 'undefined') return;
+      const raw = window.localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
+      if (!raw) return;
+
+      try {
+        const parsed = JSON.parse(raw) as { companyCity?: string };
+        if (parsed.companyCity?.trim()) {
+          setCompanyReceiptCity(parsed.companyCity.trim());
+        }
+      } catch {
+        // ignore invalid company settings
+      }
+    };
+
+    void loadCompanyReceiptCity();
   }, []);
 
   useEffect(() => {

@@ -36,6 +36,7 @@ type UserRole =
   | 'Auxiliar Administrativo Nível 2';
 
 const USER_LEVEL_TABS = ['profile', 'appearance', 'security'] as const;
+const SYSTEM_SETTINGS_COMPANY_KEY = 'company_profile';
 
 function applyThemePreference(theme: ThemeOption) {
   const root = document.documentElement;
@@ -114,6 +115,33 @@ export default function SettingsPage() {
     applyThemePreference(savedTheme);
     applyFontSizePreference(savedFontSize);
 
+    const loadCompanySettingsFromSupabase = async () => {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', SYSTEM_SETTINGS_COMPANY_KEY)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error loading company settings from Supabase:', error);
+        return;
+      }
+
+      const value = data?.value;
+      if (!value || typeof value !== 'object') return;
+
+      const parsed = value as Partial<typeof companySettings>;
+      setCompanySettings((current) => ({
+        companyName: parsed.companyName || current.companyName,
+        companyAddress: parsed.companyAddress || current.companyAddress,
+        companyCity: parsed.companyCity || current.companyCity,
+        companyPhone: parsed.companyPhone || current.companyPhone,
+        companyCnpj: parsed.companyCnpj || current.companyCnpj,
+        companyIe: parsed.companyIe || current.companyIe,
+        companyEmail: parsed.companyEmail || current.companyEmail,
+      }));
+    };
+
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
@@ -126,6 +154,7 @@ export default function SettingsPage() {
         });
       }
     };
+    void loadCompanySettingsFromSupabase();
     getUser();
   }, []);
 
@@ -150,6 +179,24 @@ export default function SettingsPage() {
 
     if (error) {
       console.error('Error updating profile:', error);
+    }
+
+    const { error: companySettingsError } = await supabase
+      .from('system_settings')
+      .upsert(
+        {
+          key: SYSTEM_SETTINGS_COMPANY_KEY,
+          value: companySettings,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'key' }
+      );
+
+    if (companySettingsError) {
+      console.error('Error saving company settings to Supabase:', companySettingsError);
+      alert('Os dados da empresa não puderam ser salvos no Supabase. Rode a migração de configurações do sistema e tente novamente.');
+      setIsSaving(false);
+      return;
     }
 
     localStorage.setItem('app-theme', theme);
@@ -976,16 +1023,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
               <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
                 Última alteração: Hoje às 14:32
               </p>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => {
-                    setTheme('dark');
-                    setFontSize('medium');
-                  }}
-                  className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#1a1a1a] transition-all"
-                >
-                  Restaurar Padrões
-                </button>
+              <div className="flex items-center">
                 <button 
                   onClick={handleSave}
                   disabled={isSaving}
