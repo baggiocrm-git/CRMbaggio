@@ -167,8 +167,8 @@ function CustomSelect({
                 value === option.value
                   ? 'bg-[#d4ff3f] text-[#0a0a0a]'
                   : option.accent
-                    ? 'text-[#d4ff3f] hover:bg-[#d4ff3f]/10'
-                    : 'text-white hover:bg-[#d4ff3f]/10 hover:text-[#d4ff3f]'
+                    ? 'text-slate-400 hover:bg-white/5'
+                    : 'text-white hover:bg-white/5 hover:text-slate-300'
               }`}
             >
               {option.label}
@@ -685,7 +685,7 @@ export default function ContactsPage() {
     }
   };
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
+    <div className="contacts-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
         title="Contatos e Fornecedores" 
         subtitle="Gestão centralizada de parceiros de engenharia, fornecedores de materiais e clientes de projetos."
@@ -799,11 +799,11 @@ export default function ContactsPage() {
 
 
         {/* Data Table */}
-        <div className="overflow-hidden rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm">
+        <div className="contacts-list-shell overflow-hidden rounded-3xl border border-slate-800/50 bg-[#1a1a1a] shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-[#0a0a0a]">
+                <tr className="contacts-list-head bg-[#0a0a0a]">
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Empresa', 'company')}</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Nome', 'name')}</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Telefone', 'phone')}</th>
@@ -815,7 +815,7 @@ export default function ContactsPage() {
                   <th className="px-4 py-3 text-right"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
+              <tbody className="contacts-list-body divide-y divide-slate-800/50">
                 {isLoading ? (
                   <tr>
                     <td colSpan={9} className="px-6 py-12 text-center">
@@ -835,11 +835,11 @@ export default function ContactsPage() {
                   paginatedContacts.map((contact, index) => (
                     <tr
                       key={`${contact.id || 'contact'}-${contact.email || contact.name || contact.company || 'row'}-${index}`}
-                      className="hover:bg-[#2a2a2a]/30 transition-colors group leading-none"
+                      className="contacts-list-row hover:bg-[#2a2a2a]/30 transition-colors group leading-none"
                     >
-                      <td className="px-4 py-1.5 text-sm text-[#d4ff3f] tracking-tight">{contact.company || '-'}</td>
-                      <td className="px-4 py-1.5 text-sm text-white tracking-tight">{contact.name || '-'}</td>
-                      <td className="px-4 py-1.5 text-xs text-slate-300">{contact.phone || '-'}</td>
+                      <td className="px-4 py-1.5 text-sm text-slate-300 tracking-tight">{contact.company || '-'}</td>
+                      <td className="contacts-light-name px-4 py-1.5 text-sm text-white tracking-tight">{contact.name || '-'}</td>
+                      <td className="contacts-light-phone px-4 py-1.5 text-xs text-slate-300">{contact.phone || '-'}</td>
                       <td className="px-4 py-1.5 text-xs text-slate-300">{contact.cellphone || '-'}</td>
                       <td className="px-4 py-1.5 text-xs text-slate-300">{contact.email || '-'}</td>
                       <td className="px-4 py-1.5 text-xs text-slate-500">{contact.category === 'Parceiro' ? 'Diversos' : contact.category}</td>
@@ -858,7 +858,7 @@ export default function ContactsPage() {
                                 alert('E-mail não cadastrado.');
                               }
                             }}
-                            className="p-1 rounded-md bg-[#0a0a0a] text-slate-500 hover:bg-[#d4ff3f]/10 hover:text-[#d4ff3f] transition-all border border-slate-800/50"
+                            className="p-1 rounded-md bg-[#0a0a0a] text-slate-500 hover:bg-blue-500/10 hover:text-blue-500 transition-all border border-slate-800/50"
                             title="Enviar E-mail"
                           >
                             <Mail size={18} />
@@ -908,7 +908,7 @@ export default function ContactsPage() {
             </table>
           </div>
           {/* Pagination */}
-          <div className="px-6 py-4 flex items-center justify-between border-t border-slate-800/50 bg-[#0a0a0a]">
+          <div className="contacts-list-footer px-6 py-4 flex items-center justify-between border-t border-slate-800/50 bg-[#0a0a0a]">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
               Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contatos
             </p>

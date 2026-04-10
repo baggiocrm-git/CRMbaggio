@@ -6,6 +6,8 @@ import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 
+const CLIENT_PORTAL_CLOSE_LOGOUT_KEY = 'client-portal-force-logout';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,6 +15,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [storageBlocked, setStorageBlocked] = useState(false);
+  const [activeSessionEmail, setActiveSessionEmail] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -42,6 +45,11 @@ export default function LoginPage() {
       }
 
       try {
+        if (window.localStorage.getItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY) === '1') {
+          window.localStorage.removeItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY);
+          await supabase.auth.signOut();
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('LoginPage: Resultado getSession:', { hasSession: !!session, error });
         
@@ -52,7 +60,7 @@ export default function LoginPage() {
         
         if (session?.user) {
           console.log('LoginPage: Usuário já logado:', session.user.email);
-          router.push('/dashboard');
+          setActiveSessionEmail(session.user.email || session.user.user_metadata?.email || 'Usuário logado');
         }
       } catch (err) {
         console.error('LoginPage: Exceção em checkUser:', err);
@@ -76,6 +84,8 @@ export default function LoginPage() {
         if (event === 'SIGNED_IN' && session) {
           console.log('LoginPage: Login detectado via onAuthStateChange, redirecionando...');
           router.push('/dashboard');
+        } else if (event === 'SIGNED_OUT') {
+          setActiveSessionEmail(null);
         }
       });
       subscription = data.subscription;
@@ -97,6 +107,38 @@ export default function LoginPage() {
       window.removeEventListener('message', handleMessage);
     };
   }, [router]);
+
+
+  const handleSwitchUser = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      if (!supabase || !supabase.auth) {
+        throw new Error('Supabase não está configurado.');
+      }
+
+      await supabase.auth.signOut();
+      setActiveSessionEmail(null);
+      setPassword('');
+
+      try {
+        localStorage.removeItem('remembered_email');
+        sessionStorage.clear();
+      } catch (storageError) {
+        console.warn('Could not clear remembered session state:', storageError);
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Não foi possível encerrar a sessão atual.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleContinueSession = () => {
+    router.push('/dashboard');
+  };
 
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -277,6 +319,33 @@ export default function LoginPage() {
           <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-2 text-center">Gestão de Engenharia e Construção</p>
         </div>
 
+        {isSupabaseConfigured && activeSessionEmail && (
+          <div className="relative z-10 mb-6 rounded-3xl border border-blue-500/20 bg-blue-500/10 p-5 text-left">
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Sessão ativa detectada</p>
+            <p className="mt-2 break-all text-sm font-bold text-white">{activeSessionEmail}</p>
+            <p className="mt-2 text-xs text-slate-400">
+              Para entrar com outro usuário, encerre primeiro a sessão atual.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleContinueSession}
+                className="flex-1 rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-slate-800"
+              >
+                Continuar Sessão
+              </button>
+              <button
+                type="button"
+                onClick={handleSwitchUser}
+                disabled={loading}
+                className="flex-1 rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-[10px] font-black uppercase tracking-widest text-rose-400 transition-all hover:bg-rose-500/20 disabled:opacity-50"
+              >
+                {loading ? 'Saindo...' : 'Trocar Usuário'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleLogin} className="space-y-6 relative z-10">
           {error && (
             <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex items-center gap-3 text-rose-500 text-xs font-bold animate-in fade-in slide-in-from-top-1">
@@ -304,7 +373,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          {!storageBlocked && (
+          {!storageBlocked && !activeSessionEmail && (
             <>
               <div className="space-y-2">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Usuário / E-mail</label>

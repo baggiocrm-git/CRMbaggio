@@ -24,18 +24,48 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
+type ThemeOption = 'light' | 'dark';
+type FontSizeOption = 'small' | 'medium' | 'large';
+type UserRole =
+  | 'Administrador'
+  | 'Usuário'
+  | 'Cliente'
+  | 'Auxiliar Administrativo Nível 1'
+  | 'Auxiliar Administrativo Nível 2';
+
+const USER_LEVEL_TABS = ['profile', 'appearance', 'security'] as const;
+
+function applyThemePreference(theme: ThemeOption) {
+  const root = document.documentElement;
+  root.classList.remove('dark', 'light');
+
+  root.classList.add(theme);
+}
+
+function applyFontSizePreference(fontSize: FontSizeOption) {
+  const root = document.documentElement;
+  root.classList.remove('font-small', 'font-medium', 'font-large');
+  root.classList.add(`font-${fontSize}`);
+}
+
 export default function SettingsPage() {
   const COMPANY_SETTINGS_STORAGE_KEY = 'system-company-settings';
   const [activeTab, setActiveTab] = useState('profile');
-  const [theme, setTheme] = useState('dark');
-  const [fontSize, setFontSize] = useState('medium');
+  const [theme, setTheme] = useState<ThemeOption>('dark');
+  const [fontSize, setFontSize] = useState<FontSizeOption>('medium');
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmNewPassword: '',
+  });
+  const [passwordFeedback, setPasswordFeedback] = useState<string | null>(null);
   const [, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState({
     fullName: '',
     email: '',
-    role: 'UsuÃ¡rio',
+    role: 'Usuário',
     phone: ''
   });
   const [companySettings, setCompanySettings] = useState({
@@ -50,8 +80,8 @@ export default function SettingsPage() {
 
   // Load settings and user from Supabase
   useEffect(() => {
-    const savedTheme = localStorage.getItem('app-theme') || 'dark';
-    const savedFontSize = localStorage.getItem('app-font-size') || 'medium';
+    const savedTheme = (localStorage.getItem('app-theme') as ThemeOption | null) || 'dark';
+    const savedFontSize = (localStorage.getItem('app-font-size') as FontSizeOption | null) || 'medium';
     const savedCompanySettings = localStorage.getItem(COMPANY_SETTINGS_STORAGE_KEY);
     setTheme(savedTheme);
     setFontSize(savedFontSize);
@@ -72,16 +102,8 @@ export default function SettingsPage() {
       }
     }
     
-    // Apply theme to document
-    if (savedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-
-    // Apply font size
-    document.documentElement.classList.remove('font-small', 'font-medium', 'font-large');
-    document.documentElement.classList.add(`font-${savedFontSize}`);
+    applyThemePreference(savedTheme);
+    applyFontSizePreference(savedFontSize);
 
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -90,13 +112,21 @@ export default function SettingsPage() {
         setProfile({
           fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
           email: user.email || '',
-          role: user.user_metadata?.role || 'UsuÃ¡rio',
+          role: user.user_metadata?.role || 'Usuário',
           phone: user.user_metadata?.phone || ''
         });
       }
     };
     getUser();
   }, []);
+
+  useEffect(() => {
+    applyThemePreference(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    applyFontSizePreference(fontSize);
+  }, [fontSize]);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -105,7 +135,6 @@ export default function SettingsPage() {
     const { error } = await supabase.auth.updateUser({
       data: {
         full_name: profile.fullName,
-        role: profile.role,
         phone: profile.phone
       }
     });
@@ -117,31 +146,52 @@ export default function SettingsPage() {
     localStorage.setItem('app-theme', theme);
     localStorage.setItem('app-font-size', fontSize);
     localStorage.setItem(COMPANY_SETTINGS_STORAGE_KEY, JSON.stringify(companySettings));
-    
-    // Apply theme
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
 
-    // Apply font size
-    document.documentElement.classList.remove('font-small', 'font-medium', 'font-large');
-    document.documentElement.classList.add(`font-${fontSize}`);
+    applyThemePreference(theme);
+    applyFontSizePreference(fontSize);
     
     setIsSaving(false);
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
   };
 
+  const handlePasswordUpdate = () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmNewPassword) {
+      setPasswordFeedback('Preencha a senha atual, a nova senha e a confirmação.');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
+      setPasswordFeedback('A confirmação da nova senha não confere.');
+      return;
+    }
+
+    setPasswordFeedback('Confirmação de senha validada. Integração de troca pode seguir para o próximo passo.');
+  };
+
   const tabs = [
     { id: 'profile', name: 'Perfil', icon: UserIcon },
     { id: 'company', name: 'Empresa', icon: Building2 },
-    { id: 'appearance', name: 'AparÃªncia', icon: Monitor },
-    { id: 'notifications', name: 'NotificaÃ§Ãµes', icon: Bell },
-    { id: 'security', name: 'SeguranÃ§a', icon: Shield },
+    { id: 'appearance', name: 'Aparência', icon: Monitor },
+    { id: 'notifications', name: 'Notificações', icon: Bell },
+    { id: 'security', name: 'Segurança', icon: Shield },
     { id: 'database', name: 'Banco de Dados', icon: Database },
   ];
+
+  const isUserLevelSettingsOnly =
+    profile.role === 'Auxiliar Administrativo Nível 1' ||
+    profile.role === 'Auxiliar Administrativo Nível 2' ||
+    profile.role === 'Usuário';
+
+  const visibleTabs = isUserLevelSettingsOnly
+    ? tabs.filter((tab) => USER_LEVEL_TABS.includes(tab.id as (typeof USER_LEVEL_TABS)[number]))
+    : tabs;
+
+  useEffect(() => {
+    if (!visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab('profile');
+    }
+  }, [activeTab, visibleTabs]);
 
   const userInitials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
@@ -149,16 +199,16 @@ export default function SettingsPage() {
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <header className="p-8 border-b border-slate-800/50">
         <h1 className="text-4xl font-black tracking-tight italic">
-          ConfiguraÃ§Ãµes <span className="text-[#d4ff3f]">do Sistema</span>
+          Configurações <span className="text-[#d4ff3f]">do Sistema</span>
         </h1>
-        <p className="text-slate-500 text-xs font-bold mt-1">Gerencie suas preferÃªncias e informaÃ§Ãµes de conta</p>
+        <p className="text-slate-500 text-xs font-bold mt-1">Gerencie suas preferências e informações de conta</p>
       </header>
 
       <div className="p-8 max-w-5xl mx-auto">
         <div className="flex flex-col md:flex-row gap-8">
           {/* Sidebar Tabs */}
           <div className="w-full md:w-64 space-y-1">
-            {tabs.map((tab) => (
+            {visibleTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -195,7 +245,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-xl font-black">{profile.fullName || 'UsuÃ¡rio'}</h3>
+                      <h3 className="text-xl font-black">{profile.fullName || 'Usuário'}</h3>
                       <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{profile.role}</p>
                     </div>
                   </div>
@@ -220,12 +270,12 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cargo</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nível de Acesso</label>
                       <input 
                         type="text"
                         value={profile.role}
-                        onChange={(e) => setProfile({ ...profile, role: e.target.value })}
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        disabled
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-slate-500 font-bold outline-none cursor-not-allowed"
                       />
                     </div>
                     <div className="space-y-2">
@@ -253,7 +303,7 @@ export default function SettingsPage() {
                       Dados da Empresa
                     </h3>
                     <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
-                      InformaÃ§Ãµes institucionais usadas em documentos, recibos e relatÃ³rios do sistema
+                      Informações institucionais usadas em documentos, recibos e relatórios do sistema
                     </p>
                   </div>
 
@@ -269,13 +319,13 @@ export default function SettingsPage() {
                       />
                     </div>
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">EndereÃ§o</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Endereço</label>
                       <input 
                         type="text"
                         value={companySettings.companyAddress}
                         onChange={(e) => setCompanySettings({ ...companySettings, companyAddress: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
-                        placeholder="Rua, nÃºmero, bairro, cidade, UF"
+                        placeholder="Rua, número, bairro, cidade, UF"
                       />
                     </div>
                     <div className="space-y-2">
@@ -315,7 +365,7 @@ export default function SettingsPage() {
                         value={companySettings.companyIe}
                         onChange={(e) => setCompanySettings({ ...companySettings, companyIe: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
-                        placeholder="InscriÃ§Ã£o Estadual"
+                        placeholder="Inscrição Estadual"
                       />
                     </div>
                     <div className="space-y-2">
@@ -325,7 +375,7 @@ export default function SettingsPage() {
                         value={companySettings.companyCity}
                         onChange={(e) => setCompanySettings({ ...companySettings, companyCity: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
-                        placeholder="SÃ£o Paulo - SP"
+                        placeholder="São Paulo - SP"
                       />
                     </div>
                   </div>
@@ -347,7 +397,6 @@ export default function SettingsPage() {
                       {[
                         { id: 'light', name: 'Claro', icon: Sun },
                         { id: 'dark', name: 'Escuro', icon: Moon },
-                        { id: 'system', name: 'Sistema', icon: Monitor },
                       ].map((t) => (
                         <button
                           key={t.id}
@@ -374,7 +423,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4 bg-[#0a0a0a] p-2 rounded-2xl border border-slate-800/50 w-fit">
                       {[
                         { id: 'small', name: 'Pequeno' },
-                        { id: 'medium', name: 'MÃ©dio' },
+                        { id: 'medium', name: 'Médio' },
                         { id: 'large', name: 'Grande' },
                       ].map((s) => (
                         <button
@@ -406,13 +455,13 @@ export default function SettingsPage() {
                 >
                   <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-6">
                     <Bell size={20} className="text-[#d4ff3f]" />
-                    PreferÃªncias de NotificaÃ§Ã£o
+                    Preferências de Notificação
                   </h3>
                   {[
-                    { title: 'E-mails de Resumo', desc: 'Receba um resumo diÃ¡rio das atividades financeiras.' },
-                    { title: 'Alertas de Vencimento', desc: 'NotificaÃ§Ãµes sobre contas a pagar e receber prÃ³ximas do vencimento.' },
+                    { title: 'E-mails de Resumo', desc: 'Receba um resumo diário das atividades financeiras.' },
+                    { title: 'Alertas de Vencimento', desc: 'Notificações sobre contas a pagar e receber próximas do vencimento.' },
                     { title: 'Novos Projetos', desc: 'Seja avisado quando um novo projeto for criado.' },
-                    { title: 'AtualizaÃ§Ãµes de Equipe', desc: 'NotificaÃ§Ãµes sobre mudanÃ§as na equipe ou novos membros.' },
+                    { title: 'Atualizações de Equipe', desc: 'Notificações sobre mudanças na equipe ou novos membros.' },
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30">
                       <div>
@@ -436,7 +485,7 @@ export default function SettingsPage() {
                 >
                   <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-6">
                     <Shield size={20} className="text-[#d4ff3f]" />
-                    SeguranÃ§a da Conta
+                    Segurança da Conta
                   </h3>
                   
                   <div className="space-y-4">
@@ -446,14 +495,43 @@ export default function SettingsPage() {
                         <input 
                           type="password"
                           placeholder="Senha Atual"
+                          value={passwordForm.currentPassword}
+                          onChange={(e) => {
+                            setPasswordForm({ ...passwordForm, currentPassword: e.target.value });
+                            setPasswordFeedback(null);
+                          }}
                           className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                         />
                         <input 
                           type="password"
                           placeholder="Nova Senha"
+                          value={passwordForm.newPassword}
+                          onChange={(e) => {
+                            setPasswordForm({ ...passwordForm, newPassword: e.target.value });
+                            setPasswordFeedback(null);
+                          }}
                           className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                         />
-                        <button className="px-6 py-2.5 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all">
+                        <input 
+                          type="password"
+                          placeholder="Repetir Nova Senha"
+                          value={passwordForm.confirmNewPassword}
+                          onChange={(e) => {
+                            setPasswordForm({ ...passwordForm, confirmNewPassword: e.target.value });
+                            setPasswordFeedback(null);
+                          }}
+                          className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-4 py-3 text-sm text-white focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        />
+                        {passwordFeedback && (
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                            {passwordFeedback}
+                          </p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handlePasswordUpdate}
+                          className="px-6 py-2.5 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
+                        >
                           Atualizar Senha
                         </button>
                       </div>
@@ -461,8 +539,8 @@ export default function SettingsPage() {
 
                     <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-black">AutenticaÃ§Ã£o em Duas Etapas</p>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Adicione uma camada extra de seguranÃ§a Ã  sua conta.</p>
+                        <p className="text-sm font-black">Autenticação em Duas Etapas</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Adicione uma camada extra de segurança à sua conta.</p>
                       </div>
                       <button className="px-4 py-2 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#1a1a1a] transition-all">
                         Configurar
@@ -481,7 +559,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-2">
                       <Database size={20} className="text-[#d4ff3f]" />
-                      ConfiguraÃ§Ã£o do Banco de Dados
+                      Configuração do Banco de Dados
                     </h3>
                     <a 
                       href="https://supabase.com/dashboard/project/_/sql" 
@@ -495,7 +573,7 @@ export default function SettingsPage() {
                   
                   <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 space-y-6">
                     <div className="space-y-2">
-                      <p className="text-sm font-black">Script SQL: GestÃ£o de Documentos</p>
+                      <p className="text-sm font-black">Script SQL: Gestão de Documentos</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
                         Execute este script para criar as tabelas de pastas, documentos e tokens do Google.
                       </p>
@@ -628,7 +706,7 @@ CREATE POLICY "Allow all for authenticated" ON public.google_tokens FOR ALL TO a
                     <div className="space-y-2">
                       <p className="text-sm font-black">Script SQL: Contas a Receber</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                        Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessÃ¡ria.
+                        Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessária.
                       </p>
                     </div>
                     
@@ -680,7 +758,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
     USING (true)
     WITH CHECK (true);`;
                           navigator.clipboard.writeText(sql);
-                          alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
+                          alert('Script SQL copiado para a área de transferência!');
                         }}
                         className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                       >
@@ -753,7 +831,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
     USING (true)
     WITH CHECK (true);`;
                           navigator.clipboard.writeText(sql);
-                          alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
+                          alert('Script SQL copiado para a área de transferência!');
                         }}
                         className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                       >
@@ -764,9 +842,9 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
                     <div className="p-4 bg-[#d4ff3f]/5 border border-[#d4ff3f]/20 rounded-xl flex items-start gap-4">
                       <AlertCircle size={18} className="text-[#d4ff3f] mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">AtenÃ§Ã£o</p>
+                        <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">Atenção</p>
                         <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">
-                          ApÃ³s executar o script, a pÃ¡gina de Contas a Receber estarÃ¡ totalmente funcional e sincronizada com seu banco de dados.
+                          Após executar o script, a página de Contas a Receber estará totalmente funcional e sincronizada com seu banco de dados.
                         </p>
                       </div>
                     </div>
@@ -793,7 +871,7 @@ ADD COLUMN IF NOT EXISTS funcao TEXT,
 ADD COLUMN IF NOT EXISTS data_admissao DATE,
 ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                             navigator.clipboard.writeText(sql);
-                            alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
+                            alert('Script SQL copiado para a área de transferência!');
                           }}
                           className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                         >
@@ -809,7 +887,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
             {/* Footer Actions */}
             <div className="p-6 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
               <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
-                Ãšltima alteraÃ§Ã£o: Hoje Ã s 14:32
+                Última alteração: Hoje às 14:32
               </p>
               <div className="flex items-center gap-3">
                 <button 
@@ -819,7 +897,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                   }}
                   className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#1a1a1a] transition-all"
                 >
-                  Restaurar PadrÃµes
+                  Restaurar Padrões
                 </button>
                 <button 
                   onClick={handleSave}
@@ -835,7 +913,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                   ) : (
                     <Save size={16} />
                   )}
-                  {showSuccess ? 'Salvo!' : isSaving ? 'Salvando...' : 'Salvar AlteraÃ§Ãµes'}
+                  {showSuccess ? 'Salvo!' : isSaving ? 'Salvando...' : 'Salvar Alterações'}
                 </button>
               </div>
             </div>
@@ -845,4 +923,5 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
     </div>
   );
 }
+
 

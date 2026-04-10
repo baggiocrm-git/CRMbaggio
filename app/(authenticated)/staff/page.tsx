@@ -2883,7 +2883,7 @@ export default function StaffPage() {
   const sortedStaffExportList = [...filteredStaffFlat].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
+    <div className="staff-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <Header 
         title="R.H." 
         subtitle="Gestão centralizada de pessoal, cursos e conformidade."
@@ -2936,7 +2936,7 @@ export default function StaffPage() {
         <div className="grid grid-cols-1 gap-8">
           {/* Staff Directory */}
           <div className="space-y-6">
-            <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-visible shadow-sm">
+            <div className="staff-directory-shell bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-visible shadow-sm">
               <div ref={directoryHeaderRef} className="relative z-10 p-6 border-b border-slate-800/50 flex items-center justify-between">
                 <h3 className="font-black text-lg tracking-tight">Diretório de Equipe</h3>
                 <div className="flex gap-2">
@@ -3029,9 +3029,9 @@ export default function StaffPage() {
                   </div>
                 )}
               </div>
-              <div className={`${filteredStaffFlat.length === 0 ? 'min-h-[260px]' : ''} overflow-x-auto`}>
+              <div className={`staff-directory-body ${filteredStaffFlat.length === 0 ? 'min-h-[260px]' : ''} overflow-x-auto`}>
                 <table className="w-full text-left">
-                  <thead className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest">
+                  <thead className="staff-directory-head bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest">
                     <tr>
                       <th className="px-6 py-2.5">Funcionário</th>
                       <th className="px-6 py-2.5">Função</th>
@@ -3039,7 +3039,7 @@ export default function StaffPage() {
                       <th className="px-6 py-2.5">Docs</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/50">
+                  <tbody className="staff-directory-table divide-y divide-slate-800/50">
                     {isLoading ? (
                       <tr>
                         <td colSpan={4} className="px-6 py-14 text-center">
@@ -3052,7 +3052,7 @@ export default function StaffPage() {
                     ) : (
                       filteredCategorizedStaff.flatMap((group) => {
                         const groupRows: React.ReactNode[] = [
-                          <tr key={`group-${group.label}`} className="bg-[#111111]">
+                          <tr key={`group-${group.label}`} className="staff-directory-group-row bg-[#111111]">
                             <td colSpan={4} className="px-6 py-3">
                               <div className="flex items-center justify-between">
                                 <span className="text-[10px] font-black uppercase tracking-widest text-[#d4ff3f]">{group.label}</span>
@@ -3080,15 +3080,15 @@ export default function StaffPage() {
                               <tr
                                 key={`${person.id || 'staff'}-${person.nome || 'pessoa'}-${index}`}
                                 onClick={() => handleOpenModal(person)}
-                                className="hover:bg-[#2a2a2a]/30 transition-colors group cursor-pointer"
+                                className="staff-directory-row hover:bg-[#2a2a2a]/30 transition-colors group cursor-pointer"
                               >
                                 <td className="px-6 py-1.5">
                                   <div className="space-y-0">
-                                    <p className="text-sm font-medium leading-tight text-slate-100">{person.nome}</p>
+                                    <p className="staff-directory-name text-sm font-medium leading-tight text-slate-100">{person.nome}</p>
                                   </div>
                                 </td>
                                 <td className="px-6 py-1.5">
-                                  <p className="text-sm font-medium leading-tight text-slate-200">{person.cargo}</p>
+                                  <p className="staff-directory-role text-sm font-medium leading-tight text-slate-200">{person.cargo}</p>
                                 </td>
                                 <td className="px-6 py-1.5">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -3106,7 +3106,7 @@ export default function StaffPage() {
                                         e.stopPropagation();
                                         openIndividualTimecard(person);
                                       }}
-                                      className="inline-flex items-center justify-center rounded-lg border border-[#d4ff3f]/30 bg-[#d4ff3f]/10 p-1.5 text-[#d4ff3f] transition-all hover:bg-[#d4ff3f]/20"
+                                      className="staff-directory-icon inline-flex items-center justify-center rounded-lg border border-[#d4ff3f]/30 bg-[#d4ff3f]/10 p-1.5 text-[#d4ff3f] transition-all hover:bg-[#d4ff3f]/20"
                                       title="Cartão ponto individual"
                                     >
                                       <Clock3 size={13} />
@@ -3117,7 +3117,7 @@ export default function StaffPage() {
                                         e.stopPropagation();
                                         openFinanceModal(person);
                                       }}
-                                      className="inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 p-1.5 text-amber-300 transition-all hover:bg-amber-500/20"
+                                      className="staff-directory-icon inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 p-1.5 text-amber-300 transition-all hover:bg-amber-500/20"
                                       title="Lançamentos financeiros"
                                     >
                                       <Wallet size={13} />
@@ -3142,7 +3142,7 @@ export default function StaffPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
+              <div className="staff-directory-footer p-4 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Exibindo {filteredStaffFlat.length} funcionários</span>
                 <div className="flex gap-2">
                   <button className="px-4 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50 hover:bg-[#2a2a2a] transition-all">Anterior</button>

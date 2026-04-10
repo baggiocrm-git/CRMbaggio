@@ -1,15 +1,20 @@
-'use client';
+﻿'use client';
 
 import React, { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import InternalChat from '@/components/chat/InternalChat';
 import { supabase } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 
+const CLIENT_PORTAL_CLOSE_LOGOUT_KEY = 'client-portal-force-logout';
+const AUXILIAR_ADMIN_NIVEL_1 = 'Auxiliar Administrativo Nível 1';
+const AUXILIAR_ADMIN_NIVEL_2 = 'Auxiliar Administrativo Nível 2';
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
   const [loadingStep, setLoadingStep] = useState('Iniciando...');
   const [user, setUser] = useState<User | null>(null);
@@ -20,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user]);
 
   React.useLayoutEffect(() => {
-    setLoadingStep('Iniciando verificação...');
+    setLoadingStep('Iniciando verificaÃ§Ã£o...');
   }, []);
 
   const [storageBlocked, setStorageBlocked] = useState(false);
@@ -40,7 +45,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     console.log('DashboardLayout: useEffect started');
     let mounted = true;
-    setLoadingStep('Iniciando verificação...');
+    setLoadingStep('Iniciando verificaÃ§Ã£o...');
 
     const handleUserRole = async (userData: User) => {
       if (!mounted) return;
@@ -72,6 +77,45 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         };
         setUser(updatedUser);
 
+        const canAccessCurrentRoute = (() => {
+          if (!pathname) return true;
+          if (userRole === 'Administrador' || userRole === 'Usuário' || userRole === 'Cliente') return true;
+
+          if (userRole === AUXILIAR_ADMIN_NIVEL_1) {
+            return (
+              pathname === '/dashboard' ||
+              pathname.startsWith('/calendar') ||
+              pathname.startsWith('/contacts') ||
+              pathname.startsWith('/staff') ||
+              pathname.startsWith('/documents') ||
+              pathname === '/finances' ||
+              pathname.startsWith('/finances/receivables') ||
+              pathname.startsWith('/finances/payables') ||
+              pathname.startsWith('/finances/cost-centers') ||
+              pathname.startsWith('/settings')
+            );
+          }
+
+          if (userRole === AUXILIAR_ADMIN_NIVEL_2) {
+            return (
+              pathname === '/dashboard' ||
+              pathname.startsWith('/calendar') ||
+              pathname.startsWith('/contacts') ||
+              pathname.startsWith('/staff') ||
+              pathname.startsWith('/documents') ||
+              pathname.startsWith('/settings')
+            );
+          }
+
+          return true;
+        })();
+
+        if (!canAccessCurrentRoute) {
+          setLoading(false);
+          router.push(userRole === AUXILIAR_ADMIN_NIVEL_1 ? '/finances' : '/dashboard');
+          return;
+        }
+
         if (userRole === 'Cliente') {
           console.log('DashboardLayout: Iniciando busca de projeto para cliente...');
           
@@ -101,8 +145,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setLoadingStep('Conectando ao Supabase Auth...');
     
     if (!supabase?.auth) {
-      console.error('DashboardLayout: supabase.auth não disponível');
-      setLoadingStep('Erro: Supabase não inicializado corretamente.');
+      console.error('DashboardLayout: supabase.auth nÃ£o disponÃ­vel');
+      setLoadingStep('Erro: Supabase nÃ£o inicializado corretamente.');
       setLoading(false);
       return;
     }
@@ -119,7 +163,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
         await handleUserRole(session.user);
       } else if (event === 'SIGNED_OUT' || (event === 'INITIAL_SESSION' && !session)) {
-        console.log('DashboardLayout: Sem sessão ou deslogado');
+        console.log('DashboardLayout: Sem sessÃ£o ou deslogado');
         setUser(null);
         setLoading(false);
         if (!window.location.pathname.includes('/login')) {
@@ -132,7 +176,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const checkInitialSession = async () => {
       try {
         console.log('DashboardLayout: Iniciando checkInitialSession');
-        setLoadingStep('Verificando sessão ativa...');
+        setLoadingStep('Verificando sessÃ£o ativa...');
+        if (typeof window !== 'undefined' && window.localStorage.getItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY) === '1') {
+          window.localStorage.removeItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY);
+          await supabase.auth.signOut();
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+            router.push('/login');
+          }
+          return;
+        }
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -142,7 +196,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }
 
         if (session?.user) {
-          console.log('DashboardLayout: Sessão encontrada em checkInitialSession');
+          console.log('DashboardLayout: SessÃ£o encontrada em checkInitialSession');
           if (typeof window !== 'undefined' && window.opener) {
             console.log('DashboardLayout: Fechando popup de login...');
             window.close();
@@ -150,7 +204,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           }
           await handleUserRole(session.user);
         } else {
-          console.log('DashboardLayout: Nenhuma sessão em checkInitialSession');
+          console.log('DashboardLayout: Nenhuma sessÃ£o em checkInitialSession');
           if (mounted) {
             setLoading(false);
             if (!window.location.pathname.includes('/login')) {
@@ -169,7 +223,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     // 3. Safety timeout
     const timer = setTimeout(() => {
       if (mounted) {
-        setLoadingStep('O carregamento está demorando mais que o esperado. Tente limpar o cache.');
+        setLoadingStep('O carregamento estÃ¡ demorando mais que o esperado. Tente limpar o cache.');
       }
     }, 10000);
 
@@ -179,7 +233,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       subscription.unsubscribe();
       clearTimeout(timer);
     };
-  }, [router]);
+  }, [pathname, router]);
 
   const isSupabaseConfigured = !!process.env.NEXT_PUBLIC_SUPABASE_URL && !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -187,10 +241,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-8 text-center">
         <AlertCircle size={48} className="text-rose-500 mb-4" />
-        <h2 className="text-white text-xl font-black uppercase tracking-tighter mb-2">Configuração Pendente</h2>
+        <h2 className="text-white text-xl font-black uppercase tracking-tighter mb-2">ConfiguraÃ§Ã£o Pendente</h2>
         <p className="text-slate-400 text-sm mb-6">
-          As variáveis de ambiente do Supabase não foram detectadas. <br />
-          Por favor, configure <strong>NEXT_PUBLIC_SUPABASE_URL</strong> e <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> nas configurações do projeto.
+          As variÃ¡veis de ambiente do Supabase nÃ£o foram detectadas. <br />
+          Por favor, configure <strong>NEXT_PUBLIC_SUPABASE_URL</strong> e <strong>NEXT_PUBLIC_SUPABASE_ANON_KEY</strong> nas configuraÃ§Ãµes do projeto.
         </p>
         <button 
           onClick={() => router.push('/login')}
@@ -208,7 +262,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex flex-col items-center gap-6 max-w-md w-full text-center relative z-[99999]">
           <Loader2 className="w-12 h-12 text-[#d4ff3f] animate-spin" />
           <div className="space-y-2">
-            <h2 className="text-xl font-black text-white uppercase tracking-tighter">Verificando sua sessão...</h2>
+            <h2 className="text-xl font-black text-white uppercase tracking-tighter">Verificando sua sessÃ£o...</h2>
             <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest">{loadingStep}</p>
           </div>
           
@@ -216,8 +270,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 flex flex-col items-center gap-3 text-rose-500 text-xs font-bold animate-in fade-in slide-in-from-top-1">
               <AlertCircle size={24} />
               <p className="text-center">
-                O acesso ao armazenamento local está bloqueado. <br />
-                Isso impedirá o funcionamento da sessão em iframes. <br />
+                O acesso ao armazenamento local estÃ¡ bloqueado. <br />
+                Isso impedirÃ¡ o funcionamento da sessÃ£o em iframes. <br />
                 Tente abrir em uma nova aba.
               </p>
               <button 
@@ -254,12 +308,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <AlertCircle className={errorParam ? 'text-red-500' : 'text-amber-500'} size={32} />
           </div>
           <h2 className="text-white text-xl font-black uppercase tracking-tighter">
-            {errorParam ? 'Erro de Autenticação' : 'Sessão não detectada'}
+            {errorParam ? 'Erro de AutenticaÃ§Ã£o' : 'SessÃ£o nÃ£o detectada'}
           </h2>
           <p className="text-slate-400 text-sm max-w-xs mx-auto">
             {errorParam 
               ? `Ocorreu um erro ao tentar entrar: ${errorDesc || errorParam}`
-              : 'Detectamos uma tentativa de login, mas o navegador ainda não processou os dados.'}
+              : 'Detectamos uma tentativa de login, mas o navegador ainda nÃ£o processou os dados.'}
           </p>
           <p className="text-slate-600 text-[8px] break-all max-w-xs mx-auto opacity-50">
             URL: {typeof window !== 'undefined' ? window.location.href : ''}
@@ -271,7 +325,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => window.location.reload()}
             className="w-full bg-[#d4ff3f] text-[#0a0a0a] font-black text-xs uppercase tracking-widest py-4 rounded-2xl hover:bg-[#c4ef2f] transition-all"
           >
-            Recarregar Página
+            Recarregar PÃ¡gina
           </button>
           <button 
             onClick={() => router.push('/login')}
@@ -294,3 +348,4 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   );
 }
+

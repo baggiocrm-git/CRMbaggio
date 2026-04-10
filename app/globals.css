@@ -4,6 +4,31 @@
   --bg: #f5f5f4;
   --ink: #0a0a0a;
   --line: rgba(10, 10, 10, 0.1);
+  --font-scale: 1;
+}
+
+:root.light {
+  --bg: #f5f5f4;
+  --ink: #0a0a0a;
+  --line: rgba(10, 10, 10, 0.1);
+}
+
+:root.dark {
+  --bg: #0a0a0a;
+  --ink: #f5f5f4;
+  --line: rgba(245, 245, 244, 0.08);
+}
+
+:root.font-small {
+  --font-scale: 0.92;
+}
+
+:root.font-medium {
+  --font-scale: 1;
+}
+
+:root.font-large {
+  --font-scale: 1.08;
 }
 
 /* Dark Scrollbar Styles */
@@ -78,4 +103,266 @@ body {
   background-color: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  font-size: calc(16px * var(--font-scale));
+}
+
+:root.light .themed-app,
+:root.light .themed-app body {
+  background-color: #f5f5f4;
+  color: #0f172a;
+}
+
+:root.light [class*="bg-[#0a0a0a]"] {
+  background-color: #f5f5f4 !important;
+}
+
+:root.light [class*="bg-[#1a1a1a]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light [class*="bg-[#2a2a2a]"] {
+  background-color: #e7e5e4 !important;
+}
+
+:root.light [class*="border-slate-800/50"],
+:root.light [class*="border-slate-800/30"],
+:root.light [class*="border-slate-800"] {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+:root.light [class*="text-white"] {
+  color: #0f172a !important;
+}
+
+:root.light [class*="text-slate-500"] {
+  color: #64748b !important;
+}
+
+:root.light [class*="text-slate-400"] {
+  color: #475569 !important;
+}
+
+:root.light [class*="text-slate-600"] {
+  color: #334155 !important;
+}
+
+:root.light [class*="bg-white/5"] {
+  background-color: rgba(15, 23, 42, 0.04) !important;
+}
+
+:root.light [class*="bg-slate-800/50"] {
+  background-color: rgba(15, 23, 42, 0.06) !important;
+}
+
+:root.light [class*="hover:bg-[#1a1a1a]"]:hover,
+:root.light [class*="hover:bg-[#2a2a2a]"]:hover {
+  background-color: #f1f5f9 !important;
+}
+
+:root.light [class*="text-[#d4ff3f]"] {
+  color: #2563eb !important;
+}
+
+:root.light [class*="text-emerald-500"] {
+  color: #2563eb !important;
+}
+
+:root.light [class*="text-emerald-400"] {
+  color: #2563eb !important;
+}
+
+:root.light [class*="text-blue-500"] {
+  color: #2563eb !important;
+}
+
+:root.light [class*="text-blue-400"] {
+  color: #2563eb !important;
+}
+
+:root.light [class*="border-[#d4ff3f]"] {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+
+:root.light [class*="bg-[#d4ff3f]/10"],
+:root.light [class*="bg-[#d4ff3f]/5"],
+:root.light [class*="bg-emerald-500/10"],
+:root.light [class*="bg-blue-500/10"] {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+:root.light button[class*="bg-[#d4ff3f]"],
+:root.light a[class*="bg-[#d4ff3f]"] {
+  background-color: #d4ff3f !important;
+  color: #0a0a0a !important;
+}
+
+:root.light button[class*="hover:bg-[#c4ef2f]"]:hover,
+:root.light a[class*="hover:bg-[#c4ef2f]"]:hover {
+  background-color: #c4ef2f !important;
+  color: #0a0a0a !important;
+}
+
+/* Explicit Tailwind utility overrides for light theme accents */
+:root.light .text-\[\#d4ff3f\],
+:root.light .text-emerald-500,
+:root.light .text-emerald-400,
+:root.light .text-blue-500,
+:root.light .text-blue-400 {
+  color: #2563eb !important;
+}
+
+:root.light .bg-\[\#d4ff3f\]\/10,
+:root.light .bg-\[\#d4ff3f\]\/5,
+:root.light .bg-emerald-500\/10,
+:root.light .bg-blue-500\/10 {
+  background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+:root.light .border-\[\#d4ff3f\],
+:root.light .border-\[\#d4ff3f\]\/50,
+:root.light .border-\[\#d4ff3f\]\/30,
+:root.light .border-\[\#d4ff3f\]\/20 {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+
+:root.light .shadow-\[\#d4ff3f\]\/10 {
+  --tw-shadow-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+:root.light .hover\:text-\[\#d4ff3f\]:hover,
+:root.light .group:hover .group-hover\:text-\[\#d4ff3f\] {
+  color: #2563eb !important;
+}
+
+:root.light .focus\:ring-\[\#d4ff3f\]\/20:focus,
+:root.light .focus\:ring-\[\#d4ff3f\]\/30:focus,
+:root.light .focus\:ring-\[\#d4ff3f\]\/50:focus {
+  --tw-ring-color: rgba(37, 99, 235, 0.28) !important;
+}
+
+/* Primary action buttons become royal blue in light theme */
+:root.light button.bg-\[\#d4ff3f\],
+:root.light a.bg-\[\#d4ff3f\] {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+:root.light button.hover\:bg-\[\#c4ef2f\]:hover,
+:root.light a.hover\:bg-\[\#c4ef2f\]:hover {
+  background-color: #1d4ed8 !important;
+  color: #ffffff !important;
+}
+
+/* Calendar light theme */
+:root.light .calendar-theme {
+  background-color: #f5f5f4 !important;
+  color: #0f172a !important;
+}
+
+:root.light .calendar-theme main,
+:root.light .calendar-theme aside,
+:root.light .calendar-theme header {
+  background-color: #f5f5f4 !important;
+}
+
+:root.light .calendar-theme [class*="bg-[#141414]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light .calendar-theme [class*="bg-[#141414]/50"] {
+  background-color: #f1f5f9 !important;
+  opacity: 1 !important;
+}
+
+:root.light .calendar-theme [class*="bg-[#1a1a1a]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light .calendar-theme [class*="border-white/20"],
+:root.light .calendar-theme [class*="border-white/10"] {
+  border-color: rgba(15, 23, 42, 0.1) !important;
+}
+
+:root.light .calendar-theme [class*="text-white"] {
+  color: #0f172a !important;
+}
+
+:root.light .calendar-theme [class*="text-slate-500"] {
+  color: #64748b !important;
+}
+
+:root.light .calendar-theme [class*="text-slate-600"] {
+  color: #475569 !important;
+}
+
+/* Contacts light theme table surfaces */
+:root.light .contacts-theme [class*="bg-[#1a1a1a]"],
+:root.light .contacts-theme [class*="bg-[#0a0a0a]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light .contacts-theme .contacts-list-shell,
+:root.light .contacts-theme .contacts-list-head,
+:root.light .contacts-theme .contacts-list-body,
+:root.light .contacts-theme .contacts-list-footer,
+:root.light .contacts-theme .contacts-list-row {
+  background-color: #ffffff !important;
+}
+
+:root.light .contacts-theme .contacts-list-row:hover {
+  background-color: #f8fafc !important;
+}
+
+:root.light .contacts-theme .contacts-light-name,
+:root.light .contacts-theme .contacts-light-phone {
+  color: #2563eb !important;
+}
+
+/* Staff light theme directory */
+:root.light .staff-theme .staff-directory-shell,
+:root.light .staff-theme .staff-directory-body,
+:root.light .staff-theme .staff-directory-head,
+:root.light .staff-theme .staff-directory-table,
+:root.light .staff-theme .staff-directory-footer,
+:root.light .staff-theme .staff-directory-row {
+  background-color: #ffffff !important;
+}
+
+:root.light .staff-theme .staff-directory-group-row {
+  background-color: #f8fafc !important;
+}
+
+:root.light .staff-theme .staff-directory-row:hover {
+  background-color: #f8fbff !important;
+}
+
+:root.light .staff-theme .staff-directory-name,
+:root.light .staff-theme .staff-directory-role,
+:root.light .staff-theme .staff-directory-row [class*="text-slate-100"],
+:root.light .staff-theme .staff-directory-row [class*="text-slate-200"] {
+  color: #111827 !important;
+}
+
+:root.light .staff-theme .staff-directory-head [class*="text-slate-500"],
+:root.light .staff-theme .staff-directory-footer [class*="text-slate-500"],
+:root.light .staff-theme .staff-directory-group-row [class*="text-slate-500"] {
+  color: #64748b !important;
+}
+
+:root.light .staff-theme .staff-directory-shell,
+:root.light .staff-theme .staff-directory-footer,
+:root.light .staff-theme .staff-directory-head,
+:root.light .staff-theme .staff-directory-table {
+  border-color: rgba(148, 163, 184, 0.28) !important;
+}
+
+:root.light .staff-theme .staff-directory-icon {
+  background-color: #dbeafe !important;
+  border-color: #bfdbfe !important;
+  color: #2563eb !important;
+}
+
+:root.light .staff-theme .staff-directory-icon:hover {
+  background-color: #bfdbfe !important;
+  color: #1d4ed8 !important;
 }

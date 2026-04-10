@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
   LogOut,
+  X,
   Sun,
   Cloud,
   Users,
@@ -19,6 +20,9 @@ import { supabase } from '@/lib/supabase';
 import { RDO, Project } from '@/lib/types';
 import { motion, AnimatePresence } from 'motion/react';
 
+const CLIENT_PORTAL_CLOSE_LOGOUT_KEY = 'client-portal-force-logout';
+const CLIENT_PORTAL_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+
 export default function ClientRDOPage() {
   const { projectId } = useParams();
   const router = useRouter();
@@ -26,6 +30,7 @@ export default function ClientRDOPage() {
   const [rdos, setRdos] = useState<RDO[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRdo, setSelectedRdo] = useState<RDO | null>(null);
+  const [isClosingApp, setIsClosingApp] = useState(false);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -78,8 +83,64 @@ export default function ClientRDOPage() {
   }, [projectId, router]);
 
   const handleLogout = async () => {
+    try {
+      window.localStorage.removeItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY);
+    } catch {}
     await supabase.auth.signOut();
     router.push('/login');
+  };
+
+  useEffect(() => {
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const resetIdleTimer = () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+
+      idleTimer = setTimeout(async () => {
+        try {
+          window.localStorage.setItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY, '1');
+        } catch {}
+        await supabase.auth.signOut();
+        router.push('/login');
+      }, CLIENT_PORTAL_IDLE_TIMEOUT_MS);
+    };
+
+    const markClientSessionForLogout = () => {
+      try {
+        window.localStorage.setItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY, '1');
+      } catch {}
+      void supabase.auth.signOut();
+    };
+
+    const activityEvents: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, resetIdleTimer, { passive: true }));
+    window.addEventListener('beforeunload', markClientSessionForLogout);
+    window.addEventListener('pagehide', markClientSessionForLogout);
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimer) {
+        clearTimeout(idleTimer);
+      }
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, resetIdleTimer));
+      window.removeEventListener('beforeunload', markClientSessionForLogout);
+      window.removeEventListener('pagehide', markClientSessionForLogout);
+    };
+  }, [router]);
+
+  const handleCloseApp = async () => {
+    setIsClosingApp(true);
+
+    try {
+      window.localStorage.setItem(CLIENT_PORTAL_CLOSE_LOGOUT_KEY, '1');
+    } catch {}
+
+    await supabase.auth.signOut();
+    window.close();
+    router.push('/login');
+    setIsClosingApp(false);
   };
 
   if (loading) {
@@ -109,9 +170,20 @@ export default function ClientRDOPage() {
           <h1 className="text-sm font-black text-white tracking-tight uppercase">Portal do <span className="text-[#d4ff3f]">Cliente</span></h1>
           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{project.nome}</p>
         </div>
-        <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-white transition-colors">
-          <LogOut size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={handleCloseApp}
+            disabled={isClosingApp}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-800/50 bg-[#0f0f0f] px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors hover:text-white disabled:opacity-50"
+          >
+            <X size={16} />
+            Fechar App
+          </button>
+          <button onClick={handleLogout} className="p-2 text-slate-500 hover:text-white transition-colors" title="Encerrar sessão">
+            <LogOut size={20} />
+          </button>
+        </div>
       </div>
 
       <div className="max-w-3xl mx-auto px-4 pt-8">

@@ -565,7 +565,7 @@ export default function CalendarPage() {
           className={cn(
             "min-h-[120px] p-2 border-r border-b border-white/20 flex flex-col gap-1 transition-colors",
             !isSameMonth(day, monthStart) ? "bg-[#141414]/50 opacity-30" : "bg-[#141414]",
-            isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/18 via-[#d4ff3f]/10 to-[#d4ff3f]/6 ring-1 ring-inset ring-[#d4ff3f]/35 shadow-[inset_0_0_0_1px_rgba(212,255,63,0.08)]"
+            isToday(day) && "bg-gradient-to-b from-orange-400/22 via-orange-400/12 to-orange-400/8 ring-1 ring-inset ring-orange-400/35 shadow-[inset_0_0_0_1px_rgba(251,146,60,0.10)]"
           )}
         >
           <div className="flex justify-between items-center mb-1">
@@ -575,7 +575,7 @@ export default function CalendarPage() {
             )}>
               {format(day, 'd')}
             </span>
-            {isToday(day) && <div className="size-1 rounded-full bg-[#d4ff3f]" />}
+            {isToday(day) && <div className="size-1 rounded-full bg-orange-400" />}
           </div>
           
           <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[80px]">
@@ -640,7 +640,7 @@ export default function CalendarPage() {
                 key={day.toString()}
                 className={cn(
                   "py-4 text-center border-r border-white/20 transition-colors",
-                  isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/16 via-[#d4ff3f]/8 to-transparent ring-1 ring-inset ring-[#d4ff3f]/30"
+                  isToday(day) && "bg-gradient-to-b from-orange-400/20 via-orange-400/10 to-transparent ring-1 ring-inset ring-orange-400/30"
                 )}
               >
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{format(day, 'EEE', { locale: ptBR })}</p>
@@ -668,7 +668,7 @@ export default function CalendarPage() {
                   key={day.toString()}
                   className={cn(
                     "border-r border-white/20 relative transition-colors",
-                    isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/14 via-[#d4ff3f]/8 to-[#141414]"
+                    isToday(day) && "bg-gradient-to-b from-orange-400/18 via-orange-400/10 to-[#141414]"
                   )}
                 >
                   {hours.map(hour => (
@@ -809,7 +809,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white flex flex-col overflow-hidden">
+    <div className="calendar-theme flex-1 bg-[#0a0a0a] text-white flex flex-col overflow-hidden">
       {error && (
         <div className="bg-rose-500/10 border border-rose-500/20 p-4 mx-8 mt-4 rounded-xl flex items-center justify-between">
           <p className="text-rose-500 text-xs font-bold uppercase tracking-widest">Erro: {error}</p>

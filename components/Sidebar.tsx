@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React from 'react';
 import Link from 'next/link';
@@ -35,6 +35,9 @@ interface NavGroup {
   group: string;
   items: NavItem[];
 }
+
+const AUXILIAR_ADMIN_NIVEL_1 = 'Auxiliar Administrativo Nível 1';
+const AUXILIAR_ADMIN_NIVEL_2 = 'Auxiliar Administrativo Nível 2';
 
 const navItems: NavGroup[] = [
   { group: 'PRINCIPAL', items: [
@@ -123,10 +126,26 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
   
   const userRole = user?.user_metadata?.role || 'Usuário';
   const isAdmin = userRole === 'Administrador';
+  const isAuxAdminLevel1 = userRole === AUXILIAR_ADMIN_NIVEL_1;
+  const isAuxAdminLevel2 = userRole === AUXILIAR_ADMIN_NIVEL_2;
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
 
   const filteredNavItems = navItems.map(group => {
+    if (isAuxAdminLevel2) {
+      if (group.group === 'PRINCIPAL' || group.group === 'OUTROS') {
+        return { ...group };
+      }
+      return { ...group, items: [] };
+    }
+
+    if (isAuxAdminLevel1) {
+      if (group.group === 'PRINCIPAL' || group.group === 'FINANCEIRO' || group.group === 'OUTROS') {
+        return { ...group };
+      }
+      return { ...group, items: [] };
+    }
+
     if (group.group === 'OUTROS') {
       const items = [...group.items];
       if (isAdmin) {
@@ -228,10 +247,11 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-bold text-white truncate">{userName}</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{userRole} • {userEmail}</p>
+            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{userRole} â€¢ {userEmail}</p>
           </div>
         </div>
       </div>
     </aside>
   );
 }
+

@@ -897,7 +897,7 @@ export default function PayablesPage() {
                       }}
                       className={cn(
                         "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
-                        isCustomSupplier ? "text-[#d4ff3f]" : "text-white"
+                        isCustomSupplier ? "text-slate-400" : "text-white"
                       )}
                     >
                       <option value="" disabled>Selecione um fornecedor</option>
@@ -906,7 +906,7 @@ export default function PayablesPage() {
                           {supplier}
                         </option>
                       ))}
-                      <option value={NEW_SUPPLIER_OPTION} className="text-[#d4ff3f]">Novo fornecedor</option>
+                      <option value={NEW_SUPPLIER_OPTION} className="text-slate-400">Novo fornecedor</option>
                     </select>
                     {isCustomSupplier && (
                       <input
