@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "documents-helper": "node scripts/windows-document-helper.mjs",
+    "documents-helper:package": "powershell -ExecutionPolicy Bypass -File .\\scripts\\build-documents-helper-installer.ps1"
   },
   "dependencies": {
     "@google/genai": "latest",

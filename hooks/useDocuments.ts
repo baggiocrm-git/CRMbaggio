@@ -14,6 +14,7 @@ export interface Document {
   pasta_id?: string | null;
   drive_file_id?: string | null;
   webViewLink?: string | null;
+  is_drive_only?: boolean;
 }
 
 export interface Folder {

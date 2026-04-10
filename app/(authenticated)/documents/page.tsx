@@ -57,6 +57,7 @@ const STATUSES = ['Todos', 'Vigente', 'Vencido', 'Arquivado'];
 const YEARS = [2026, 2025, 2024, 2023];
 
 export default function DocumentManagementPage() {
+  const localDocumentHelperUrl = 'http://127.0.0.1:43125';
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedArea, setSelectedArea] = useState('Todas');
@@ -80,6 +81,7 @@ export default function DocumentManagementPage() {
 
   const [connectedAccount, setConnectedAccount] = useState<string | null>(null);
   const [isServiceAccount, setIsServiceAccount] = useState(false);
+  const [isLocalHelperConnected, setIsLocalHelperConnected] = useState(false);
   const [sortConfig, setSortConfig] = useState<{
     key: keyof Document | 'folder';
     direction: 'asc' | 'desc';
@@ -341,6 +343,27 @@ export default function DocumentManagementPage() {
   useEffect(() => {
     fetchAuthStatus();
   }, [fetchAuthStatus]);
+
+  const checkLocalDocumentHelper = useCallback(async () => {
+    try {
+      const response = await fetch(`${localDocumentHelperUrl}/health`);
+      if (!response.ok) {
+        setIsLocalHelperConnected(false);
+        return;
+      }
+
+      const payload = await response.json().catch(() => null);
+      setIsLocalHelperConnected(Boolean(payload?.ok));
+    } catch {
+      setIsLocalHelperConnected(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkLocalDocumentHelper();
+    const intervalId = window.setInterval(checkLocalDocumentHelper, 15000);
+    return () => window.clearInterval(intervalId);
+  }, [checkLocalDocumentHelper]);
 
   const currentFolders = useMemo(() => {
     return folders;
@@ -605,15 +628,6 @@ export default function DocumentManagementPage() {
     }
   };
 
-  const handleViewDocument = (doc: Document) => {
-    if (doc.webViewLink) {
-      window.open(doc.webViewLink, '_blank');
-    } else {
-      const url = getFileUrl(doc.file_path);
-      window.open(url, '_blank');
-    }
-  };
-
   const handleDeleteSelected = async () => {
     if (selectedDocs.size === 0 && selectedFolders.size === 0) return;
 
@@ -716,6 +730,53 @@ export default function DocumentManagementPage() {
     return `${supabaseUrl}/storage/v1/object/public/documentos/${path}`;
   };
 
+  const openDocumentWithWindowsHelper = useCallback(async (doc: Document) => {
+    if (!doc.file_path) return false;
+
+    const url = getFileUrl(doc.file_path);
+    if (!url || url === '#') return false;
+
+    const response = await fetch(`${localDocumentHelperUrl}/open`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url,
+        filename: doc.nome,
+      }),
+    });
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Helper local indisponível.');
+    }
+
+    return true;
+  }, []);
+
+  const handleViewDocument = async (doc: Document) => {
+    if (!doc.is_drive_only && doc.file_path) {
+      try {
+        await openDocumentWithWindowsHelper(doc);
+        setIsLocalHelperConnected(true);
+        showNotification('Arquivo aberto no programa padrão do Windows.');
+        return;
+      } catch (error) {
+        console.error('Windows helper error:', error);
+        setIsLocalHelperConnected(false);
+        showNotification('Helper local não encontrado. Inicie `npm run documents-helper` para abrir no Windows.', 'error');
+      }
+    }
+
+    if (doc.webViewLink) {
+      window.open(doc.webViewLink, '_blank');
+    } else {
+      const url = getFileUrl(doc.file_path);
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] p-8 space-y-8">
       {/* Header */}
@@ -787,6 +848,37 @@ export default function DocumentManagementPage() {
                 <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">Ativa</span>
               </div>
             )}
+          </div>
+
+          <div className="bg-[#1a1a1a] border border-slate-800/50 rounded-2xl p-3 flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div
+                className={cn(
+                  "size-8 rounded-lg flex items-center justify-center transition-all",
+                  isLocalHelperConnected ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"
+                )}
+              >
+                <FolderOpen size={16} />
+              </div>
+              <div>
+                <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Helper Local Windows</h4>
+                <p className="text-[10px] font-bold text-white">
+                  {isLocalHelperConnected ? 'Conectado' : 'Desconectado'}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={checkLocalDocumentHelper}
+              className={cn(
+                "px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border",
+                isLocalHelperConnected
+                  ? "bg-white/5 border-slate-800/50 text-slate-400 hover:text-white hover:bg-white/10"
+                  : "bg-amber-500/10 border-amber-500/20 text-amber-300 hover:bg-amber-500/20"
+              )}
+            >
+              Verificar
+            </button>
           </div>
         </div>
 
