@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { 
   FileText, 
@@ -22,7 +22,11 @@ import {
   Edit2,
   ArrowUp,
   ArrowDown,
-  FolderOpen
+  FolderOpen,
+  Sparkles,
+  Loader2,
+  Mic,
+  Square
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
@@ -149,6 +153,32 @@ export default function DocumentManagementPage() {
     parent_id: null as string | null,
     mode: 'create' as 'create' | 'edit'
   });
+  const [isAiGenerateModalOpen, setIsAiGenerateModalOpen] = useState(false);
+  const [isGeneratingAiDocument, setIsGeneratingAiDocument] = useState(false);
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false);
+  const [isListeningToAiPrompt, setIsListeningToAiPrompt] = useState(false);
+  const [aiDocForm, setAiDocForm] = useState({
+    name: '',
+    documentType: 'livre',
+    category: 'Geral' as DocumentCategory,
+    format: 'markdown' as 'markdown' | 'text' | 'docx',
+    pasta_id: 'root' as string | 'root',
+    prompt: '',
+  });
+  const aiSpeechRecognitionRef = useRef<{
+    start: () => void;
+    stop: () => void;
+    abort?: () => void;
+    continuous?: boolean;
+    interimResults?: boolean;
+    lang?: string;
+    onresult?: ((event: {
+      resultIndex: number;
+      results: ArrayLike<ArrayLike<{ transcript: string }>>;
+    }) => void) | null;
+    onerror?: ((event: { error?: string }) => void) | null;
+    onend?: (() => void) | null;
+  } | null>(null);
 
   useEffect(() => {
     if (newDoc.file && !newDoc.name) {
@@ -162,6 +192,106 @@ export default function DocumentManagementPage() {
       setNewDoc(prev => ({ ...prev, pasta_id: currentFolderId }));
     }
   }, [isModalOpen, currentPath, currentFolderId]);
+
+  useEffect(() => {
+    if (isAiGenerateModalOpen) {
+      setAiDocForm((prev) => ({
+        ...prev,
+        pasta_id: currentFolderId,
+      }));
+    }
+  }, [isAiGenerateModalOpen, currentFolderId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const speechWindow = window as Window & {
+      SpeechRecognition?: new () => {
+        start: () => void;
+        stop: () => void;
+        abort?: () => void;
+        continuous?: boolean;
+        interimResults?: boolean;
+        lang?: string;
+        onresult?: ((event: {
+          resultIndex: number;
+          results: ArrayLike<ArrayLike<{ transcript: string }>>;
+        }) => void) | null;
+        onerror?: ((event: { error?: string }) => void) | null;
+        onend?: (() => void) | null;
+      };
+      webkitSpeechRecognition?: new () => {
+        start: () => void;
+        stop: () => void;
+        abort?: () => void;
+        continuous?: boolean;
+        interimResults?: boolean;
+        lang?: string;
+        onresult?: ((event: {
+          resultIndex: number;
+          results: ArrayLike<ArrayLike<{ transcript: string }>>;
+        }) => void) | null;
+        onerror?: ((event: { error?: string }) => void) | null;
+        onend?: (() => void) | null;
+      };
+    };
+
+    const RecognitionConstructor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+    if (!RecognitionConstructor) {
+      setIsVoiceSupported(false);
+      aiSpeechRecognitionRef.current = null;
+      return;
+    }
+
+    setIsVoiceSupported(true);
+    const recognition = new RecognitionConstructor();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'pt-BR';
+
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        transcript += event.results[index][0]?.transcript || '';
+      }
+
+      const cleanedTranscript = transcript.trim();
+      if (!cleanedTranscript) return;
+
+      setAiDocForm((prev) => ({
+        ...prev,
+        prompt: prev.prompt.trim() ? `${prev.prompt.trim()} ${cleanedTranscript}`.trim() : cleanedTranscript,
+      }));
+    };
+
+    recognition.onerror = (event) => {
+      setIsListeningToAiPrompt(false);
+      if (event?.error && event.error !== 'no-speech' && event.error !== 'aborted') {
+        showNotification(`Microfone: ${event.error}`, 'error');
+      }
+    };
+
+    recognition.onend = () => {
+      setIsListeningToAiPrompt(false);
+    };
+
+    aiSpeechRecognitionRef.current = recognition;
+
+    return () => {
+      recognition.onresult = null;
+      recognition.onerror = null;
+      recognition.onend = null;
+      recognition.abort?.();
+      aiSpeechRecognitionRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isAiGenerateModalOpen && isListeningToAiPrompt) {
+      aiSpeechRecognitionRef.current?.stop();
+      setIsListeningToAiPrompt(false);
+    }
+  }, [isAiGenerateModalOpen, isListeningToAiPrompt]);
 
   const fetchFolders = useCallback(() => {
     fetchDocuments();
@@ -505,6 +635,70 @@ export default function DocumentManagementPage() {
     });
   };
 
+  const handleGenerateAiDocument = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isListeningToAiPrompt) {
+      aiSpeechRecognitionRef.current?.stop();
+      setIsListeningToAiPrompt(false);
+    }
+    if (!aiDocForm.name.trim() || !aiDocForm.prompt.trim()) {
+      showNotification('Preencha o nome do arquivo e as instruções da IA.', 'error');
+      return;
+    }
+
+    try {
+      setIsGeneratingAiDocument(true);
+      const response = await fetch('/api/documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(aiDocForm),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result?.error || 'Falha ao gerar documento por IA.');
+      }
+
+      showNotification('Documento gerado com IA e salvo com sucesso.');
+      setIsAiGenerateModalOpen(false);
+      setAiDocForm({
+        name: '',
+        documentType: 'livre',
+        category: 'Geral',
+        format: 'markdown',
+        pasta_id: currentFolderId,
+        prompt: '',
+      });
+      fetchDocuments();
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Erro desconhecido ao gerar documento.';
+      showNotification(message, 'error');
+    } finally {
+      setIsGeneratingAiDocument(false);
+    }
+  };
+
+  const toggleAiVoiceInput = () => {
+    if (!isVoiceSupported || !aiSpeechRecognitionRef.current) {
+      showNotification('Microfone não suportado neste navegador.', 'error');
+      return;
+    }
+
+    if (isListeningToAiPrompt) {
+      aiSpeechRecognitionRef.current.stop();
+      setIsListeningToAiPrompt(false);
+      return;
+    }
+
+    try {
+      aiSpeechRecognitionRef.current.start();
+      setIsListeningToAiPrompt(true);
+    } catch {
+      showNotification('Não foi possível iniciar o microfone agora.', 'error');
+      setIsListeningToAiPrompt(false);
+    }
+  };
+
 
   const getFileUrl = (path?: string) => {
     if (!path) return '#';
@@ -582,6 +776,13 @@ export default function DocumentManagementPage() {
             </button>
           )}
           <button 
+            onClick={() => setIsAiGenerateModalOpen(true)}
+            className="bg-[#1a1a1a] hover:bg-[#222222] text-white px-5 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all border border-slate-800/50"
+          >
+            <Sparkles size={18} />
+            Gerar com IA
+          </button>
+          <button 
             onClick={() => setIsModalOpen(true)}
             className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 transition-all shadow-xl shadow-[#d4ff3f]/10 active:scale-95"
           >
@@ -623,6 +824,151 @@ export default function DocumentManagementPage() {
         confirmModal={confirmModal}
         setConfirmModal={setConfirmModal}
       />
+
+      <AnimatePresence>
+        {isAiGenerateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !isGeneratingAiDocument && setIsAiGenerateModalOpen(false)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.94, opacity: 0, y: 20 }}
+              className="relative w-full max-w-2xl rounded-[32px] border border-slate-800/50 bg-[#1a1a1a] p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black text-white tracking-tight">Gerar Documento com IA</h2>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    OpenRouter compatível com OpenAI integrado ao módulo de documentos
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !isGeneratingAiDocument && setIsAiGenerateModalOpen(false)}
+                  className="text-slate-500 hover:text-white transition-colors"
+                >
+                  <Plus size={18} className="rotate-45" />
+                </button>
+              </div>
+
+              <form onSubmit={handleGenerateAiDocument} className="mt-6 space-y-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Nome do Arquivo</label>
+                    <input
+                      type="text"
+                      value={aiDocForm.name}
+                      onChange={(e) => setAiDocForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                      placeholder="Ex.: comunicado-cliente-abril"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Tipo de Documento</label>
+                    <select
+                      value={aiDocForm.documentType}
+                      onChange={(e) => setAiDocForm((prev) => ({ ...prev, documentType: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      <option value="livre">Livre</option>
+                      <option value="oficio">Ofício</option>
+                      <option value="comunicado">Comunicado</option>
+                      <option value="ata">Ata</option>
+                      <option value="relatorio">Relatório</option>
+                      <option value="contrato">Minuta contratual</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Categoria</label>
+                    <select
+                      value={aiDocForm.category}
+                      onChange={(e) => setAiDocForm((prev) => ({ ...prev, category: e.target.value as DocumentCategory }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      {CATEGORIES.map((category) => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Formato</label>
+                    <select
+                      value={aiDocForm.format}
+                      onChange={(e) => setAiDocForm((prev) => ({ ...prev, format: e.target.value as 'markdown' | 'text' | 'docx' }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      <option value="markdown">Markdown (.md)</option>
+                      <option value="text">Texto (.txt)</option>
+                      <option value="docx">Word (.docx)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <label className="ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Instruções para a IA</label>
+                    <button
+                      type="button"
+                      onClick={toggleAiVoiceInput}
+                      className={cn(
+                        "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all",
+                        isListeningToAiPrompt
+                          ? "border-rose-500/40 bg-rose-500/10 text-rose-300"
+                          : "border-slate-800/50 bg-[#0a0a0a] text-slate-300 hover:border-[#d4ff3f]/30 hover:text-[#d4ff3f]"
+                      )}
+                      title={isVoiceSupported ? 'Ditado por voz com microfone' : 'Microfone não suportado neste navegador'}
+                    >
+                      {isListeningToAiPrompt ? <Square size={12} /> : <Mic size={12} />}
+                      {isListeningToAiPrompt ? 'Parar microfone' : 'Falar com microfone'}
+                    </button>
+                  </div>
+                  <textarea
+                    rows={10}
+                    value={aiDocForm.prompt}
+                    onChange={(e) => setAiDocForm((prev) => ({ ...prev, prompt: e.target.value }))}
+                    className="w-full resize-none rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm leading-relaxed text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    placeholder="Descreva o documento que a IA deve gerar. Ex.: Crie um comunicado formal informando paralisação da obra por chuva intensa entre 10 e 12 de abril, com orientação para remarcação do cronograma."
+                  />
+                  <p className="mt-2 ml-1 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                    {isVoiceSupported
+                      ? isListeningToAiPrompt
+                        ? 'Microfone ativo. Fale normalmente para preencher as instruções.'
+                        : 'Você também pode ditar o comando de voz pelo microfone.'
+                      : 'Seu navegador não oferece suporte ao ditado por voz nesta tela.'}
+                  </p>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAiGenerateModalOpen(false)}
+                    disabled={isGeneratingAiDocument}
+                    className="flex-1 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-white/5 hover:text-white disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isGeneratingAiDocument}
+                    className="flex-1 rounded-2xl bg-[#d4ff3f] px-6 py-4 text-xs font-black uppercase tracking-widest text-[#0a0a0a] transition-all hover:bg-[#c4ef2f] disabled:opacity-50"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      {isGeneratingAiDocument ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                      {isGeneratingAiDocument ? 'Gerando...' : 'Gerar Documento'}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
 
 

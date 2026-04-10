@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
@@ -17,7 +17,8 @@ import {
   Database,
   Copy,
   ExternalLink,
-  AlertCircle
+  AlertCircle,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
@@ -34,12 +35,17 @@ export default function SettingsPage() {
   const [profile, setProfile] = useState({
     fullName: '',
     email: '',
-    role: 'Usuário',
+    role: 'UsuÃ¡rio',
     phone: ''
   });
   const [companySettings, setCompanySettings] = useState({
+    companyName: '',
     companyAddress: '',
     companyCity: '',
+    companyPhone: '',
+    companyCnpj: '',
+    companyIe: '',
+    companyEmail: '',
   });
 
   // Load settings and user from Supabase
@@ -53,8 +59,13 @@ export default function SettingsPage() {
       try {
         const parsed = JSON.parse(savedCompanySettings) as Partial<typeof companySettings>;
         setCompanySettings({
+          companyName: parsed.companyName || '',
           companyAddress: parsed.companyAddress || '',
           companyCity: parsed.companyCity || '',
+          companyPhone: parsed.companyPhone || '',
+          companyCnpj: parsed.companyCnpj || '',
+          companyIe: parsed.companyIe || '',
+          companyEmail: parsed.companyEmail || '',
         });
       } catch {
         // ignore invalid company settings
@@ -79,7 +90,7 @@ export default function SettingsPage() {
         setProfile({
           fullName: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
           email: user.email || '',
-          role: user.user_metadata?.role || 'Usuário',
+          role: user.user_metadata?.role || 'UsuÃ¡rio',
           phone: user.user_metadata?.phone || ''
         });
       }
@@ -125,9 +136,10 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'profile', name: 'Perfil', icon: UserIcon },
-    { id: 'appearance', name: 'Aparência', icon: Monitor },
-    { id: 'notifications', name: 'Notificações', icon: Bell },
-    { id: 'security', name: 'Segurança', icon: Shield },
+    { id: 'company', name: 'Empresa', icon: Building2 },
+    { id: 'appearance', name: 'AparÃªncia', icon: Monitor },
+    { id: 'notifications', name: 'NotificaÃ§Ãµes', icon: Bell },
+    { id: 'security', name: 'SeguranÃ§a', icon: Shield },
     { id: 'database', name: 'Banco de Dados', icon: Database },
   ];
 
@@ -137,9 +149,9 @@ export default function SettingsPage() {
     <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <header className="p-8 border-b border-slate-800/50">
         <h1 className="text-4xl font-black tracking-tight italic">
-          Configurações <span className="text-[#d4ff3f]">do Sistema</span>
+          ConfiguraÃ§Ãµes <span className="text-[#d4ff3f]">do Sistema</span>
         </h1>
-        <p className="text-slate-500 text-xs font-bold mt-1">Gerencie suas preferências e informações de conta</p>
+        <p className="text-slate-500 text-xs font-bold mt-1">Gerencie suas preferÃªncias e informaÃ§Ãµes de conta</p>
       </header>
 
       <div className="p-8 max-w-5xl mx-auto">
@@ -183,7 +195,7 @@ export default function SettingsPage() {
                       </button>
                     </div>
                     <div>
-                      <h3 className="text-xl font-black">{profile.fullName || 'Usuário'}</h3>
+                      <h3 className="text-xl font-black">{profile.fullName || 'UsuÃ¡rio'}</h3>
                       <p className="text-slate-500 text-xs font-bold uppercase tracking-widest">{profile.role}</p>
                     </div>
                   </div>
@@ -225,24 +237,95 @@ export default function SettingsPage() {
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
                       />
                     </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'company' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="space-y-8"
+                >
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-black tracking-tight flex items-center gap-2">
+                      <Building2 size={20} className="text-[#d4ff3f]" />
+                      Dados da Empresa
+                    </h3>
+                    <p className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">
+                      InformaÃ§Ãµes institucionais usadas em documentos, recibos e relatÃ³rios do sistema
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2 md:col-span-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Endereço da Empresa</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Nome da Empresa</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyName}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyName: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="Construtora Baggio Silveira Ltda."
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">EndereÃ§o</label>
                       <input 
                         type="text"
                         value={companySettings.companyAddress}
                         onChange={(e) => setCompanySettings({ ...companySettings, companyAddress: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
-                        placeholder="Rua, número, bairro, cidade, UF"
+                        placeholder="Rua, nÃºmero, bairro, cidade, UF"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cidade / UF da Empresa</label>
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Telefone</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyPhone}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyPhone: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="(11) 0000-0000"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">E-mail</label>
+                      <input 
+                        type="email"
+                        value={companySettings.companyEmail}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyEmail: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="contato@empresa.com.br"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">CNPJ</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyCnpj}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyCnpj: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="00.000.000/0001-00"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">IE</label>
+                      <input 
+                        type="text"
+                        value={companySettings.companyIe}
+                        onChange={(e) => setCompanySettings({ ...companySettings, companyIe: e.target.value })}
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
+                        placeholder="InscriÃ§Ã£o Estadual"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Cidade / UF</label>
                       <input 
                         type="text"
                         value={companySettings.companyCity}
                         onChange={(e) => setCompanySettings({ ...companySettings, companyCity: e.target.value })}
                         className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 focus:border-[#d4ff3f]/50 outline-none transition-all"
-                        placeholder="São Paulo - SP"
+                        placeholder="SÃ£o Paulo - SP"
                       />
                     </div>
                   </div>
@@ -291,7 +374,7 @@ export default function SettingsPage() {
                     <div className="flex items-center gap-4 bg-[#0a0a0a] p-2 rounded-2xl border border-slate-800/50 w-fit">
                       {[
                         { id: 'small', name: 'Pequeno' },
-                        { id: 'medium', name: 'Médio' },
+                        { id: 'medium', name: 'MÃ©dio' },
                         { id: 'large', name: 'Grande' },
                       ].map((s) => (
                         <button
@@ -323,13 +406,13 @@ export default function SettingsPage() {
                 >
                   <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-6">
                     <Bell size={20} className="text-[#d4ff3f]" />
-                    Preferências de Notificação
+                    PreferÃªncias de NotificaÃ§Ã£o
                   </h3>
                   {[
-                    { title: 'E-mails de Resumo', desc: 'Receba um resumo diário das atividades financeiras.' },
-                    { title: 'Alertas de Vencimento', desc: 'Notificações sobre contas a pagar e receber próximas do vencimento.' },
+                    { title: 'E-mails de Resumo', desc: 'Receba um resumo diÃ¡rio das atividades financeiras.' },
+                    { title: 'Alertas de Vencimento', desc: 'NotificaÃ§Ãµes sobre contas a pagar e receber prÃ³ximas do vencimento.' },
                     { title: 'Novos Projetos', desc: 'Seja avisado quando um novo projeto for criado.' },
-                    { title: 'Atualizações de Equipe', desc: 'Notificações sobre mudanças na equipe ou novos membros.' },
+                    { title: 'AtualizaÃ§Ãµes de Equipe', desc: 'NotificaÃ§Ãµes sobre mudanÃ§as na equipe ou novos membros.' },
                   ].map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/30">
                       <div>
@@ -353,7 +436,7 @@ export default function SettingsPage() {
                 >
                   <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-6">
                     <Shield size={20} className="text-[#d4ff3f]" />
-                    Segurança da Conta
+                    SeguranÃ§a da Conta
                   </h3>
                   
                   <div className="space-y-4">
@@ -378,8 +461,8 @@ export default function SettingsPage() {
 
                     <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 flex items-center justify-between">
                       <div>
-                        <p className="text-sm font-black">Autenticação em Duas Etapas</p>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Adicione uma camada extra de segurança à sua conta.</p>
+                        <p className="text-sm font-black">AutenticaÃ§Ã£o em Duas Etapas</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Adicione uma camada extra de seguranÃ§a Ã  sua conta.</p>
                       </div>
                       <button className="px-4 py-2 border border-slate-800 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#1a1a1a] transition-all">
                         Configurar
@@ -398,7 +481,7 @@ export default function SettingsPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-black tracking-tight flex items-center gap-2 mb-2">
                       <Database size={20} className="text-[#d4ff3f]" />
-                      Configuração do Banco de Dados
+                      ConfiguraÃ§Ã£o do Banco de Dados
                     </h3>
                     <a 
                       href="https://supabase.com/dashboard/project/_/sql" 
@@ -412,7 +495,7 @@ export default function SettingsPage() {
                   
                   <div className="p-6 bg-[#0a0a0a] rounded-2xl border border-slate-800/30 space-y-6">
                     <div className="space-y-2">
-                      <p className="text-sm font-black">Script SQL: Gestão de Documentos</p>
+                      <p className="text-sm font-black">Script SQL: GestÃ£o de Documentos</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
                         Execute este script para criar as tabelas de pastas, documentos e tokens do Google.
                       </p>
@@ -545,7 +628,7 @@ CREATE POLICY "Allow all for authenticated" ON public.google_tokens FOR ALL TO a
                     <div className="space-y-2">
                       <p className="text-sm font-black">Script SQL: Contas a Receber</p>
                       <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
-                        Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessária.
+                        Copie e execute o script abaixo no SQL Editor do seu painel Supabase para criar a tabela necessÃ¡ria.
                       </p>
                     </div>
                     
@@ -597,7 +680,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_receb
     USING (true)
     WITH CHECK (true);`;
                           navigator.clipboard.writeText(sql);
-                          alert('Script SQL copiado para a área de transferência!');
+                          alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
                         }}
                         className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                       >
@@ -670,7 +753,7 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
     USING (true)
     WITH CHECK (true);`;
                           navigator.clipboard.writeText(sql);
-                          alert('Script SQL copiado para a área de transferência!');
+                          alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
                         }}
                         className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                       >
@@ -681,9 +764,9 @@ CREATE POLICY "Allow all actions for authenticated users" ON public.contas_pagar
                     <div className="p-4 bg-[#d4ff3f]/5 border border-[#d4ff3f]/20 rounded-xl flex items-start gap-4">
                       <AlertCircle size={18} className="text-[#d4ff3f] mt-0.5 flex-shrink-0" />
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">Atenção</p>
+                        <p className="text-[10px] font-black text-[#d4ff3f] uppercase tracking-widest">AtenÃ§Ã£o</p>
                         <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-tighter">
-                          Após executar o script, a página de Contas a Receber estará totalmente funcional e sincronizada com seu banco de dados.
+                          ApÃ³s executar o script, a pÃ¡gina de Contas a Receber estarÃ¡ totalmente funcional e sincronizada com seu banco de dados.
                         </p>
                       </div>
                     </div>
@@ -710,7 +793,7 @@ ADD COLUMN IF NOT EXISTS funcao TEXT,
 ADD COLUMN IF NOT EXISTS data_admissao DATE,
 ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                             navigator.clipboard.writeText(sql);
-                            alert('Script SQL copiado para a área de transferência!');
+                            alert('Script SQL copiado para a Ã¡rea de transferÃªncia!');
                           }}
                           className="absolute top-4 right-4 p-2 bg-[#0a0a0a] border border-slate-800 rounded-lg text-slate-500 hover:text-[#d4ff3f] transition-all opacity-0 group-hover:opacity-100"
                         >
@@ -726,7 +809,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
             {/* Footer Actions */}
             <div className="p-6 bg-[#0a0a0a] border-t border-slate-800/50 flex items-center justify-between">
               <p className="text-slate-600 text-[10px] font-bold uppercase tracking-widest">
-                Última alteração: Hoje às 14:32
+                Ãšltima alteraÃ§Ã£o: Hoje Ã s 14:32
               </p>
               <div className="flex items-center gap-3">
                 <button 
@@ -736,7 +819,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                   }}
                   className="px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#1a1a1a] transition-all"
                 >
-                  Restaurar Padrões
+                  Restaurar PadrÃµes
                 </button>
                 <button 
                   onClick={handleSave}
@@ -752,7 +835,7 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
                   ) : (
                     <Save size={16} />
                   )}
-                  {showSuccess ? 'Salvo!' : isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                  {showSuccess ? 'Salvo!' : isSaving ? 'Salvando...' : 'Salvar AlteraÃ§Ãµes'}
                 </button>
               </div>
             </div>
@@ -762,3 +845,4 @@ ADD COLUMN IF NOT EXISTS data_demissao DATE;`;
     </div>
   );
 }
+

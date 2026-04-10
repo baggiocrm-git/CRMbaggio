@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
@@ -9,7 +9,6 @@ import {
   ArrowUpRight, 
   AlertCircle, 
   ArrowDownRight,
-  Plus,
   Calendar,
   ArrowRight,
   Wallet,
@@ -153,7 +152,7 @@ export default function FinanceDashboard() {
       const d = new Date(r.data_recebimento);
       return !isNaN(d.getTime());
     }).map(r => ({
-      name: `Recebimento — ${r.cliente}`,
+      name: `Recebimento - ${r.cliente}`,
       desc: `Vendas · ${new Date(r.data_recebimento!).toLocaleDateString('pt-BR')}`,
       amount: `+ ${formatCurrency(r.valor_recebido)}`,
       color: 'text-[#d4ff3f]',
@@ -165,7 +164,7 @@ export default function FinanceDashboard() {
       const d = new Date(p.data_pagamento);
       return !isNaN(d.getTime());
     }).map(p => ({
-      name: `Pagamento — ${p.fornecedor}`,
+      name: `Pagamento - ${p.fornecedor}`,
       desc: `Despesa · ${new Date(p.data_pagamento!).toLocaleDateString('pt-BR')}`,
       amount: `- ${formatCurrency(p.valor_pago)}`,
       color: 'text-rose-500',
@@ -193,12 +192,7 @@ export default function FinanceDashboard() {
           >
             <Calendar size={14} /> Sincronizar
           </button>
-          <button 
-            onClick={() => window.location.href = '/finances/receivables'}
-            className="flex items-center gap-2 px-4 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
-          >
-            <Plus size={14} /> Novo Lançamento
-          </button>
+          
         </div>
       </header>
 
@@ -426,3 +420,4 @@ export default function FinanceDashboard() {
     </div>
   );
 }
+

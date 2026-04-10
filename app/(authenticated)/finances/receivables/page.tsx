@@ -77,6 +77,7 @@ export default function ReceivablesPage() {
     direction: 'asc'
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     cliente: '',
@@ -253,6 +254,18 @@ export default function ReceivablesPage() {
     fetchReceivables();
     fetchPayers();
   }, [fetchReceivables, fetchPayers]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!isFilterOpen) return;
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterOpen]);
 
   const handleOpenModal = (item?: Receivable) => {
     if (item) {
@@ -513,7 +526,7 @@ export default function ReceivablesPage() {
           >
             <Plus size={18} /> CONTA A RECEBER
           </button>
-          <div className="relative">
+          <div ref={filterRef} className="relative">
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(

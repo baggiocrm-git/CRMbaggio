@@ -93,6 +93,7 @@ export default function PayablesPage() {
     direction: 'asc'
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     fornecedor: '',
@@ -277,6 +278,18 @@ export default function PayablesPage() {
     fetchPayables();
     fetchSuppliers();
   }, [fetchPayables, fetchSuppliers]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!isFilterOpen) return;
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setIsFilterOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isFilterOpen]);
 
   const handleOpenModal = (item?: Payable) => {
     if (item) {
@@ -544,7 +557,7 @@ export default function PayablesPage() {
           >
             <Plus size={18} /> CONTA A PAGAR
           </button>
-          <div className="relative">
+          <div ref={filterRef} className="relative">
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
@@ -557,6 +570,8 @@ export default function PayablesPage() {
             
             <AnimatePresence>
               {isFilterOpen && (
+                <>
+                <div className="fixed inset-0 z-20" onClick={() => setIsFilterOpen(false)} />
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -608,6 +623,7 @@ export default function PayablesPage() {
                     </div>
                   </div>
                 </motion.div>
+                </>
               )}
             </AnimatePresence>
           </div>
