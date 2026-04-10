@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -46,6 +46,10 @@ interface Event {
   location?: string;
   attendees?: string[];
   calendarColor?: string;
+  calendarId?: string;
+  description?: string;
+  allDay?: boolean;
+  reminderMinutes?: number | null;
 }
 
 const MOCK_EVENTS: Event[] = [
@@ -94,6 +98,19 @@ export default function CalendarPage() {
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [newEventForm, setNewEventForm] = useState({
+    calendarId: 'primary',
+    title: '',
+    description: '',
+    location: '',
+    start: '',
+    end: '',
+    allDay: false,
+    reminderMinutes: 30 as number | '',
+  });
 
   // Initialize with mock events only if not connected
   useEffect(() => {
@@ -109,6 +126,46 @@ export default function CalendarPage() {
       setSelectedCalendarIds(mockCalendars.map((calendar) => calendar.id));
     }
   }, [isGoogleConnected]);
+
+  useEffect(() => {
+    if (!isCreateEventModalOpen) return;
+
+    if (editingEvent) {
+      setNewEventForm({
+        calendarId: editingEvent.calendarId || 'primary',
+        title: editingEvent.title,
+        description: editingEvent.description || '',
+        location: editingEvent.location || '',
+        start: editingEvent.allDay ? format(editingEvent.start, 'yyyy-MM-dd') : format(editingEvent.start, "yyyy-MM-dd'T'HH:mm"),
+        end: editingEvent.allDay ? format(editingEvent.end, 'yyyy-MM-dd') : format(editingEvent.end, "yyyy-MM-dd'T'HH:mm"),
+        allDay: !!editingEvent.allDay,
+        reminderMinutes: editingEvent.reminderMinutes ?? '',
+      });
+      return;
+    }
+
+    const selectedCalendarId =
+      selectedCalendarIds[0] ||
+      calendars.find((calendar) => calendar.primary)?.id ||
+      calendars[0]?.id ||
+      'primary';
+
+    const startDate = new Date(currentDate);
+    startDate.setHours(9, 0, 0, 0);
+    const endDate = new Date(currentDate);
+    endDate.setHours(10, 0, 0, 0);
+
+    setNewEventForm({
+      calendarId: selectedCalendarId,
+      title: '',
+      description: '',
+      location: '',
+      start: format(startDate, "yyyy-MM-dd'T'HH:mm"),
+      end: format(endDate, "yyyy-MM-dd'T'HH:mm"),
+      allDay: false,
+      reminderMinutes: 30,
+    });
+  }, [isCreateEventModalOpen, calendars, currentDate, editingEvent, selectedCalendarIds]);
 
   const fetchGoogleCalendars = React.useCallback(async () => {
     try {
@@ -161,15 +218,21 @@ export default function CalendarPage() {
         // Find calendar color
         const calendar = availableCalendars.find(c => c.id === calendarId);
         
-        return data.map((e: { id: string; summary?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[] }) => ({
+        return data.map((e: { id: string; summary?: string; description?: string; start: { dateTime?: string; date: string }; end: { dateTime?: string; date: string }; location?: string; attendees?: { displayName?: string; email: string }[]; reminders?: { overrides?: { minutes?: number }[] } }) => ({
           id: e.id,
           title: e.summary || 'Sem título',
           start: new Date(e.start.dateTime || e.start.date),
-          end: new Date(e.end.dateTime || e.end.date),
+          end: !e.start.dateTime
+            ? new Date(new Date(e.end.date).getTime() - 24 * 60 * 60 * 1000)
+            : new Date(e.end.dateTime || e.end.date),
           type: 'meeting',
           location: e.location,
           attendees: e.attendees?.map((a: { displayName?: string; email: string }) => a.displayName || a.email),
-          calendarColor: calendar?.backgroundColor || '#d4ff3f'
+          calendarColor: calendar?.backgroundColor || '#d4ff3f',
+          calendarId,
+          description: e.description,
+          allDay: !e.start.dateTime,
+          reminderMinutes: e.reminders?.overrides?.[0]?.minutes ?? null,
         }));
       });
 
@@ -223,7 +286,16 @@ export default function CalendarPage() {
   const handleConnectGoogle = async () => {
     try {
       const response = await fetch('/api/auth/google/url');
-      const { url } = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const responseText = await response.text();
+        throw new Error(`Falha ao iniciar conexão com Google (${response.status}). ${responseText.slice(0, 120)}`);
+      }
+
+      const { url, error } = await response.json();
+      if (!response.ok || !url) {
+        throw new Error(error || 'Não foi possível iniciar a autenticação com Google.');
+      }
       
       const authWindow = window.open(url, 'google_oauth', 'width=600,height=700');
       
@@ -232,6 +304,119 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error('Error connecting to Google:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao conectar com Google.');
+    }
+  };
+
+  const handleOpenCreateEventModal = () => {
+    if (!isGoogleConnected) {
+      setError('Conecte uma conta Google para criar eventos na agenda.');
+      return;
+    }
+
+    setEditingEvent(null);
+    setIsCreateEventModalOpen(true);
+  };
+
+  const handleEditEvent = (event: Event) => {
+    if (!isGoogleConnected || !event.calendarId) return;
+
+    setEditingEvent(event);
+    setNewEventForm({
+      calendarId: event.calendarId,
+      title: event.title,
+      description: event.description || '',
+      location: event.location || '',
+      start: event.allDay ? format(event.start, 'yyyy-MM-dd') : format(event.start, "yyyy-MM-dd'T'HH:mm"),
+      end: event.allDay ? format(event.end, 'yyyy-MM-dd') : format(event.end, "yyyy-MM-dd'T'HH:mm"),
+      allDay: !!event.allDay,
+      reminderMinutes: event.reminderMinutes ?? '',
+    });
+    setIsCreateEventModalOpen(true);
+  };
+
+  const handleCreateGoogleEvent = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newEventForm.title.trim()) {
+      setError('Informe um título para o evento.');
+      return;
+    }
+
+    try {
+      setIsCreatingEvent(true);
+      setError(null);
+
+      const response = await fetch('/api/google/calendar/events', {
+        method: editingEvent ? 'PATCH' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newEventForm,
+          eventId: editingEvent?.id,
+          reminderMinutes: newEventForm.reminderMinutes === '' ? null : Number(newEventForm.reminderMinutes),
+        }),
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const responseText = await response.text();
+        throw new Error(`Falha ao criar evento (${response.status}). ${responseText.slice(0, 120)}`);
+      }
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Não foi possível salvar o evento.');
+      }
+
+      setIsCreateEventModalOpen(false);
+      setEditingEvent(null);
+      await fetchGoogleEvents(selectedCalendarIds, calendars);
+    } catch (err) {
+      console.error('Error creating Google event:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao criar evento.');
+    } finally {
+      setIsCreatingEvent(false);
+    }
+  };
+
+  const handleDeleteGoogleEvent = async () => {
+    if (!editingEvent?.id || !editingEvent.calendarId) return;
+
+    const confirmed = window.confirm('Deseja realmente remover este evento da agenda do Google?');
+    if (!confirmed) return;
+
+    try {
+      setIsCreatingEvent(true);
+      setError(null);
+
+      const response = await fetch(
+        `/api/google/calendar/events?calendarId=${encodeURIComponent(editingEvent.calendarId)}&eventId=${encodeURIComponent(editingEvent.id)}`,
+        {
+          method: 'DELETE',
+        }
+      );
+
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const responseText = await response.text();
+        throw new Error(`Falha ao remover evento (${response.status}). ${responseText.slice(0, 120)}`);
+      }
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Não foi possível remover o evento.');
+      }
+
+      setIsCreateEventModalOpen(false);
+      setEditingEvent(null);
+      await fetchGoogleEvents(selectedCalendarIds, calendars);
+    } catch (err) {
+      console.error('Error deleting Google event:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao remover evento.');
+    } finally {
+      setIsCreatingEvent(false);
     }
   };
 
@@ -351,7 +536,10 @@ export default function CalendarPage() {
           )}
         </div>
 
-        <button className="flex items-center gap-2 px-6 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10">
+        <button
+          onClick={handleOpenCreateEventModal}
+          className="flex items-center gap-2 px-6 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all shadow-lg shadow-[#d4ff3f]/10"
+        >
           <Plus size={14} /> Novo Evento
         </button>
       </div>
@@ -377,7 +565,7 @@ export default function CalendarPage() {
           className={cn(
             "min-h-[120px] p-2 border-r border-b border-white/20 flex flex-col gap-1 transition-colors",
             !isSameMonth(day, monthStart) ? "bg-[#141414]/50 opacity-30" : "bg-[#141414]",
-            isToday(day) && "bg-[#d4ff3f]/5"
+            isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/18 via-[#d4ff3f]/10 to-[#d4ff3f]/6 ring-1 ring-inset ring-[#d4ff3f]/35 shadow-[inset_0_0_0_1px_rgba(212,255,63,0.08)]"
           )}
         >
           <div className="flex justify-between items-center mb-1">
@@ -394,8 +582,9 @@ export default function CalendarPage() {
             {dayEvents.map(event => (
               <div 
                 key={event.id}
+                onClick={() => handleEditEvent(event)}
                 className={cn(
-                  "px-2 py-1 rounded-md text-[9px] font-bold truncate border",
+                  "px-2 py-1 rounded-md text-[9px] font-bold truncate border cursor-pointer hover:brightness-110",
                   !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
                   !event.calendarColor && event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
                   !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
@@ -447,7 +636,13 @@ export default function CalendarPage() {
           <div className="border-r border-white/20"></div>
           <div className="grid grid-cols-7">
             {days.map(day => (
-              <div key={day.toString()} className="py-4 text-center border-r border-white/20">
+              <div
+                key={day.toString()}
+                className={cn(
+                  "py-4 text-center border-r border-white/20 transition-colors",
+                  isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/16 via-[#d4ff3f]/8 to-transparent ring-1 ring-inset ring-[#d4ff3f]/30"
+                )}
+              >
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{format(day, 'EEE', { locale: ptBR })}</p>
                 <p className={cn(
                   "text-lg font-black",
@@ -469,7 +664,13 @@ export default function CalendarPage() {
             </div>
             <div className="grid grid-cols-7 relative bg-[#141414]">
               {days.map(day => (
-                <div key={day.toString()} className="border-r border-white/20 relative">
+                <div
+                  key={day.toString()}
+                  className={cn(
+                    "border-r border-white/20 relative transition-colors",
+                    isToday(day) && "bg-gradient-to-b from-[#d4ff3f]/14 via-[#d4ff3f]/8 to-[#141414]"
+                  )}
+                >
                   {hours.map(hour => (
                     <div key={hour} className="h-20 border-b border-white/10"></div>
                   ))}
@@ -479,8 +680,9 @@ export default function CalendarPage() {
                     return (
                       <div 
                         key={event.id}
+                        onClick={() => handleEditEvent(event)}
                         className={cn(
-                          "absolute left-1 right-1 p-2 rounded-xl border z-10 overflow-hidden",
+                          "absolute left-1 right-1 p-2 rounded-xl border z-10 overflow-hidden cursor-pointer hover:brightness-110",
                           !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/20 text-blue-400 border-blue-500/30" :
                           !event.calendarColor && event.type === 'task' ? "bg-orange-500/20 text-orange-400 border-orange-500/30" :
                           !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/20 text-[#d4ff3f] border-[#d4ff3f]/30" :
@@ -550,8 +752,9 @@ export default function CalendarPage() {
                     key={event.id}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
+                    onClick={() => handleEditEvent(event)}
                     className={cn(
-                      "absolute left-8 right-8 p-4 rounded-2xl border z-10 flex flex-col justify-between shadow-2xl",
+                      "absolute left-8 right-8 p-4 rounded-2xl border z-10 flex flex-col justify-between shadow-2xl cursor-pointer hover:brightness-110",
                       !event.calendarColor && event.type === 'meeting' ? "bg-blue-500/10 text-blue-400 border-blue-500/20" :
                       !event.calendarColor && event.type === 'task' ? "bg-orange-500/10 text-orange-400 border-orange-500/20" :
                       !event.calendarColor && event.type === 'project' ? "bg-[#d4ff3f]/10 text-[#d4ff3f] border-[#d4ff3f]/20" :
@@ -616,6 +819,189 @@ export default function CalendarPage() {
         </div>
       )}
       {renderHeader()}
+
+      <AnimatePresence>
+        {isCreateEventModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                if (!isCreatingEvent) {
+                  setIsCreateEventModalOpen(false);
+                  setEditingEvent(null);
+                }
+              }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 20 }}
+              className="relative w-full max-w-xl rounded-[32px] border border-slate-800/50 bg-[#1a1a1a] p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-black tracking-tight">{editingEvent ? 'Editar Evento' : 'Novo Evento'}</h2>
+                  <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    {editingEvent ? 'Atualizar evento na agenda Google selecionada' : 'Criar evento na agenda Google selecionada'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isCreatingEvent) {
+                      setIsCreateEventModalOpen(false);
+                      setEditingEvent(null);
+                    }
+                  }}
+                  className="text-slate-500 hover:text-white transition-colors"
+                >
+                  <Plus size={18} className="rotate-45" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateGoogleEvent} className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Agenda</label>
+                    <select
+                      value={newEventForm.calendarId}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, calendarId: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      {calendars.map((calendar) => (
+                        <option key={calendar.id} value={calendar.id}>
+                          {calendar.summary}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Título</label>
+                    <input
+                      type="text"
+                      value={newEventForm.title}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, title: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                      placeholder="Ex.: Reunião de alinhamento"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Início</label>
+                    <input
+                      type={newEventForm.allDay ? 'date' : 'datetime-local'}
+                      value={newEventForm.allDay ? newEventForm.start.slice(0, 10) : newEventForm.start}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, start: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Fim</label>
+                    <input
+                      type={newEventForm.allDay ? 'date' : 'datetime-local'}
+                      value={newEventForm.allDay ? newEventForm.end.slice(0, 10) : newEventForm.end}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, end: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Local</label>
+                    <input
+                      type="text"
+                      value={newEventForm.location}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, location: e.target.value }))}
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                      placeholder="Ex.: Escritório ou obra"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Lembrete</label>
+                    <select
+                      value={newEventForm.reminderMinutes}
+                      onChange={(e) =>
+                        setNewEventForm((prev) => ({
+                          ...prev,
+                          reminderMinutes: e.target.value === '' ? '' : Number(e.target.value),
+                        }))
+                      }
+                      className="w-full rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      <option value="">Sem lembrete</option>
+                      <option value="5">5 min antes</option>
+                      <option value="10">10 min antes</option>
+                      <option value="15">15 min antes</option>
+                      <option value="30">30 min antes</option>
+                      <option value="60">1 hora antes</option>
+                      <option value="1440">1 dia antes</option>
+                    </select>
+                  </div>
+                  <label className="mt-6 flex items-center gap-3 rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm font-bold text-white">
+                    <input
+                      type="checkbox"
+                      checked={newEventForm.allDay}
+                      onChange={(e) =>
+                        setNewEventForm((prev) => ({
+                          ...prev,
+                          allDay: e.target.checked,
+                        }))
+                      }
+                      className="size-4 rounded border-slate-700 bg-transparent text-[#d4ff3f] focus:ring-[#d4ff3f]/30"
+                    />
+                    Evento de dia inteiro
+                  </label>
+
+                  <div className="md:col-span-2">
+                    <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">Descrição</label>
+                    <textarea
+                      rows={4}
+                      value={newEventForm.description}
+                      onChange={(e) => setNewEventForm((prev) => ({ ...prev, description: e.target.value }))}
+                      className="w-full resize-none rounded-2xl border border-slate-800/50 bg-[#0a0a0a] px-4 py-3 text-sm leading-relaxed text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                      placeholder="Detalhes do evento"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreateEventModalOpen(false);
+                      setEditingEvent(null);
+                    }}
+                    disabled={isCreatingEvent}
+                    className="flex-1 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-white/5 hover:text-white disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                  {editingEvent && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteGoogleEvent}
+                      disabled={isCreatingEvent}
+                      className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-6 py-4 text-xs font-black uppercase tracking-widest text-rose-300 transition-all hover:bg-rose-500/20 disabled:opacity-50"
+                    >
+                      Remover
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={isCreatingEvent}
+                    className="flex-1 rounded-2xl bg-[#d4ff3f] px-6 py-4 text-xs font-black uppercase tracking-widest text-[#0a0a0a] transition-all hover:bg-[#c4ef2f] disabled:opacity-50"
+                  >
+                    {isCreatingEvent ? 'Salvando...' : editingEvent ? 'Salvar Alterações' : 'Criar Evento'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       
       <div className="flex-1 flex overflow-hidden">
         {/* Sidebar Mini Calendar & Filters */}
@@ -689,3 +1075,5 @@ export default function CalendarPage() {
     </div>
   );
 }
+
+

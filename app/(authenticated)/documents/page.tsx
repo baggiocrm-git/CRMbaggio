@@ -300,7 +300,17 @@ export default function DocumentManagementPage() {
   const fetchAuthStatus = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/google/status');
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        const responseText = await response.text();
+        throw new Error(`Falha ao verificar Google Drive (${response.status}). ${responseText.slice(0, 120)}`);
+      }
+
       const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || 'Falha ao verificar Google Drive.');
+      }
+
       if (data.connected) {
         setConnectedAccount(data.email);
         setIsServiceAccount(data.isServiceAccount || false);
@@ -742,9 +752,24 @@ export default function DocumentManagementPage() {
             {!isServiceAccount && (
               <button 
                 onClick={async () => {
-                  const res = await fetch('/api/auth/google/url');
-                  const { url } = await res.json();
-                  window.open(url, 'google_auth', 'width=600,height=700');
+                  try {
+                    const res = await fetch('/api/auth/google/url');
+                    const contentType = res.headers.get('content-type') || '';
+                    if (!contentType.includes('application/json')) {
+                      const responseText = await res.text();
+                      throw new Error(`Falha ao iniciar conexão com Google (${res.status}). ${responseText.slice(0, 120)}`);
+                    }
+
+                    const { url, error } = await res.json();
+                    if (!res.ok || !url) {
+                      throw new Error(error || 'Não foi possível iniciar a autenticação com Google.');
+                    }
+
+                    window.open(url, 'google_auth', 'width=600,height=700');
+                  } catch (error) {
+                    console.error('Erro ao conectar Google Drive:', error);
+                    showNotification(error instanceof Error ? error.message : 'Erro ao conectar Google Drive.', 'error');
+                  }
                 }}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border",

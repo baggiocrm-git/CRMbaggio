@@ -405,7 +405,17 @@ export default function DashboardPage() {
                     onClick={async () => {
                       try {
                         const response = await fetch('/api/auth/google/url');
-                        const { url } = await response.json();
+                        const contentType = response.headers.get('content-type') || '';
+                        if (!contentType.includes('application/json')) {
+                          const responseText = await response.text();
+                          throw new Error(`Falha ao iniciar conexão com Google (${response.status}). ${responseText.slice(0, 120)}`);
+                        }
+
+                        const { url, error } = await response.json();
+                        if (!response.ok || !url) {
+                          throw new Error(error || 'Não foi possível iniciar a autenticação com Google.');
+                        }
+
                         window.open(url, 'google_auth', 'width=600,height=700');
                       } catch (error) {
                         console.error('Erro ao conectar Google Drive:', error);

@@ -310,7 +310,19 @@ export default function InternalChat() {
           },
         });
 
-        const usersPayload = (await usersResponse.json()) as { error?: string; users?: ChatUser[] };
+        const usersContentType = usersResponse.headers.get('content-type') || '';
+        let usersPayload: { error?: string; users?: ChatUser[] } = {};
+        if (usersContentType.includes('application/json')) {
+          usersPayload = (await usersResponse.json()) as { error?: string; users?: ChatUser[] };
+        } else {
+          const responseText = await usersResponse.text();
+          throw new Error(
+            usersResponse.ok
+              ? 'Resposta invalida ao carregar os usuarios do chat.'
+              : `Nao foi possivel carregar os usuarios do chat (${usersResponse.status}). ${responseText.slice(0, 120)}`
+          );
+        }
+
         if (!usersResponse.ok) {
           throw new Error(usersPayload.error || 'Nao foi possivel carregar os usuarios do chat.');
         }

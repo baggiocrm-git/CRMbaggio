@@ -30,7 +30,22 @@ export default function ProjectModal({ isOpen, onClose, onSuccess, project }: Pr
             'Authorization': `Bearer ${session.access_token}`
           }
         });
+
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          const responseText = await response.text();
+          throw new Error(
+            response.ok
+              ? 'Resposta invalida ao carregar clientes.'
+              : `Falha ao carregar clientes (${response.status}). ${responseText.slice(0, 120)}`
+          );
+        }
+
         const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || 'Falha ao carregar clientes.');
+        }
+
         if (data.users) {
           const clientUsers = data.users
             .filter((u: { user_metadata?: { role?: string } }) => u.user_metadata?.role === 'Cliente')
