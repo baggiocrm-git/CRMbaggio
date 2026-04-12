@@ -227,7 +227,7 @@ export default function LoginPage() {
         provider: 'google',
         options: {
           skipBrowserRedirect: true,
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '')}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -432,24 +432,6 @@ export default function LoginPage() {
                 )}
               </button>
 
-              <div className="pt-6 border-t border-slate-800/50 mt-6">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    window.location.reload();
-                  }}
-                  className="w-full bg-rose-500/10 border border-rose-500/30 text-rose-500 font-black text-[10px] uppercase tracking-widest py-4 rounded-2xl hover:bg-rose-500/20 transition-all flex items-center justify-center gap-2"
-                >
-                  <AlertCircle size={14} />
-                  LIMPAR TUDO E RECARREGAR
-                </button>
-                <p className="text-slate-600 text-[8px] text-center mt-3 uppercase font-black tracking-widest opacity-50">
-                  Use este botão se o sistema estiver travado em uma versão antiga
-                </p>
-              </div>
-
               <div className="relative py-4">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-slate-800/50"></div>
@@ -474,27 +456,6 @@ export default function LoginPage() {
                 />
                 Entrar com Google Account
               </button>
-
-              <div className="pt-6 flex flex-col gap-4 items-center">
-                <button 
-                  type="button"
-                  onClick={() => {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    // Clear all cookies
-                    document.cookie.split(";").forEach(function(c) { 
-                      document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
-                    });
-                    window.location.reload();
-                  }}
-                  className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 font-black text-[10px] uppercase tracking-widest py-3 rounded-2xl transition-all border border-rose-500/20"
-                >
-                  LIMPAR TUDO E RECARREGAR (F5 FORÇADO)
-                </button>
-                <p className="text-slate-700 text-[8px] font-bold uppercase tracking-widest">
-                  Use este botão se o login falhar após F5
-                </p>
-              </div>
             </>
           )}
         </form>
