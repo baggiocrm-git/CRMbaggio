@@ -1,5 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { NextRequest } from 'next/server';
+import { authorizeRequest } from '@/lib/server-auth';
 
 type GoogleTokenData = {
   access_token: string;
@@ -17,7 +19,12 @@ type EventPayloadInput = {
   reminderMinutes?: number | null;
 };
 
-async function getGoogleToken() {
+async function getGoogleToken(req: NextRequest) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return { error: authorization.response };
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -48,7 +55,7 @@ async function getGoogleToken() {
 }
 
 async function buildAccessTokenTools(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   tokenData: GoogleTokenData
 ) {
   let accessToken = tokenData.access_token;
@@ -128,12 +135,12 @@ function buildEventPayload({
   };
 }
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const calendarId = searchParams.get('calendarId') || 'primary';
 
-    const tokenResult = await getGoogleToken();
+    const tokenResult = await getGoogleToken(req);
     if ('error' in tokenResult) return tokenResult.error;
 
     const { supabase, tokenData } = tokenResult;
@@ -177,7 +184,7 @@ export async function GET(req: Request) {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
@@ -204,7 +211,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Título, início e fim são obrigatórios.' }, { status: 400 });
     }
 
-    const tokenResult = await getGoogleToken();
+    const tokenResult = await getGoogleToken(req);
     if ('error' in tokenResult) return tokenResult.error;
 
     const { supabase, tokenData } = tokenResult;
@@ -247,7 +254,7 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PATCH(req: Request) {
+export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
     const {
@@ -276,7 +283,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Evento, título, início e fim são obrigatórios.' }, { status: 400 });
     }
 
-    const tokenResult = await getGoogleToken();
+    const tokenResult = await getGoogleToken(req);
     if ('error' in tokenResult) return tokenResult.error;
 
     const { supabase, tokenData } = tokenResult;
@@ -319,7 +326,7 @@ export async function PATCH(req: Request) {
   }
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const calendarId = searchParams.get('calendarId') || 'primary';
@@ -329,7 +336,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: 'Evento não informado.' }, { status: 400 });
     }
 
-    const tokenResult = await getGoogleToken();
+    const tokenResult = await getGoogleToken(req);
     if ('error' in tokenResult) return tokenResult.error;
 
     const { supabase, tokenData } = tokenResult;

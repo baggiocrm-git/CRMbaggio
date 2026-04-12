@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authorizeRequest } from '@/lib/server-auth';
 
 function getDisplayName(user: {
   email?: string | null;
@@ -13,9 +14,9 @@ function getDisplayName(user: {
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '').trim();
-    if (!token) {
-      return NextResponse.json({ error: 'Token de autenticacao ausente.' }, { status: 401 });
+    const authorization = await authorizeRequest(request);
+    if (!authorization.ok) {
+      return authorization.response;
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -31,11 +32,6 @@ export async function GET(request: NextRequest) {
         persistSession: false,
       },
     });
-
-    const { data: { user: requester }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !requester) {
-      return NextResponse.json({ error: 'Usuario nao autenticado.' }, { status: 401 });
-    }
 
     const { data, error } = await supabaseAdmin.auth.admin.listUsers();
     if (error) {

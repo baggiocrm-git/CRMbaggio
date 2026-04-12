@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authorizeRequest } from '@/lib/server-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -8,6 +9,11 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   const supabase = createClient(supabaseUrl, supabaseKey);
   const { id } = await params;
   
@@ -32,6 +38,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   const supabase = createClient(supabaseUrl, supabaseKey);
   const { id } = await params;
   

@@ -400,7 +400,11 @@ export default function ViewBudgetPage() {
         compression: "DEFLATE"
       });
 
-      const blob = new Blob([out], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" });
+      const outBytes = new Uint8Array(out.length);
+      outBytes.set(out);
+      const blob = new Blob([outBytes.buffer], {
+        type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      });
       const safeName = budget.nome.replace(/[^a-z0-9]/gi, '_');
       saveAs(blob, `Proposta_${safeName}.docx`);
     } catch (error) {
@@ -513,15 +517,15 @@ export default function ViewBudgetPage() {
   const sortedItems = [...items].sort((a, b) => {
     if (!sortConfig.key || !sortConfig.direction) return 0;
     
-    let aValue: number | string | boolean | null;
-    let bValue: number | string | boolean | null;
+    let aValue: number | string | null;
+    let bValue: number | string | null;
 
     if (sortConfig.key === 'total') {
       aValue = a.subtotal_preco;
       bValue = b.subtotal_preco;
     } else {
-      aValue = a[sortConfig.key as keyof AnalyticalItem];
-      bValue = b[sortConfig.key as keyof AnalyticalItem];
+      aValue = (a[sortConfig.key as keyof AnalyticalItem] as string | number | null | undefined) ?? null;
+      bValue = (b[sortConfig.key as keyof AnalyticalItem] as string | number | null | undefined) ?? null;
     }
 
     if (aValue === undefined || aValue === null) return 1;

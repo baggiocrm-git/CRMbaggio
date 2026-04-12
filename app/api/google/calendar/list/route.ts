@@ -1,8 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { authorizeRequest } from '@/lib/server-auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const authorization = await authorizeRequest(req);
+    if (!authorization.ok) {
+      return authorization.response;
+    }
+
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 

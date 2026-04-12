@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import Header from '@/components/Header';
 import { supabase } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 import { 
   Construction, 
   Users, 
@@ -140,8 +141,8 @@ export default function DashboardPage() {
       // Fetch Google Events if connected
       try {
         const [googleRes, driveStatusRes] = await Promise.all([
-          fetch('/api/google/calendar/events'),
-          fetch('/api/auth/google/status')
+          authFetch('/api/google/calendar/events'),
+          authFetch('/api/auth/google/status')
         ]);
 
         if (googleRes.ok) {
@@ -404,7 +405,7 @@ export default function DashboardPage() {
                   <button 
                     onClick={async () => {
                       try {
-                        const response = await fetch('/api/auth/google/url');
+                        const response = await authFetch('/api/auth/google/url');
                         const contentType = response.headers.get('content-type') || '';
                         if (!contentType.includes('application/json')) {
                           const responseText = await response.text();

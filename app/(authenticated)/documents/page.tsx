@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
+import { authFetch } from '@/lib/auth-fetch';
 import { FileTree, FileSystemItem } from '@/components/documents/FileTree';
 import { DocumentModals } from '@/components/documents/DocumentModals';
 import { DocumentList } from '@/components/documents/DocumentList';
@@ -37,6 +38,8 @@ import { DocumentGrid } from '@/components/documents/DocumentGrid';
 import { DocumentSidebar } from '@/components/documents/DocumentSidebar';
 
 import { useDocuments, Document, Folder } from '@/hooks/useDocuments';
+
+type SortKey = 'nome' | 'tamanho_arquivo' | 'data' | 'Ano' | 'folder';
 
 // Types
 type DocumentCategory = 
@@ -83,9 +86,9 @@ export default function DocumentManagementPage() {
   const [isServiceAccount, setIsServiceAccount] = useState(false);
   const [isLocalHelperConnected, setIsLocalHelperConnected] = useState(false);
   const [sortConfig, setSortConfig] = useState<{
-    key: keyof Document | 'folder';
+    key: SortKey;
     direction: 'asc' | 'desc';
-  }>({ key: 'created_at', direction: 'desc' });
+  }>({ key: 'data', direction: 'desc' });
   
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,14 +123,14 @@ export default function DocumentManagementPage() {
   const [notification, setNotification] = useState<{
     show: boolean;
     message: string;
-    type: 'success' | 'error';
+    type: 'success' | 'error' | 'info';
   }>({
     show: false,
     message: '',
     type: 'success'
   });
 
-  const showNotification = (message: string, type: 'success' | 'error' = 'success') => {
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setNotification({ show: true, message, type });
     setTimeout(() => setNotification(prev => ({ ...prev, show: false })), 3000);
   };
@@ -301,7 +304,7 @@ export default function DocumentManagementPage() {
 
   const fetchAuthStatus = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/google/status');
+      const response = await authFetch('/api/auth/google/status');
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         const responseText = await response.text();
@@ -387,8 +390,8 @@ export default function DocumentManagementPage() {
         aValue = folders.find(f => f.id === a.pasta_id)?.nome || 'Raiz';
         bValue = folders.find(f => f.id === b.pasta_id)?.nome || 'Raiz';
       } else {
-        aValue = a[sortConfig.key as keyof Document];
-        bValue = b[sortConfig.key as keyof Document];
+        aValue = a[sortConfig.key];
+        bValue = b[sortConfig.key];
       }
 
       if (aValue === null) return 1;
@@ -399,14 +402,14 @@ export default function DocumentManagementPage() {
     });
   }, [documents, searchQuery, selectedArea, selectedStatus, selectedYear, sortConfig, folders]);
 
-  const toggleSort = (key: keyof Document | 'folder') => {
+  const toggleSort = (key: SortKey) => {
     setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const getSortIcon = (key: keyof Document | 'folder') => {
+  const getSortIcon = (key: SortKey) => {
     if (sortConfig.key !== key) return null;
     return sortConfig.direction === 'asc' ? <ArrowUp size={10} className="ml-1" /> : <ArrowDown size={10} className="ml-1" />;
   };
@@ -456,7 +459,7 @@ export default function DocumentManagementPage() {
 
       setUploadProgress(30);
 
-      const response = await fetch('/api/documents/upload', {
+      const response = await authFetch('/api/documents/upload', {
         method: 'POST',
         body: formData,
       });
@@ -499,7 +502,7 @@ export default function DocumentManagementPage() {
       const url = folderForm.mode === 'create' ? '/api/folders' : `/api/folders/${folderForm.id}`;
       const method = folderForm.mode === 'create' ? 'POST' : 'PATCH';
       
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -526,7 +529,7 @@ export default function DocumentManagementPage() {
       message: `Deseja realmente excluir a pasta "${folder.nome}"? Isso não excluirá os arquivos dentro dela, mas eles ficarão sem pasta.`,
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
+          const response = await authFetch(`/api/folders/${folder.id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error('Erro ao excluir pasta');
           fetchFolders();
           if (currentFolderId === folder.id) setCurrentPath([{id: 'root', name: 'Drive Root'}]);
@@ -543,7 +546,7 @@ export default function DocumentManagementPage() {
   const handleRenameDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/documents', {
+      const response = await authFetch('/api/documents', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: docRenameForm.id, nome: docRenameForm.nome }),
@@ -567,7 +570,7 @@ export default function DocumentManagementPage() {
       message: `Deseja realmente excluir o documento "${doc.nome}"?`,
       onConfirm: async () => {
         try {
-          const response = await fetch(`/api/documents?id=${doc.id}`, { method: 'DELETE' });
+          const response = await authFetch(`/api/documents?id=${doc.id}`, { method: 'DELETE' });
           if (!response.ok) throw new Error('Erro ao excluir documento');
           fetchDocuments();
           showNotification('Documento excluído com sucesso');
@@ -583,7 +586,7 @@ export default function DocumentManagementPage() {
   const handleSyncToDrive = async (doc: Document) => {
     try {
       showNotification('Sincronizando com Drive...', 'info');
-      const response = await fetch('/api/documents/sync', {
+      const response = await authFetch('/api/documents/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: doc.id }),
@@ -608,7 +611,7 @@ export default function DocumentManagementPage() {
     if (!docToMove || !targetFolderId) return;
 
     try {
-      const response = await fetch('/api/documents', {
+      const response = await authFetch('/api/documents', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -639,11 +642,11 @@ export default function DocumentManagementPage() {
         try {
           // Delete Documents
           for (const docId of selectedDocs) {
-            await fetch(`/api/documents?id=${docId}`, { method: 'DELETE' });
+            await authFetch(`/api/documents?id=${docId}`, { method: 'DELETE' });
           }
           // Delete Folders
           for (const folderId of selectedFolders) {
-            await fetch(`/api/folders/${folderId}`, { method: 'DELETE' });
+            await authFetch(`/api/folders/${folderId}`, { method: 'DELETE' });
           }
           
           setSelectedDocs(new Set());
@@ -672,7 +675,7 @@ export default function DocumentManagementPage() {
 
     try {
       setIsGeneratingAiDocument(true);
-      const response = await fetch('/api/documents', {
+      const response = await authFetch('/api/documents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(aiDocForm),
@@ -814,7 +817,7 @@ export default function DocumentManagementPage() {
               <button 
                 onClick={async () => {
                   try {
-                    const res = await fetch('/api/auth/google/url');
+                    const res = await authFetch('/api/auth/google/url');
                     const contentType = res.headers.get('content-type') || '';
                     if (!contentType.includes('application/json')) {
                       const responseText = await res.text();
@@ -1099,7 +1102,11 @@ export default function DocumentManagementPage() {
               exit={{ opacity: 0, y: 50, x: '-50%' }}
               className={cn(
                 "fixed bottom-8 left-1/2 z-[70] px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 min-w-[300px]",
-                notification.type === 'success' ? "bg-emerald-500 text-white" : "bg-rose-500 text-white"
+                notification.type === 'success'
+                  ? "bg-emerald-500 text-white"
+                  : notification.type === 'info'
+                    ? "bg-blue-500 text-white"
+                    : "bg-rose-500 text-white"
               )}
             >
               {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
@@ -1182,7 +1189,7 @@ export default function DocumentManagementPage() {
                   onChange={(e) => {
                     const [key, direction] = e.target.value.split('-');
                     setSortConfig({ 
-                      key: key as keyof Document | 'folder', 
+                      key: key as SortKey, 
                       direction: direction as 'asc' | 'desc' 
                     });
                   }}
@@ -1190,8 +1197,8 @@ export default function DocumentManagementPage() {
                 >
                   <option value="nome-asc">Nome (A-Z)</option>
                   <option value="nome-desc">Nome (Z-A)</option>
-                  <option value="created_at-desc">Data (Mais Recente)</option>
-                  <option value="created_at-asc">Data (Mais Antigo)</option>
+                  <option value="data-desc">Data (Mais Recente)</option>
+                  <option value="data-asc">Data (Mais Antigo)</option>
                   {currentFolderId === 'root' && <option value="folder-asc">Pasta</option>}
                 </select>
               </div>

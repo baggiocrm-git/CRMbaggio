@@ -9,23 +9,24 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DocumentCard } from './DocumentCard';
+import type { Document } from '@/hooks/useDocuments';
 
 interface DocumentGridProps {
   folders: any[];
-  filteredDocuments: any[];
+  filteredDocuments: Document[];
   currentFolderId: string;
-  handleViewDocument: (doc: any) => void;
-  getFileExtension: (doc: any) => string;
+  handleViewDocument: (doc: Document) => void;
+  getFileExtension: (doc: Document) => string;
   getFileUrl: (filePath: string) => string;
   activeDocMenu: string | null;
   setActiveDocMenu: (id: string | null) => void;
-  handleSyncToDrive: (doc: any) => void;
+  handleSyncToDrive: (doc: Document) => void;
   setDocRenameForm: (form: any) => void;
   setIsDocRenameModalOpen: (open: boolean) => void;
-  setDocToMove: (doc: any) => void;
+  setDocToMove: React.Dispatch<React.SetStateAction<Document | null>>;
   setTargetFolderId: (id: string) => void;
   setIsMoveModalOpen: (open: boolean) => void;
-  handleDeleteDocument: (doc: any) => void;
+  handleDeleteDocument: (doc: Document) => void;
   setCurrentPath: React.Dispatch<React.SetStateAction<{id: string, name: string}[]>>;
   selectedDocs: Set<string>;
   setSelectedDocs: React.Dispatch<React.SetStateAction<Set<string>>>;

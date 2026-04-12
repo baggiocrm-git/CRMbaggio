@@ -16,24 +16,25 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import type { Document } from '@/hooks/useDocuments';
 
 interface DocumentCardProps {
-  doc: any;
+  doc: Document;
   index: number;
   currentFolderId: string;
   folders: any[];
-  handleViewDocument: (doc: any) => void;
-  getFileExtension: (doc: any) => string;
+  handleViewDocument: (doc: Document) => void;
+  getFileExtension: (doc: Document) => string;
   getFileUrl: (filePath: string) => string;
   activeDocMenu: string | null;
   setActiveDocMenu: (id: string | null) => void;
-  handleSyncToDrive: (doc: any) => void;
+  handleSyncToDrive: (doc: Document) => void;
   setDocRenameForm: (form: any) => void;
   setIsDocRenameModalOpen: (open: boolean) => void;
-  setDocToMove: (doc: any) => void;
+  setDocToMove: React.Dispatch<React.SetStateAction<Document | null>>;
   setTargetFolderId: (id: string) => void;
   setIsMoveModalOpen: (open: boolean) => void;
-  handleDeleteDocument: (doc: any) => void;
+  handleDeleteDocument: (doc: Document) => void;
   selectedDocs: Set<string>;
   setSelectedDocs: React.Dispatch<React.SetStateAction<Set<string>>>;
 }

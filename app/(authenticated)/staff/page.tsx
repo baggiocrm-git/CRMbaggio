@@ -2371,7 +2371,7 @@ export default function StaffPage() {
             vale_transporte: financeForm.quantidade_vt.trim() || null,
             vale_cafe: valorVc,
             vale_mercado: valorVm,
-            total_vales,
+            total_vales: totalVales,
             financeiro_lancado_por: currentUserLabel,
             financeiro_lancado_em: new Date().toISOString(),
           })

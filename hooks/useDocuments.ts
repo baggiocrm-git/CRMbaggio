@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from 'react';
+import { authFetch } from '@/lib/auth-fetch';
 
 export interface Document {
   id: string;
@@ -40,8 +41,8 @@ export function useDocuments(currentFolderId: string) {
       // 1. Fetch ALL Folders for the Sidebar Tree
       try {
         const [driveFoldersRes, supabaseFoldersRes] = await Promise.allSettled([
-          fetch('/api/google/drive/list?type=folders_only'),
-          fetch('/api/folders')
+          authFetch('/api/google/drive/list?type=folders_only'),
+          authFetch('/api/folders')
         ]);
 
         let df: any[] = [];
@@ -75,7 +76,7 @@ export function useDocuments(currentFolderId: string) {
           ? `/api/google/drive/list?folderId=${currentFolderId}` 
           : '/api/google/drive/list';
         
-        const driveResponse = await fetch(driveUrl);
+        const driveResponse = await authFetch(driveUrl);
         if (driveResponse.ok) {
           const driveData = await driveResponse.json();
           if (!driveData.error) {
@@ -93,7 +94,7 @@ export function useDocuments(currentFolderId: string) {
 
       // 3. Fetch Folders from Supabase for current view
       try {
-        const foldersResponse = await fetch('/api/folders');
+        const foldersResponse = await authFetch('/api/folders');
         if (foldersResponse.ok) {
           const foldersData = await foldersResponse.json();
           if (Array.isArray(foldersData)) {
@@ -116,7 +117,7 @@ export function useDocuments(currentFolderId: string) {
           ? `/api/documents?pasta_id=${currentFolderId}` 
           : '/api/documents?pasta_id=root';
         
-        const localResponse = await fetch(localUrl);
+        const localResponse = await authFetch(localUrl);
         if (localResponse.ok) {
           const localData = await localResponse.json();
           if (!localData.error && Array.isArray(localData)) {

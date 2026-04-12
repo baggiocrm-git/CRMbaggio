@@ -105,15 +105,15 @@ export default function BudgetPage() {
     .sort((a, b) => {
       if (!sortConfig.key || !sortConfig.direction) return 0;
       
-      let aValue: number | string | boolean | null;
-      let bValue: number | string | boolean | null;
+      let aValue: number | string;
+      let bValue: number | string;
 
       if (sortConfig.key === 'projeto.nome') {
         aValue = a.projeto?.nome || '';
         bValue = b.projeto?.nome || '';
       } else {
-        aValue = a[sortConfig.key as keyof Budget];
-        bValue = b[sortConfig.key as keyof Budget];
+        aValue = ((a[sortConfig.key as keyof Budget] as string | number | undefined) ?? '');
+        bValue = ((b[sortConfig.key as keyof Budget] as string | number | undefined) ?? '');
       }
 
       if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;

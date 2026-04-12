@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Readable } from 'stream';
+import { authorizeRequest } from '@/lib/server-auth';
 
 // ─── Mapa de pastas do Google Drive ───────────────────────────────────────────
 // Cada chave corresponde a uma variável de ambiente com o ID da pasta no Drive.
@@ -43,6 +44,11 @@ function resolveDriveFolderFromKey(key: string): string | undefined {
 export async function POST(req: NextRequest) {
   console.log('POST /api/documents/upload - Request received');
   try {
+    const authorization = await authorizeRequest(req);
+    if (!authorization.ok) {
+      return authorization.response;
+    }
+
     let formData: FormData;
     try {
       formData = await req.formData();

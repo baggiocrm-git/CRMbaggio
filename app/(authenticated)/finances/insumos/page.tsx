@@ -128,8 +128,8 @@ export default function InsumosPage() {
       
       if (!allInsumos || !allItems) throw new Error('Falha ao buscar dados para recalcular.');
 
-      const insumosMap = new Map(allInsumos.map(i => [i.id, i]));
-      const itemsMap = new Map(allItems.map(i => [i.id, i]));
+      const insumosMap = new Map<string, Insumo>(allInsumos.map(i => [i.id, i as Insumo]));
+      const itemsMap = new Map<string, any>(allItems.map(i => [i.id, i]));
 
       // 2. Perform recalculation (3 passes to handle nesting)
       const updatedItems = [...allItems];

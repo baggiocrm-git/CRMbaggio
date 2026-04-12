@@ -12,6 +12,7 @@ export interface TCPOItem {
   custo_domingo_feriado?: number;
   bdi_padrao: number;
   composicao?: {
+    codigo?: string;
     insumo: string;
     un: string;
     coef: number;

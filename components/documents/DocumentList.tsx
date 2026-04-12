@@ -8,23 +8,7 @@ import {
 } from 'lucide-react';
 import { DocumentRow } from './DocumentRow';
 import { cn } from '@/lib/utils';
-
-interface Document {
-  id: string;
-  nome: string;
-  Categoria: string;
-  area?: string;
-  tipo_arquivo: string;
-  status: string;
-  Ano: string;
-  data: string;
-  tamanho_arquivo: string;
-  file_path: string;
-  pasta_id?: string | null;
-  drive_file_id?: string | null;
-  webViewLink?: string | null;
-  is_drive_only?: boolean;
-}
+import type { Document } from '@/hooks/useDocuments';
 
 interface DocumentListProps {
   currentFolders: any[];
@@ -42,7 +26,7 @@ interface DocumentListProps {
   handleSyncToDrive: (doc: Document) => void;
   setDocRenameForm: (form: any) => void;
   setIsDocRenameModalOpen: (open: boolean) => void;
-  setDocToMove: (doc: Document) => void;
+  setDocToMove: React.Dispatch<React.SetStateAction<Document | null>>;
   setTargetFolderId: (id: string) => void;
   setIsMoveModalOpen: (open: boolean) => void;
   handleDeleteDocument: (doc: Document) => void;

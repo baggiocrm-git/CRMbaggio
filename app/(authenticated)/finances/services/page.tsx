@@ -14,7 +14,7 @@ import {
   ChevronsUpDown
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel } from 'docx';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -78,15 +78,15 @@ export default function ServicesPage() {
     .sort((a, b) => {
       if (!sortConfig.key || !sortConfig.direction) return 0;
       
-      let aValue: number | string | boolean | null;
-      let bValue: number | string | boolean | null;
+      let aValue: number | string;
+      let bValue: number | string;
 
       if (sortConfig.key === 'total') {
         aValue = a.custo_mo + a.custo_mat + a.custo_eq;
         bValue = b.custo_mo + b.custo_mat + b.custo_eq;
       } else {
-        aValue = a[sortConfig.key as keyof TCPOItem];
-        bValue = b[sortConfig.key as keyof TCPOItem];
+        aValue = ((a[sortConfig.key as keyof TCPOItem] as string | number | undefined) ?? '');
+        bValue = ((b[sortConfig.key as keyof TCPOItem] as string | number | undefined) ?? '');
       }
 
       if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -155,12 +155,12 @@ export default function ServicesPage() {
       const tableRows = [
         new TableRow({
           children: [
-            new TableCell({ children: [new Paragraph({ text: 'Código', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Descrição', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Un', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Normal (R$)', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Sáb. (R$)', bold: true })] }),
-            new TableCell({ children: [new Paragraph({ text: 'Dom/Fer (R$)', bold: true })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Código', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Descrição', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Un', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Normal (R$)', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Sáb. (R$)', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Dom/Fer (R$)', bold: true })] })] }),
           ],
         }),
         ...filteredServices.map(s => new TableRow({
@@ -429,4 +429,3 @@ export default function ServicesPage() {
     </div>
   );
 }
-

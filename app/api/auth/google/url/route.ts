@@ -1,7 +1,13 @@
 import { google } from 'googleapis';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { authorizeRequest } from '@/lib/server-auth';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authorization = await authorizeRequest(req, { adminOnly: true });
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { AlignmentType, Document as DocxDocument, HeadingLevel, Packer, Paragraph, TextRun } from 'docx';
+import { authorizeRequest } from '@/lib/server-auth';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -35,6 +36,11 @@ type OpenRouterErrorPayload = {
 };
 
 export async function GET(req: NextRequest) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase credentials missing' }, { status: 500 });
   }
@@ -62,6 +68,11 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase credentials missing' }, { status: 500 });
   }
@@ -306,6 +317,11 @@ Regras:
 }
 
 export async function PATCH(req: NextRequest) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase credentials missing' }, { status: 500 });
   }
@@ -329,6 +345,11 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authorization = await authorizeRequest(req);
+  if (!authorization.ok) {
+    return authorization.response;
+  }
+
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase credentials missing' }, { status: 500 });
   }

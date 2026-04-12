@@ -501,7 +501,7 @@ export default function SettingsPage() {
                       ].map((t) => (
                         <button
                           key={t.id}
-                          onClick={() => setTheme(t.id)}
+                          onClick={() => setTheme(t.id as ThemeOption)}
                           className={cn(
                             "flex flex-col items-center gap-3 p-6 rounded-2xl border transition-all",
                             theme === t.id 
@@ -529,7 +529,7 @@ export default function SettingsPage() {
                       ].map((s) => (
                         <button
                           key={s.id}
-                          onClick={() => setFontSize(s.id)}
+                          onClick={() => setFontSize(s.id as FontSizeOption)}
                           className={cn(
                             "px-6 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition-all",
                             fontSize === s.id 

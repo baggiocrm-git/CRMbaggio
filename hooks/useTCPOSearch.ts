@@ -94,7 +94,8 @@ export function useOrcamento() {
         if (insumos) {
           const priceMap = new Map(insumos.map(i => [i.id, i.preco_unitario]));
           updatedComposition = updatedComposition.map(c => {
-            const p_unit = priceMap.get(c.codigo) || c.p_unit || 0;
+            const mappedPrice = c.codigo ? priceMap.get(c.codigo) : undefined;
+            const p_unit = typeof mappedPrice === 'number' ? mappedPrice : (c.p_unit || 0);
             return {
               ...c,
               p_unit,

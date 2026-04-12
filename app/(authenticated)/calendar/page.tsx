@@ -34,6 +34,7 @@ import {
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { authFetch } from '@/lib/auth-fetch';
 
 type ViewType = 'day' | 'week' | 'month';
 
@@ -169,7 +170,7 @@ export default function CalendarPage() {
 
   const fetchGoogleCalendars = React.useCallback(async () => {
     try {
-      const response = await fetch('/api/google/calendar/list');
+      const response = await authFetch('/api/google/calendar/list');
       if (response.ok) {
         const data: GoogleCalendar[] = await response.json();
         
@@ -208,7 +209,7 @@ export default function CalendarPage() {
 
       // Fetch from all selected calendars
       const allEventsPromises = calendarIds.map(async (calendarId) => {
-        const response = await fetch(`/api/google/calendar/events?calendarId=${encodeURIComponent(calendarId)}`);
+        const response = await authFetch(`/api/google/calendar/events?calendarId=${encodeURIComponent(calendarId)}`);
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.error || `Falha ao buscar eventos da agenda ${calendarId}`);
@@ -285,7 +286,7 @@ export default function CalendarPage() {
 
   const handleConnectGoogle = async () => {
     try {
-      const response = await fetch('/api/auth/google/url');
+      const response = await authFetch('/api/auth/google/url');
       const contentType = response.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         const responseText = await response.text();
@@ -347,7 +348,7 @@ export default function CalendarPage() {
       setIsCreatingEvent(true);
       setError(null);
 
-      const response = await fetch('/api/google/calendar/events', {
+      const response = await authFetch('/api/google/calendar/events', {
         method: editingEvent ? 'PATCH' : 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -391,7 +392,7 @@ export default function CalendarPage() {
       setIsCreatingEvent(true);
       setError(null);
 
-      const response = await fetch(
+      const response = await authFetch(
         `/api/google/calendar/events?calendarId=${encodeURIComponent(editingEvent.calendarId)}&eventId=${encodeURIComponent(editingEvent.id)}`,
         {
           method: 'DELETE',
@@ -422,21 +423,22 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const checkConnection = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.app_metadata?.provider === 'google') {
-        setIsGoogleConnected(true);
-        fetchGoogleCalendars();
-        return;
+      try {
+        const response = await authFetch('/api/auth/google/status');
+        if (!response.ok) return;
+
+        const status = await response.json();
+        if (status.connected) {
+          setIsGoogleConnected(true);
+          fetchGoogleCalendars();
+          return;
+        }
+      } catch (error) {
+        console.error('Error checking Google connection:', error);
       }
 
-      // Check if we have tokens in the database
-      const { data: tokens } = await supabase
-        .from('google_tokens')
-        .select('id')
-        .eq('id', 2)
-        .maybeSingle();
-      
-      if (tokens) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.app_metadata?.provider === 'google') {
         setIsGoogleConnected(true);
         fetchGoogleCalendars();
       }

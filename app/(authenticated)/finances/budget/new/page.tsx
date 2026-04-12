@@ -65,8 +65,8 @@ export default function NewBudgetPage() {
     }
 
     const sortedItems = [...items].sort((a, b) => {
-      let valA: number | string | boolean | null;
-      let valB: number | string | boolean | null;
+      let valA: number | string;
+      let valB: number | string;
 
       if (key === 'preco_unit') {
         valA = (a.custo_unit_mo || 0) + (a.custo_unit_mat || 0) + (a.custo_unit_eq || 0);
@@ -77,8 +77,8 @@ export default function NewBudgetPage() {
         const unitB = (b.custo_unit_mo || 0) + (b.custo_unit_mat || 0) + (b.custo_unit_eq || 0);
         valB = (unitB * (b.quantidade || 0)) * (1 + (b.bdi || 0) / 100);
       } else {
-        valA = a[key as keyof typeof a] || '';
-        valB = b[key as keyof typeof b] || '';
+        valA = ((a[key as keyof typeof a] as string | number | undefined) ?? '');
+        valB = ((b[key as keyof typeof b] as string | number | undefined) ?? '');
       }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
