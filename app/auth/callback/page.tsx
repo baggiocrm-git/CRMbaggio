@@ -13,7 +13,20 @@ export default function AuthCallbackPage() {
       console.log('AuthCallbackPage: Iniciando processamento de autenticação...');
       
       try {
-        // Supabase client handles the hash automatically and updates the session
+        const url = new URL(window.location.href);
+        const authCode = url.searchParams.get('code');
+
+        if (authCode) {
+          console.log('AuthCallbackPage: Código OAuth detectado, trocando por sessão...');
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+
+          if (exchangeError) {
+            console.error('AuthCallbackPage: Erro ao trocar código por sessão:', exchangeError.message);
+            router.push('/login?error=' + encodeURIComponent(exchangeError.message));
+            return;
+          }
+        }
+
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {

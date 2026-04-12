@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -17,6 +17,34 @@ export default function LoginPage() {
   const [storageBlocked, setStorageBlocked] = useState(false);
   const [activeSessionEmail, setActiveSessionEmail] = useState<string | null>(null);
   const router = useRouter();
+
+  const finalizePopupLogin = useCallback(async () => {
+    if (!supabase?.auth) {
+      setError('Supabase não está configurado.');
+      setLoading(false);
+      return;
+    }
+
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.push('/dashboard');
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    const configuredOrigin = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+    const currentOrigin = window.location.origin.replace(/\/$/, '');
+
+    if (configuredOrigin && configuredOrigin !== currentOrigin) {
+      setError(`O login Google foi concluído em ${configuredOrigin}, mas esta janela está aberta em ${currentOrigin}. Abra o sistema na mesma URL ou ajuste a origem do callback.`);
+    } else {
+      setError('O login com Google foi concluído, mas a sessão não ficou disponível nesta janela. Tente novamente em uma nova aba.');
+    }
+
+    setLoading(false);
+  }, [router]);
 
   useEffect(() => {
     // Check if localStorage is available
@@ -73,7 +101,7 @@ export default function LoginPage() {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'SUPABASE_AUTH_SUCCESS') {
         console.log('LoginPage: Mensagem SUPABASE_AUTH_SUCCESS recebida do popup');
-        router.push('/dashboard');
+        finalizePopupLogin();
       }
     };
     window.addEventListener('message', handleMessage);
@@ -106,7 +134,7 @@ export default function LoginPage() {
       if (subscription) subscription.unsubscribe();
       window.removeEventListener('message', handleMessage);
     };
-  }, [router]);
+  }, [finalizePopupLogin, router]);
 
 
   const handleSwitchUser = async () => {
@@ -220,6 +248,12 @@ export default function LoginPage() {
         throw new Error('Supabase não está configurado. Verifique as variáveis de ambiente NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_ANON_KEY.');
       }
 
+      const callbackBaseUrl = window.location.origin.replace(/\/$/, '');
+      const configuredOrigin = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+      if (configuredOrigin && configuredOrigin !== callbackBaseUrl) {
+        console.warn(`LoginPage: NEXT_PUBLIC_APP_URL (${configuredOrigin}) difere da origem atual (${callbackBaseUrl}). Usando a origem atual para manter a sessão nesta janela.`);
+      }
+
       // Open popup immediately to avoid popup blocker
       const popup = window.open('', 'oauth_popup', 'width=600,height=700');
 
@@ -227,7 +261,7 @@ export default function LoginPage() {
         provider: 'google',
         options: {
           skipBrowserRedirect: true,
-          redirectTo: `${(process.env.NEXT_PUBLIC_APP_URL || window.location.origin).replace(/\/$/, '')}/auth/callback`,
+          redirectTo: `${callbackBaseUrl}/auth/callback`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
