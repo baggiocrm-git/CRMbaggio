@@ -51,6 +51,7 @@ interface Payable {
 
 export default function FinanceDashboard() {
   const [isMounted, setIsMounted] = useState(false);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
   const [payables, setPayables] = useState<Payable[]>([]);
 
@@ -62,6 +63,11 @@ export default function FinanceDashboard() {
   const fetchData = async () => {
     try {
       console.log('FinanceDashboard: Iniciando busca de dados...');
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setUserRole(typeof session.user.user_metadata?.role === 'string' ? session.user.user_metadata.role : null);
+      }
+
       const [recRes, payRes] = await Promise.all([
         supabase.from('contas_receber').select('*'),
         supabase.from('contas_pagar').select('*')
@@ -141,6 +147,7 @@ export default function FinanceDashboard() {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
+  const canViewFinancialAmounts = ['Administrador', 'Administrador Master', 'Administrador Financeiro'].includes(userRole || '');
 
   const overdueReceivables = receivables.filter(r => 
     r.situacao !== 'Recebido' && new Date(r.data_vencimento) < new Date()
@@ -216,11 +223,23 @@ export default function FinanceDashboard() {
                 <card.icon size={16} />
               </div>
               <p className="text-slate-500 text-[10px] font-black uppercase tracking-widest mb-1.5">{card.label}</p>
-              <p className="text-xl font-black tracking-tight leading-none mb-3">{card.value}</p>
+              <p
+                className={`text-xl font-black tracking-tight leading-none mb-3 transition-all ${
+                  canViewFinancialAmounts ? '' : 'blur-sm select-none'
+                }`}
+                aria-label={canViewFinancialAmounts ? card.value : 'Valor sensível ocultado'}
+              >
+                {card.value}
+              </p>
               <div className={`flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-lg w-fit ${card.trend === 'up' ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-[#ff4d4d]/10 text-[#ff4d4d]'}`}>
                 {card.trend === 'up' ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
                 {card.change}
               </div>
+              {!canViewFinancialAmounts && (
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  Visível apenas para administradores
+                </p>
+              )}
             </motion.div>
           ))}
         </div>
@@ -231,40 +250,49 @@ export default function FinanceDashboard() {
             <div className="flex justify-between items-center mb-5">
               <h3 className="text-lg font-black tracking-tight">Receitas vs Despesas</h3>
             </div>
-            <div className="h-52 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={last6Months} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
-                  <XAxis 
-                    dataKey="name" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
-                  />
-                  <Tooltip 
-                    cursor={{ fill: '#ffffff05' }}
-                    contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
-                    formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
-                  />
-                  <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={28}>
-                    {last6Months.map((entry, index) => (
-                      <Cell key={`cell-rec-${index}`} fill={index === last6Months.length - 1 ? '#d4ff3f' : '#88ab00'} />
-                    ))}
-                  </Bar>
-                  <Bar dataKey="despesas" radius={[4, 4, 0, 0]} barSize={28}>
-                    {last6Months.map((entry, index) => (
-                      <Cell key={`cell-des-${index}`} fill={index === last6Months.length - 1 ? '#ff4d4d' : '#993333'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="relative">
+              <div className={`h-52 w-full transition-all ${canViewFinancialAmounts ? '' : 'blur-sm select-none'}`}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={last6Months} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.1} />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} 
+                    />
+                    <Tooltip 
+                      cursor={{ fill: '#ffffff05' }}
+                      contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #334155', borderRadius: '12px' }}
+                      formatter={(value: any) => formatCurrency(Number(value || 0))} // eslint-disable-line @typescript-eslint/no-explicit-any
+                    />
+                    <Bar dataKey="receitas" radius={[4, 4, 0, 0]} barSize={28}>
+                      {last6Months.map((entry, index) => (
+                        <Cell key={`cell-rec-${index}`} fill={index === last6Months.length - 1 ? '#d4ff3f' : '#88ab00'} />
+                      ))}
+                    </Bar>
+                    <Bar dataKey="despesas" radius={[4, 4, 0, 0]} barSize={28}>
+                      {last6Months.map((entry, index) => (
+                        <Cell key={`cell-des-${index}`} fill={index === last6Months.length - 1 ? '#ff4d4d' : '#993333'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              {!canViewFinancialAmounts && (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <div className="rounded-xl border border-slate-700/80 bg-[#0a0a0a]/85 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-300">
+                    Somente administradores visualizam os montantes
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex gap-5 mt-4">
+            <div className={`flex gap-5 mt-4 transition-all ${canViewFinancialAmounts ? '' : 'blur-sm select-none'}`}>
               <div className="flex items-center gap-2">
                 <div className="size-3 rounded-sm bg-[#d4ff3f]"></div>
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Receitas</span>

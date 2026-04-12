@@ -29,6 +29,7 @@ import { motion } from 'motion/react';
 
 export default function DashboardPage() {
   console.log('DashboardPage inicializado');
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [stats, setStats] = useState({
     activeProjects: 0,
     staffOnSite: 0,
@@ -56,6 +57,7 @@ export default function DashboardPage() {
         console.warn('DashboardPage: Nenhuma sessão encontrada no fetchData');
       } else {
         console.log('DashboardPage: Sessão ativa para:', session.user.email);
+        setUserRole(typeof session.user.user_metadata?.role === 'string' ? session.user.user_metadata.role : null);
       }
 
       console.log('DashboardPage: Executando queries no Supabase...');
@@ -195,6 +197,7 @@ export default function DashboardPage() {
     { label: 'A Receber', value: `R$${(stats.receivable / 1000).toFixed(1)}k`, change: '+8%', icon: DollarSign, color: 'text-emerald-500', bg: 'bg-emerald-500/10' },
     { label: 'A Pagar', value: `R$${(stats.payable / 1000).toFixed(1)}k`, change: '+12%', icon: TrendingUp, color: 'text-blue-500', bg: 'bg-blue-500/10' },
   ];
+  const canViewFinancialAmounts = ['Administrador', 'Administrador Master', 'Administrador Financeiro'].includes(userRole || '');
 
   const performanceData = chartData.length > 0 ? chartData : [
     { name: 'Seg', value: 0 },
@@ -256,11 +259,25 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-black tracking-tight leading-none">{kpi.value}</span>
+                  <span
+                    className={`text-2xl font-black tracking-tight leading-none transition-all ${
+                      !canViewFinancialAmounts && (kpi.label === 'A Receber' || kpi.label === 'A Pagar')
+                        ? 'blur-sm select-none'
+                        : ''
+                    }`}
+                    aria-label={!canViewFinancialAmounts && (kpi.label === 'A Receber' || kpi.label === 'A Pagar') ? 'Valor sensível ocultado' : kpi.value}
+                  >
+                    {kpi.value}
+                  </span>
                   <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${kpi.change.startsWith('+') ? 'bg-[#d4ff3f]/10 text-[#d4ff3f]' : 'bg-rose-500/10 text-rose-500'}`}>
                     {kpi.change}
                   </span>
                 </div>
+                {!canViewFinancialAmounts && (kpi.label === 'A Receber' || kpi.label === 'A Pagar') && (
+                  <p className="mt-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                    Visível apenas para administradores
+                  </p>
+                )}
                 <div className="mt-3 h-1 bg-[#0a0a0a] rounded-full overflow-hidden">
                   <div className={`h-full bg-[#d4ff3f] w-3/4 opacity-80`}></div>
                 </div>
