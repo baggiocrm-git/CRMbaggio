@@ -4,6 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+const COMPANY_GOOGLE_ACCOUNT_EMAIL =
+  process.env.GOOGLE_COMPANY_ACCOUNT_EMAIL?.toLowerCase().trim() || 'baggiosilveiraconstrutora@gmail.com';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -23,6 +25,35 @@ export async function GET(request: Request) {
 
   try {
     const { tokens } = await oauth2Client.getToken(code);
+
+    const profileResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: {
+        Authorization: `Bearer ${tokens.access_token}`,
+      },
+    });
+
+    if (!profileResponse.ok) {
+      throw new Error('Não foi possível identificar a conta Google autenticada.');
+    }
+
+    const profile = await profileResponse.json();
+    const connectedEmail = String(profile.email || '').toLowerCase().trim();
+
+    if (connectedEmail !== COMPANY_GOOGLE_ACCOUNT_EMAIL) {
+      return new NextResponse(`
+        <html>
+          <body>
+            <script>
+              window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', message: 'Conecte a conta corporativa ${COMPANY_GOOGLE_ACCOUNT_EMAIL}.' }, '*');
+            </script>
+            <p>Conta incorreta. Conecte a conta corporativa ${COMPANY_GOOGLE_ACCOUNT_EMAIL}.</p>
+          </body>
+        </html>
+      `, {
+        status: 403,
+        headers: { 'Content-Type': 'text/html' }
+      });
+    }
     
     // Store tokens in Supabase
     // Assuming a table 'company_settings' or 'google_tokens' exists

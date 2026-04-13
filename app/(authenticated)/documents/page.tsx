@@ -331,7 +331,7 @@ export default function DocumentManagementPage() {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'GOOGLE_AUTH_SUCCESS') {
-        showNotification('Google Drive conectado com sucesso!', 'success');
+        showNotification('Google Drive corporativo conectado com sucesso!', 'success');
         fetchAuthStatus();
         fetchDocuments();
       } else if (event.data?.type === 'GOOGLE_AUTH_ERROR') {
@@ -807,7 +807,7 @@ export default function DocumentManagementPage() {
                 />
               </div>
               <div>
-                <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sincronização Google Drive</h4>
+                <h4 className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Sincronização Drive Corporativo</h4>
                 <p className="text-[10px] font-bold text-white">
                   {connectedAccount ? connectedAccount : 'Não configurado'}
                 </p>

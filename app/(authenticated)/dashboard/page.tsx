@@ -404,10 +404,10 @@ export default function DashboardPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 p-3 rounded-xl bg-blue-500/10 border border-blue-500/20">
                     <CheckCircle2 size={16} className="text-blue-500" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Conta Conectada</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">Conta Corporativa Conectada</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Sua conta pessoal do Google está conectada para gestão de documentos.
+                    O sistema está conectado à conta Google corporativa da empresa para gestão de documentos.
                   </p>
                 </div>
               ) : (
@@ -417,7 +417,7 @@ export default function DashboardPage() {
                     <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">Não Conectado</span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed mb-4">
-                    Conecte uma conta do Google para habilitar a sincronização de documentos.
+                    Conecte a conta Google corporativa da empresa para habilitar a sincronização de documentos.
                   </p>
                   <button 
                     onClick={async () => {

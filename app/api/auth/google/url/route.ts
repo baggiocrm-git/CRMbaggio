@@ -2,6 +2,9 @@ import { google } from 'googleapis';
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/server-auth';
 
+const COMPANY_GOOGLE_ACCOUNT_EMAIL =
+  process.env.GOOGLE_COMPANY_ACCOUNT_EMAIL?.toLowerCase().trim() || 'baggiosilveiraconstrutora@gmail.com';
+
 export async function GET(req: NextRequest) {
   const authorization = await authorizeRequest(req, { adminOnly: true });
   if (!authorization.ok) {
@@ -26,7 +29,8 @@ export async function GET(req: NextRequest) {
   const url = oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
-    prompt: 'consent'
+    prompt: 'consent select_account',
+    login_hint: COMPANY_GOOGLE_ACCOUNT_EMAIL,
   });
 
   return NextResponse.json({ url });

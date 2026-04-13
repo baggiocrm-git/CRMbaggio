@@ -8,7 +8,6 @@ import {
   Plus, 
   Clock, 
   MapPin, 
-  Search,
   MoreHorizontal,
   ExternalLink,
   CheckCircle2,
@@ -99,9 +98,12 @@ export default function CalendarPage() {
   const [isGoogleConnected, setIsGoogleConnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeReminder, setActiveReminder] = useState<{ id: string; title: string; timeLabel: string } | null>(null);
   const [isCreateEventModalOpen, setIsCreateEventModalOpen] = useState(false);
   const [isCreatingEvent, setIsCreatingEvent] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const reminderAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const notifiedReminderKeysRef = React.useRef<Set<string>>(new Set());
   const [newEventForm, setNewEventForm] = useState({
     calendarId: 'primary',
     title: '',
@@ -112,21 +114,93 @@ export default function CalendarPage() {
     allDay: false,
     reminderMinutes: 30 as number | '',
   });
+  const activeCalendar =
+    calendars.find((calendar) => calendar.primary) ||
+    calendars[0] ||
+    null;
 
   // Initialize with mock events only if not connected
   useEffect(() => {
     if (!isGoogleConnected) {
       setEvents(MOCK_EVENTS);
-      const mockCalendars = [
-        { id: 'pessoal', summary: 'Pessoal', backgroundColor: '#3b82f6' },
-        { id: 'trabalho', summary: 'Trabalho', backgroundColor: '#d4ff3f' },
-        { id: 'projetos', summary: 'Projetos', backgroundColor: '#f97316' },
-        { id: 'feriados', summary: 'Feriados', backgroundColor: '#f43f5e' },
-      ];
-      setCalendars(mockCalendars);
-      setSelectedCalendarIds(mockCalendars.map((calendar) => calendar.id));
+      setCalendars([]);
+      setSelectedCalendarIds([]);
+      setActiveReminder(null);
+      notifiedReminderKeysRef.current.clear();
     }
   }, [isGoogleConnected]);
+
+  useEffect(() => {
+    reminderAudioRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2358/2358-preview.mp3');
+  }, []);
+
+  useEffect(() => {
+    if (!isGoogleConnected || events.length === 0) return;
+
+    const triggerReminder = (event: Event) => {
+      const reminderKey = `${event.id}:${event.start.toISOString()}:${event.reminderMinutes ?? 'none'}`;
+      if (notifiedReminderKeysRef.current.has(reminderKey)) return;
+
+      notifiedReminderKeysRef.current.add(reminderKey);
+
+      const timeLabel = format(event.start, 'HH:mm', { locale: ptBR });
+      setActiveReminder({
+        id: reminderKey,
+        title: event.title,
+        timeLabel,
+      });
+
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          new Notification('Lembrete da agenda', {
+            body: `${event.title} às ${timeLabel}`,
+          });
+        } else if (Notification.permission === 'default') {
+          Notification.requestPermission()
+            .then((permission) => {
+              if (permission === 'granted') {
+                new Notification('Lembrete da agenda', {
+                  body: `${event.title} às ${timeLabel}`,
+                });
+              }
+            })
+            .catch(() => {});
+        }
+      }
+
+      if (reminderAudioRef.current) {
+        reminderAudioRef.current.currentTime = 0;
+        reminderAudioRef.current.play().catch((audioError) => {
+          console.warn('Audio play blocked:', audioError);
+        });
+      }
+
+      window.setTimeout(() => {
+        setActiveReminder((current) => (current?.id === reminderKey ? null : current));
+      }, 8000);
+    };
+
+    const checkReminders = () => {
+      const now = new Date().getTime();
+
+      events.forEach((event) => {
+        if (!event.reminderMinutes || event.allDay) return;
+
+        const startTime = event.start.getTime();
+        const reminderAt = startTime - event.reminderMinutes * 60 * 1000;
+        const isDue = now >= reminderAt && now <= startTime + 60 * 1000;
+
+        if (isDue) {
+          triggerReminder(event);
+        }
+      });
+    };
+
+    checkReminders();
+    const intervalId = window.setInterval(checkReminders, 30000);
+
+    return () => window.clearInterval(intervalId);
+  }, [events, isGoogleConnected]);
 
   useEffect(() => {
     if (!isCreateEventModalOpen) return;
@@ -170,6 +244,7 @@ export default function CalendarPage() {
 
   const fetchGoogleCalendars = React.useCallback(async () => {
     try {
+      setError(null);
       const response = await authFetch('/api/google/calendar/list');
       if (response.ok) {
         const data: GoogleCalendar[] = await response.json();
@@ -185,14 +260,25 @@ export default function CalendarPage() {
         }, []);
 
         setCalendars(uniqueCalendars);
-        setSelectedCalendarIds((prev) => {
-          const validSelectedIds = prev.filter((id) => uniqueCalendars.some((calendar) => calendar.id === id));
-          if (validSelectedIds.length > 0) return validSelectedIds;
-          return uniqueCalendars.map((calendar) => calendar.id);
-        });
+        const defaultCalendarId =
+          uniqueCalendars.find((calendar) => calendar.primary)?.id ||
+          uniqueCalendars[0]?.id;
+        setSelectedCalendarIds(defaultCalendarId ? [defaultCalendarId] : []);
+
+        if (uniqueCalendars.length === 0) {
+          setError('Nenhuma agenda corporativa acessível foi encontrada para a integração atual.');
+        }
+      } else {
+        const payload = await response.json().catch(() => null);
+        setCalendars([]);
+        setSelectedCalendarIds([]);
+        setError(payload?.error || 'Não foi possível carregar as agendas corporativas.');
       }
     } catch (err) {
       console.error('Error fetching calendar list:', err);
+      setCalendars([]);
+      setSelectedCalendarIds([]);
+      setError(err instanceof Error ? err.message : 'Não foi possível carregar as agendas corporativas.');
     }
   }, []);
 
@@ -282,31 +368,6 @@ export default function CalendarPage() {
     if (view === 'month') setCurrentDate(subMonths(currentDate, 1));
     else if (view === 'week') setCurrentDate(subWeeks(currentDate, 1));
     else setCurrentDate(subDays(currentDate, 1));
-  };
-
-  const handleConnectGoogle = async () => {
-    try {
-      const response = await authFetch('/api/auth/google/url');
-      const contentType = response.headers.get('content-type') || '';
-      if (!contentType.includes('application/json')) {
-        const responseText = await response.text();
-        throw new Error(`Falha ao iniciar conexão com Google (${response.status}). ${responseText.slice(0, 120)}`);
-      }
-
-      const { url, error } = await response.json();
-      if (!response.ok || !url) {
-        throw new Error(error || 'Não foi possível iniciar a autenticação com Google.');
-      }
-      
-      const authWindow = window.open(url, 'google_oauth', 'width=600,height=700');
-      
-      if (!authWindow) {
-        alert('Por favor, habilite popups para conectar sua conta Google.');
-      }
-    } catch (error) {
-      console.error('Error connecting to Google:', error);
-      alert(error instanceof Error ? error.message : 'Erro ao conectar com Google.');
-    }
   };
 
   const handleOpenCreateEventModal = () => {
@@ -437,11 +498,6 @@ export default function CalendarPage() {
         console.error('Error checking Google connection:', error);
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.app_metadata?.provider === 'google') {
-        setIsGoogleConnected(true);
-        fetchGoogleCalendars();
-      }
     };
 
     checkConnection();
@@ -506,36 +562,19 @@ export default function CalendarPage() {
         </button>
 
         <div className="flex items-center gap-2">
-          <button 
-            onClick={handleConnectGoogle}
+          <div
             className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-              isGoogleConnected 
-                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" 
-                : "bg-[#1a1a1a] border border-slate-800 text-slate-400 hover:text-white hover:bg-[#2a2a2a]"
+              "flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border",
+              isGoogleConnected
+                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                : "bg-[#1a1a1a] text-slate-400 border-slate-800"
             )}
           >
             {isGoogleConnected ? <CheckCircle2 size={14} /> : <ExternalLink size={14} />}
-            {isGoogleConnected ? 'Google Conectado' : 'Conectar Google'}
-          </button>
-
-          {isGoogleConnected && (
-            <button 
-              onClick={async () => {
-                if (confirm('Deseja realmente desconectar sua conta Google?')) {
-                  const { error } = await supabase.from('google_tokens').delete().eq('id', 2);
-                  if (!error) {
-                    setIsGoogleConnected(false);
-                    setEvents(MOCK_EVENTS);
-                    setError(null);
-                  }
-                }
-              }}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20"
-            >
-              Desconectar
-            </button>
-          )}
+            {isGoogleConnected
+              ? activeCalendar?.summary || 'Agenda Ativa'
+              : 'Agenda Indisponível'}
+          </div>
         </div>
 
         <button
@@ -823,6 +862,61 @@ export default function CalendarPage() {
       {renderHeader()}
 
       <AnimatePresence>
+        {activeReminder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setActiveReminder(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 20 }}
+              className="relative w-full max-w-md rounded-[32px] border border-[#d4ff3f]/20 bg-[#1a1a1a] p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[#d4ff3f] text-xs font-bold uppercase tracking-widest">Lembrete da Agenda</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-tight text-white">{activeReminder.title}</h2>
+                  <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                    Começa às {activeReminder.timeLabel}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveReminder(null)}
+                  className="text-[#d4ff3f] hover:text-white transition-colors"
+                >
+                  <Plus size={18} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActiveReminder(null)}
+                  className="flex-1 rounded-2xl px-6 py-4 text-xs font-black uppercase tracking-widest text-slate-400 transition-all hover:bg-white/5 hover:text-white"
+                >
+                  Fechar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrentDate(new Date());
+                    setView('day');
+                    setActiveReminder(null);
+                  }}
+                  className="flex-1 rounded-2xl bg-[#d4ff3f] px-6 py-4 text-xs font-black uppercase tracking-widest text-[#0a0a0a] transition-all hover:bg-[#c4ef2f]"
+                >
+                  Ver Agenda
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
         {isCreateEventModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <motion.div
@@ -1006,58 +1100,6 @@ export default function CalendarPage() {
       </AnimatePresence>
       
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar Mini Calendar & Filters */}
-        <aside className="w-80 border-r border-white/20 p-8 hidden xl:flex flex-col gap-8 overflow-y-auto custom-scrollbar">
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 bg-[#1a1a1a] p-3 rounded-2xl border border-slate-800/50">
-              <Search size={16} className="text-slate-500" />
-              <input 
-                type="text" 
-                placeholder="Buscar eventos..." 
-                className="bg-transparent border-none focus:ring-0 text-xs text-white w-full font-bold placeholder:text-slate-700"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h4 className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">MINHAS AGENDAS</h4>
-            <div className="space-y-2">
-              {calendars.map(cal => (
-                <label key={cal.id} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-xl border border-slate-800/30 cursor-pointer hover:border-slate-700 transition-all">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="size-3 rounded-full" 
-                      style={{ backgroundColor: cal.backgroundColor || '#d4ff3f' }}
-                    ></div>
-                    <span className="text-xs font-bold truncate max-w-[160px]">{cal.summary}</span>
-                  </div>
-                  <input 
-                    type="checkbox" 
-                    checked={selectedCalendarIds.includes(cal.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCalendarIds(prev => prev.includes(cal.id) ? prev : [...prev, cal.id]);
-                      } else {
-                        setSelectedCalendarIds(prev => prev.filter(id => id !== cal.id));
-                      }
-                    }}
-                    className="size-4 rounded border-slate-800 bg-transparent text-[#d4ff3f] focus:ring-[#d4ff3f]/30" 
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-auto p-6 bg-[#1a1a1a] rounded-3xl border border-slate-800/50 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 size-24 bg-[#d4ff3f]/5 rounded-full blur-2xl group-hover:bg-[#d4ff3f]/10 transition-all"></div>
-            <h5 className="text-sm font-black tracking-tight mb-2">Dica do Dia</h5>
-            <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-              Sincronize seu Google Agenda para centralizar todos os seus compromissos em um só lugar.
-            </p>
-          </div>
-        </aside>
-
-        {/* Main Calendar Area */}
         <main className="flex-1 flex flex-col bg-[#0a0a0a]">
           <AnimatePresence mode="wait">
             <motion.div 

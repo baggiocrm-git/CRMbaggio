@@ -1,5 +1,6 @@
 import { google } from 'googleapis';
 import { OAuth2Client, JWT } from 'google-auth-library';
+import { calendar_v3, drive_v3 } from 'googleapis';
 
 export function getOAuth2Client(redirectUri?: string) {
   return new OAuth2Client(
@@ -9,7 +10,9 @@ export function getOAuth2Client(redirectUri?: string) {
   );
 }
 
-export function getServiceAccountAuth() {
+export function getServiceAccountAuth(
+  scopes: string[] = ['https://www.googleapis.com/auth/drive']
+) {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const privateKey = process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
@@ -20,7 +23,7 @@ export function getServiceAccountAuth() {
   return new JWT({
     email,
     key: privateKey,
-    scopes: ['https://www.googleapis.com/auth/drive'],
+    scopes,
   });
 }
 
@@ -44,8 +47,6 @@ export async function getTokens(code: string, redirectUri?: string) {
   return tokens;
 }
 
-import { drive_v3 } from 'googleapis';
-
 export async function getDriveService(tokens?: Parameters<OAuth2Client['setCredentials']>[0]) {
   if (tokens) {
     const client = getOAuth2Client();
@@ -59,6 +60,24 @@ export async function getDriveService(tokens?: Parameters<OAuth2Client['setCrede
   }
 
   throw new Error('No authentication method available for Google Drive');
+}
+
+export async function getCalendarService(tokens?: Parameters<OAuth2Client['setCredentials']>[0]) {
+  if (tokens) {
+    const client = getOAuth2Client();
+    client.setCredentials(tokens);
+    return google.calendar({ version: 'v3', auth: client });
+  }
+
+  const serviceAuth = getServiceAccountAuth([
+    'https://www.googleapis.com/auth/calendar',
+  ]);
+
+  if (serviceAuth) {
+    return google.calendar({ version: 'v3', auth: serviceAuth });
+  }
+
+  throw new Error('No authentication method available for Google Calendar');
 }
 
 export async function uploadToDrive(drive: drive_v3.Drive, file: Buffer, filename: string, mimeType: string) {
