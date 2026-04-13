@@ -200,7 +200,7 @@ export default function ContactsPage() {
   const [aiQuery, setAiQuery] = useState('');
   const [aiResults, setAiResults] = useState<AiSearchResult[]>([]);
   const [aiError, setAiError] = useState('');
-  const itemsPerPage = 10;
+  const itemsPerPage = 18;
 
   const [formData, setFormData] = useState({
     empresa: '',
@@ -439,6 +439,21 @@ export default function ContactsPage() {
   );
 
   const totalPages = Math.ceil(filteredContacts.length / itemsPerPage);
+  const visiblePages = Array.from({ length: totalPages }, (_, i) => i + 1).slice(
+    Math.max(0, currentPage - 3),
+    Math.max(5, currentPage + 2)
+  );
+
+  useEffect(() => {
+    if (totalPages === 0) {
+      setCurrentPage(1);
+      return;
+    }
+
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleSort = (field: SortField) => {
     setCurrentPage(1);
@@ -804,8 +819,8 @@ export default function ContactsPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="contacts-list-head bg-[#0a0a0a]">
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Empresa', 'company')}</th>
-                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Nome', 'name')}</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Nome', 'company')}</th>
+                  <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Empresa', 'name')}</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Telefone', 'phone')}</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('Celular', 'cellphone')}</th>
                   <th className="px-4 py-3 text-[10px] font-black uppercase tracking-widest">{renderSortHeader('E-mail', 'email')}</th>
@@ -837,49 +852,69 @@ export default function ContactsPage() {
                       key={`${contact.id || 'contact'}-${contact.email || contact.name || contact.company || 'row'}-${index}`}
                       className="contacts-list-row hover:bg-[#2a2a2a]/30 transition-colors group leading-none"
                     >
-                      <td className="px-4 py-1.5 text-sm text-slate-300 tracking-tight">{contact.company || '-'}</td>
-                      <td className="contacts-light-name px-4 py-1.5 text-sm text-white tracking-tight">{contact.name || '-'}</td>
-                      <td className="contacts-light-phone px-4 py-1.5 text-xs text-slate-300">{contact.phone || '-'}</td>
-                      <td className="px-4 py-1.5 text-xs text-slate-300">{contact.cellphone || '-'}</td>
-                      <td className="px-4 py-1.5 text-xs text-slate-300">{contact.email || '-'}</td>
-                      <td className="px-4 py-1.5 text-xs text-slate-500">{contact.category === 'Parceiro' ? 'Diversos' : contact.category}</td>
-                      <td className="px-4 py-1.5 text-xs text-slate-500 max-w-[220px]">
+                      <td className="px-4 py-0.5 text-sm text-slate-300 tracking-tight">{contact.company || '-'}</td>
+                      <td className="contacts-light-name px-4 py-0.5 text-sm text-white tracking-tight">{contact.name || '-'}</td>
+                      <td className="contacts-light-phone px-4 py-0.5 text-xs text-slate-300">{contact.phone || '-'}</td>
+                      <td className="px-4 py-0.5 text-xs text-slate-300">{contact.cellphone || '-'}</td>
+                      <td className="px-4 py-0.5 text-xs text-slate-300">{contact.email || '-'}</td>
+                      <td className="px-4 py-0.5 text-xs text-slate-500">{contact.category === 'Parceiro' ? 'Diversos' : contact.category}</td>
+                      <td className="px-4 py-0.5 text-xs text-slate-500 max-w-[220px]">
                         <p className="truncate">{contact.info || '-'}</p>
                       </td>
-                      <td className="px-4 py-1.5">
+                      <td className="px-4 py-0.5">
                         <div className="flex gap-1">
                           <a 
-                            href={contact.email ? `mailto:${contact.email}` : '#'}
+                            href={contact.email?.trim() ? `mailto:${contact.email}` : '#'}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={(e) => {
-                              if (!contact.email) {
+                              if (!contact.email?.trim()) {
                                 e.preventDefault();
                                 alert('E-mail não cadastrado.');
                               }
                             }}
-                            className="p-1 rounded-md bg-[#0a0a0a] text-slate-500 hover:bg-blue-500/10 hover:text-blue-500 transition-all border border-slate-800/50"
+                            className={`p-1 rounded-md bg-[#0a0a0a] transition-all border ${
+                              contact.email?.trim()
+                                ? 'border-amber-400/40 text-amber-300 hover:bg-amber-400/10 hover:text-amber-200'
+                                : 'border-slate-800/50 text-slate-500 hover:bg-amber-400/10 hover:text-amber-300'
+                            }`}
                             title="Enviar E-mail"
                           >
                             <Mail size={18} />
                           </a>
                           <button onClick={() => {
-                              const cleanPhone = (contact.cellphone || contact.phone).replace(/\D/g, '');
+                              const cleanPhone = contact.phone.replace(/\D/g, '');
                               if (cleanPhone) {
-                                if (contact.cellphone) {
-                                  window.open(`https://wa.me/${cleanPhone}`, '_blank');
-                                  return;
-                                }
-
                                 window.location.href = `tel:${cleanPhone}`;
                               } else {
-                                alert('Telefone/Celular não cadastrado ou inválido.');
+                                alert('Telefone não cadastrado ou inválido.');
                               }
                             }}
-                            className="p-1 rounded-md bg-[#0a0a0a] text-slate-500 hover:bg-emerald-500/10 hover:text-emerald-500 transition-all border border-slate-800/50"
-                            title={contact.cellphone ? 'WhatsApp' : 'Ligar'}
+                            className={`p-1 rounded-md bg-[#0a0a0a] transition-all border ${
+                              contact.phone?.trim()
+                                ? 'border-amber-400/40 text-amber-300 hover:bg-amber-400/10 hover:text-amber-200'
+                                : 'border-slate-800/50 text-slate-500 hover:bg-amber-400/10 hover:text-amber-300'
+                            }`}
+                            title="Ligar"
                           >
-                            {contact.cellphone ? <MessageCircle size={18} /> : <Phone size={18} />}
+                            <Phone size={18} />
+                          </button>
+                          <button onClick={() => {
+                              const cleanCellphone = contact.cellphone.replace(/\D/g, '');
+                              if (cleanCellphone) {
+                                window.open(`https://wa.me/${cleanCellphone}`, '_blank');
+                              } else {
+                                alert('Celular não cadastrado ou inválido.');
+                              }
+                            }}
+                            className={`p-1 rounded-md bg-[#0a0a0a] transition-all border ${
+                              contact.cellphone?.trim()
+                                ? 'border-emerald-500/40 text-emerald-500 hover:bg-emerald-500/10 hover:text-emerald-400'
+                                : 'border-slate-800/50 text-slate-500 hover:bg-emerald-500/10 hover:text-emerald-500'
+                            }`}
+                            title="WhatsApp"
+                          >
+                            <MessageCircle size={18} />
                           </button>
                         </div>
                       </td>
@@ -910,17 +945,17 @@ export default function ContactsPage() {
           {/* Pagination */}
           <div className="contacts-list-footer px-6 py-4 flex items-center justify-between border-t border-slate-800/50 bg-[#0a0a0a]">
             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-              Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)} de {filteredContacts.length} contatos
+              Exibindo {(currentPage - 1) * itemsPerPage + 1} a {Math.min(currentPage * itemsPerPage, filteredContacts.length)}
             </p>
             <div className="flex items-center gap-2">
               <button 
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                className="p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
+                className="shrink-0 p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
               >
                 <ChevronLeft size={16} />
               </button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              {visiblePages.map((page) => (
                 <button 
                   key={page}
                   onClick={() => setCurrentPage(page)}
@@ -936,7 +971,7 @@ export default function ContactsPage() {
               <button 
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                className="p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
+                className="shrink-0 p-2 rounded-lg border border-slate-800/50 text-slate-500 hover:bg-[#1a1a1a] transition-all disabled:opacity-50"
               >
                 <ChevronRight size={16} />
               </button>

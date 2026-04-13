@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function ServicesPage() {
   const [services, setServices] = useState<TCPOItem[]>([]);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -28,6 +29,7 @@ export default function ServicesPage() {
     key: 'id',
     direction: 'asc'
   });
+  const saveTimeoutsRef = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleSort = (key: keyof TCPOItem | 'total') => {
     let direction: 'asc' | 'desc' | null = 'asc';
@@ -121,6 +123,68 @@ export default function ServicesPage() {
       fetchServices();
     }
   };
+
+  const formatCurrencyInput = (value: number) =>
+    `R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0)}`;
+
+  const parseCurrencyInput = (rawValue: string) => {
+    const cleaned = rawValue.replace(/[^\d,.-]/g, '').trim();
+    if (!cleaned) return 0;
+
+    const hasDecimalSeparator = cleaned.includes(',') || cleaned.includes('.');
+    if (hasDecimalSeparator) {
+      const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    if (!digitsOnly) return 0;
+    return Number(digitsOnly) / 100;
+  };
+
+  const getFieldDraftKey = (serviceId: string, field: keyof TCPOItem) => `${serviceId}:${field}`;
+
+  const scheduleServiceCommit = (id: string, field: keyof TCPOItem, rawValue: string) => {
+    const timeoutKey = getFieldDraftKey(id, field);
+    if (saveTimeoutsRef.current[timeoutKey]) {
+      clearTimeout(saveTimeoutsRef.current[timeoutKey]);
+    }
+
+    saveTimeoutsRef.current[timeoutKey] = setTimeout(() => {
+      handleUpdateService(id, field, parseCurrencyInput(rawValue));
+      setDraftValues((prev) => {
+        const next = { ...prev };
+        delete next[timeoutKey];
+        return next;
+      });
+      delete saveTimeoutsRef.current[timeoutKey];
+    }, 700);
+  };
+
+  const commitServiceValue = (id: string, field: keyof TCPOItem) => {
+    const timeoutKey = getFieldDraftKey(id, field);
+    if (saveTimeoutsRef.current[timeoutKey]) {
+      clearTimeout(saveTimeoutsRef.current[timeoutKey]);
+      delete saveTimeoutsRef.current[timeoutKey];
+    }
+
+    const rawValue = draftValues[timeoutKey];
+    if (rawValue === undefined) return;
+
+    handleUpdateService(id, field, parseCurrencyInput(rawValue));
+    setDraftValues((prev) => {
+      const next = { ...prev };
+      delete next[timeoutKey];
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    return () => {
+      Object.values(saveTimeoutsRef.current).forEach((timeoutId) => clearTimeout(timeoutId));
+    };
+  }, []);
 
   const exportToExcel = () => {
     setExporting(true);
@@ -330,11 +394,18 @@ export default function ServicesPage() {
                         <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="text"
-                            value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_sabado || (service.custo_mo + service.custo_mat + service.custo_eq) * 1.5)}`}
+                            value={draftValues[getFieldDraftKey(service.id, 'custo_sabado')] ?? formatCurrencyInput(service.custo_sabado || (service.custo_mo + service.custo_mat + service.custo_eq) * 1.5)}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, "");
-                              const cents = parseInt(val || "0", 10);
-                              handleUpdateService(service.id, 'custo_sabado', cents / 100);
+                              const rawValue = e.target.value;
+                              setDraftValues((prev) => ({ ...prev, [getFieldDraftKey(service.id, 'custo_sabado')]: rawValue }));
+                              scheduleServiceCommit(service.id, 'custo_sabado', rawValue);
+                            }}
+                            onBlur={() => commitServiceValue(service.id, 'custo_sabado')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                commitServiceValue(service.id, 'custo_sabado');
+                              }
                             }}
                             onFocus={(e) => e.target.select()}
                             onClick={(e) => (e.target as HTMLInputElement).select()}
@@ -346,11 +417,18 @@ export default function ServicesPage() {
                         <div className="flex justify-end" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="text"
-                            value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_domingo_feriado || (service.custo_mo + service.custo_mat + service.custo_eq) * 2)}`}
+                            value={draftValues[getFieldDraftKey(service.id, 'custo_domingo_feriado')] ?? formatCurrencyInput(service.custo_domingo_feriado || (service.custo_mo + service.custo_mat + service.custo_eq) * 2)}
                             onChange={(e) => {
-                              const val = e.target.value.replace(/\D/g, "");
-                              const cents = parseInt(val || "0", 10);
-                              handleUpdateService(service.id, 'custo_domingo_feriado', cents / 100);
+                              const rawValue = e.target.value;
+                              setDraftValues((prev) => ({ ...prev, [getFieldDraftKey(service.id, 'custo_domingo_feriado')]: rawValue }));
+                              scheduleServiceCommit(service.id, 'custo_domingo_feriado', rawValue);
+                            }}
+                            onBlur={() => commitServiceValue(service.id, 'custo_domingo_feriado')}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                commitServiceValue(service.id, 'custo_domingo_feriado');
+                              }
                             }}
                             onFocus={(e) => e.target.select()}
                             onClick={(e) => (e.target as HTMLInputElement).select()}
@@ -373,11 +451,18 @@ export default function ServicesPage() {
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Mão de Obra</div>
                                 <input
                                   type="text"
-                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_mo || 0)}`}
+                                  value={draftValues[getFieldDraftKey(service.id, 'custo_mo')] ?? formatCurrencyInput(service.custo_mo || 0)}
                                   onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, "");
-                                    const cents = parseInt(val || "0", 10);
-                                    handleUpdateService(service.id, 'custo_mo', cents / 100);
+                                    const rawValue = e.target.value;
+                                    setDraftValues((prev) => ({ ...prev, [getFieldDraftKey(service.id, 'custo_mo')]: rawValue }));
+                                    scheduleServiceCommit(service.id, 'custo_mo', rawValue);
+                                  }}
+                                  onBlur={() => commitServiceValue(service.id, 'custo_mo')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      commitServiceValue(service.id, 'custo_mo');
+                                    }
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}
@@ -388,11 +473,18 @@ export default function ServicesPage() {
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Material</div>
                                 <input
                                   type="text"
-                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_mat || 0)}`}
+                                  value={draftValues[getFieldDraftKey(service.id, 'custo_mat')] ?? formatCurrencyInput(service.custo_mat || 0)}
                                   onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, "");
-                                    const cents = parseInt(val || "0", 10);
-                                    handleUpdateService(service.id, 'custo_mat', cents / 100);
+                                    const rawValue = e.target.value;
+                                    setDraftValues((prev) => ({ ...prev, [getFieldDraftKey(service.id, 'custo_mat')]: rawValue }));
+                                    scheduleServiceCommit(service.id, 'custo_mat', rawValue);
+                                  }}
+                                  onBlur={() => commitServiceValue(service.id, 'custo_mat')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      commitServiceValue(service.id, 'custo_mat');
+                                    }
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}
@@ -403,11 +495,18 @@ export default function ServicesPage() {
                                 <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Equipamento</div>
                                 <input
                                   type="text"
-                                  value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(service.custo_eq || 0)}`}
+                                  value={draftValues[getFieldDraftKey(service.id, 'custo_eq')] ?? formatCurrencyInput(service.custo_eq || 0)}
                                   onChange={(e) => {
-                                    const val = e.target.value.replace(/\D/g, "");
-                                    const cents = parseInt(val || "0", 10);
-                                    handleUpdateService(service.id, 'custo_eq', cents / 100);
+                                    const rawValue = e.target.value;
+                                    setDraftValues((prev) => ({ ...prev, [getFieldDraftKey(service.id, 'custo_eq')]: rawValue }));
+                                    scheduleServiceCommit(service.id, 'custo_eq', rawValue);
+                                  }}
+                                  onBlur={() => commitServiceValue(service.id, 'custo_eq')}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      commitServiceValue(service.id, 'custo_eq');
+                                    }
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}

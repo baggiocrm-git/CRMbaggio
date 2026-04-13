@@ -24,6 +24,7 @@ export async function authFetch(input: RequestInfo | URL, init?: RequestInit) {
   const accessToken = await getAccessToken();
   return fetch(input, {
     ...init,
+    cache: 'no-store',
     headers: mergeHeaders(init?.headers, accessToken),
   });
 }

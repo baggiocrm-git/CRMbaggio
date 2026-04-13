@@ -504,7 +504,7 @@ export default function InsumosPage() {
           <table className="w-full text-left border-collapse table-fixed">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[90px]" onClick={() => handleSort('id')}>
+                <th className="px-2 py-2 cursor-pointer hover:text-white transition-colors w-[140px]" onClick={() => handleSort('id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('id')}
                   </div>

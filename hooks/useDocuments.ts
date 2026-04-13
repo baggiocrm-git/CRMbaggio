@@ -25,6 +25,12 @@ export interface Folder {
   created_at: string;
 }
 
+function getDriveDocumentId(doc: Partial<Document> & { id?: string | null; drive_file_id?: string | null }) {
+  if (doc.drive_file_id) return doc.drive_file_id;
+  if (doc.id?.startsWith('drive-')) return doc.id.slice('drive-'.length);
+  return doc.id || null;
+}
+
 export function useDocuments(currentFolderId: string) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -122,10 +128,14 @@ export function useDocuments(currentFolderId: string) {
           const localData = await localResponse.json();
           if (!localData.error && Array.isArray(localData)) {
             const validLocalData = localData.filter((d: any) => d.id && d.id !== '');
-            const localDocsMap = new Map(validLocalData.map((d: any) => [d.drive_file_id, d]));
-            
+            const localDocsMap = new Map(
+              validLocalData
+                .filter((d: any) => d.drive_file_id)
+                .map((d: any) => [d.drive_file_id, d])
+            );
+             
             const mergedDriveDocs = allDocs.map((doc: any) => {
-              const driveId = doc.id;
+              const driveId = getDriveDocumentId(doc);
               if (driveId && localDocsMap.has(driveId)) {
                 const localDoc = localDocsMap.get(driveId);
                 return { ...doc, ...localDoc, is_drive_only: false, source: 'merged' };
@@ -133,12 +143,34 @@ export function useDocuments(currentFolderId: string) {
               return { ...doc, is_drive_only: true };
             });
 
-            const driveFileIds = new Set(allDocs.map(d => d.id));
+            const driveFileIds = new Set(
+              allDocs
+                .map((d: any) => getDriveDocumentId(d))
+                .filter(Boolean)
+            );
             const localOnlyDocs = validLocalData
-              .filter((d: any) => !d.drive_file_id || !driveFileIds.has(d.drive_file_id))
+              .filter((d: any) => !d.drive_file_id)
               .map((d: any) => ({ ...d, source: 'supabase' }));
 
-            allDocs = [...mergedDriveDocs, ...localOnlyDocs];
+            const staleDriveRefs = validLocalData.filter(
+              (d: any) => d.drive_file_id && !driveFileIds.has(d.drive_file_id)
+            );
+
+            if (staleDriveRefs.length > 0) {
+              console.warn(
+                'Ignoring stale document records without matching Drive files:',
+                staleDriveRefs.map((doc: any) => ({ id: doc.id, nome: doc.nome, drive_file_id: doc.drive_file_id }))
+              );
+            }
+
+            const dedupedDocs = new Map<string, any>();
+            [...mergedDriveDocs, ...localOnlyDocs].forEach((doc: any) => {
+              const identity = doc.drive_file_id || doc.file_path || doc.id;
+              if (!identity) return;
+              dedupedDocs.set(identity, doc);
+            });
+
+            allDocs = Array.from(dedupedDocs.values());
           }
         }
       } catch (localErr) {

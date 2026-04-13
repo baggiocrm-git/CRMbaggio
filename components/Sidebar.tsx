@@ -162,7 +162,7 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
 
   return (
     <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
-      <div className="p-6 border-b border-slate-800/50 flex flex-col items-center gap-3">
+      <div className="px-6 pt-6 pb-4 border-b border-slate-800/50 flex flex-col items-center gap-1">
         <div className="size-16 relative">
           <Image 
             src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
@@ -174,9 +174,9 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
             referrerPolicy="no-referrer"
           />
         </div>
-        <div className="text-center">
-          <h1 className="font-medium text-[10px] tracking-tight text-white uppercase whitespace-nowrap">Construtora Baggio Silveira Ltda.</h1>
-          <span className="text-[8px] font-bold text-[#d4ff3f] uppercase tracking-widest">Gestão de Engenharia</span>
+        <div className="text-center leading-none">
+          <h1 className="font-medium text-[10px] leading-none tracking-tight text-white uppercase whitespace-nowrap">Construtora Baggio Silveira Ltda.</h1>
+          <span className="block mt-2 font-bold text-[8px] leading-none text-[#d4ff3f] uppercase tracking-widest">Gestão de Engenharia</span>
         </div>
       </div>
 

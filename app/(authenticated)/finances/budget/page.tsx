@@ -206,27 +206,27 @@ export default function BudgetPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('nome')}>
+                <th className="px-6 py-2.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('nome')}>
                   <div className="flex items-center">
                     Orçamento {getSortIcon('nome')}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('projeto.nome')}>
+                <th className="px-6 py-2.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('projeto.nome')}>
                   <div className="flex items-center">
                     Obra / Projeto {getSortIcon('projeto.nome')}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total_geral')}>
+                <th className="px-6 py-2.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('total_geral')}>
                   <div className="flex items-center">
                     Valor Total {getSortIcon('total_geral')}
                   </div>
                 </th>
-                <th className="px-6 py-4 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('created_at')}>
+                <th className="px-6 py-2.5 cursor-pointer hover:text-white transition-colors" onClick={() => handleSort('created_at')}>
                   <div className="flex items-center">
                     Data de Criação {getSortIcon('created_at')}
                   </div>
                 </th>
-                <th className="px-6 py-4"></th>
+                <th className="px-6 py-2.5"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
@@ -246,7 +246,7 @@ export default function BudgetPage() {
               ) : (
                 filteredBudgets.map((budget) => (
                   <tr key={budget.id} className="hover:bg-[#0a0a0a] transition-colors group">
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-2">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-slate-800/50 text-[#d4ff3f]">
                           <FileText size={16} />
@@ -254,19 +254,19 @@ export default function BudgetPage() {
                         <p className="text-sm font-bold text-white">{budget.nome}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-2">
                       <div className="flex items-center gap-2">
                         <Building2 size={14} className="text-slate-500" />
                         <p className="text-sm text-slate-400">{budget.projeto?.nome || 'Sem projeto'}</p>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-2">
                       <p className="text-sm font-black text-[#d4ff3f]">{formatCurrency(budget.total_geral)}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-2">
                       <p className="text-sm text-slate-500">{new Date(budget.created_at).toLocaleDateString('pt-BR')}</p>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-2 text-right">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Link 
                           href={`/finances/budget/edit/${budget.id}`}

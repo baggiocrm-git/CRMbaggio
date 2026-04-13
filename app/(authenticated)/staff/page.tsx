@@ -3116,9 +3116,6 @@ export default function StaffPage() {
                                     }`}>
                                       {person.status}
                                     </span>
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit ${courseStatus.bg} ${courseStatus.color}`}>
-                                      {courseStatus.label}
-                                    </span>
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -3141,6 +3138,9 @@ export default function StaffPage() {
                                     >
                                       <Wallet size={13} />
                                     </button>
+                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit ${courseStatus.bg} ${courseStatus.color}`}>
+                                      {courseStatus.label}
+                                    </span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-1.5">
