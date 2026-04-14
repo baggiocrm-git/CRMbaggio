@@ -10,12 +10,18 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  FileSpreadsheet,
+  FileText,
+  Upload,
   ChevronUp,
   ChevronDown,
   ChevronsUpDown
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Insumo } from '@/lib/types';
+import * as XLSX from 'xlsx';
+import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, AlignmentType, HeadingLevel, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 
 export default function InsumosPage() {
   const [insumos, setInsumos] = useState<Insumo[]>([]);
@@ -24,12 +30,15 @@ export default function InsumosPage() {
   const [filterType, setFilterType] = useState<'all' | 'mo' | 'mat' | 'eq'>('all');
   const [isSaving, setIsSaving] = useState(false);
   const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
   const [sortConfig, setSortConfig] = useState<{ key: keyof Insumo; direction: 'asc' | 'desc' | null }>({
     key: 'descricao',
     direction: 'asc'
   });
   const updateTimeouts = React.useRef<Record<string, NodeJS.Timeout>>({});
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleSort = (key: keyof Insumo) => {
     let direction: 'asc' | 'desc' | null = 'asc';
@@ -50,6 +59,37 @@ export default function InsumosPage() {
       <ChevronDown size={12} className="ml-1 text-[#d4ff3f]" />;
   };
 
+  const roundCurrencyValue = (value: number | null | undefined) => Number((value ?? 0).toFixed(2));
+
+  const formatCurrency = (value: number | null | undefined) =>
+    `R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value || 0)}`;
+
+  const normalizeHeader = (value: unknown) =>
+    String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? roundCurrencyValue(value) : null;
+    if (typeof value !== 'string') return null;
+
+    const cleaned = value.replace(/[^\d,.-]/g, '').trim();
+    if (!cleaned) return null;
+
+    if (cleaned.includes(',') || cleaned.includes('.')) {
+      const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? roundCurrencyValue(parsed) : null;
+    }
+
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    if (!digitsOnly) return null;
+    return roundCurrencyValue(Number(digitsOnly) / 100);
+  };
+
   const fetchInsumos = async () => {
     setLoading(true);
     try {
@@ -59,7 +99,14 @@ export default function InsumosPage() {
         .order('descricao');
       
       if (error) throw error;
-      setInsumos(data || []);
+      setInsumos(
+        (data || []).map((insumo) => ({
+          ...insumo,
+          preco_unitario: roundCurrencyValue(insumo.preco_unitario),
+          preco_sabado: roundCurrencyValue(insumo.preco_sabado),
+          preco_domingo_feriado: roundCurrencyValue(insumo.preco_domingo_feriado),
+        }))
+      );
     } catch (err) {
       console.error('Error fetching insumos:', err);
       setMessage({ text: 'Erro ao carregar insumos.', type: 'error' });
@@ -73,14 +120,16 @@ export default function InsumosPage() {
   }, []);
 
   const handleUpdatePrice = (id: string, field: 'preco_unitario' | 'preco_sabado' | 'preco_domingo_feriado', newPrice: number) => {
+    const normalizedPrice = roundCurrencyValue(newPrice);
+
     // Update local state immediately for responsive UI
     setInsumos(prev => prev.map(i => {
       if (i.id === id) {
-        const updated = { ...i, [field]: newPrice };
+        const updated = { ...i, [field]: normalizedPrice };
         // Apply formulas: Saturday = Normal + 50%, Sunday = Normal + 100%
         if (field === 'preco_unitario') {
-          updated.preco_sabado = newPrice * 1.5;
-          updated.preco_domingo_feriado = newPrice * 2.0;
+          updated.preco_sabado = roundCurrencyValue(normalizedPrice * 1.5);
+          updated.preco_domingo_feriado = roundCurrencyValue(normalizedPrice * 2.0);
         }
         return updated;
       }
@@ -95,10 +144,10 @@ export default function InsumosPage() {
 
     updateTimeouts.current[timeoutKey] = setTimeout(async () => {
       try {
-        const updates: Partial<Insumo> = { [field]: newPrice };
+        const updates: Partial<Insumo> = { [field]: normalizedPrice };
         if (field === 'preco_unitario') {
-          updates.preco_sabado = newPrice * 1.5;
-          updates.preco_domingo_feriado = newPrice * 2.0;
+          updates.preco_sabado = roundCurrencyValue(normalizedPrice * 1.5);
+          updates.preco_domingo_feriado = roundCurrencyValue(normalizedPrice * 2.0);
         }
         
         const { error } = await supabase
@@ -252,6 +301,187 @@ export default function InsumosPage() {
     }
   };
 
+  const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      setMessage(null);
+
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: null });
+
+      if (!rows.length) {
+        throw new Error('A planilha está vazia.');
+      }
+
+      const updates = rows
+        .map((row) => {
+          const normalizedEntries = Object.entries(row).reduce<Record<string, unknown>>((acc, [key, value]) => {
+            acc[normalizeHeader(key)] = value;
+            return acc;
+          }, {});
+
+          const id = String(
+            normalizedEntries['codigo'] ??
+            normalizedEntries['código'] ??
+            normalizedEntries['cod'] ??
+            ''
+          ).trim();
+
+          if (!id) return null;
+
+          const tipoValue = String(normalizedEntries['tipo'] ?? '').trim().toLowerCase();
+          const parsedTipo: Insumo['tipo'] | null =
+            tipoValue === 'mo' || tipoValue === 'mao de obra' || tipoValue === 'mão de obra'
+              ? 'mo'
+              : tipoValue === 'mat' || tipoValue === 'material' || tipoValue === 'materiais'
+                ? 'mat'
+                : tipoValue === 'eq' || tipoValue === 'equipamento' || tipoValue === 'equipamentos'
+                  ? 'eq'
+                  : null;
+
+          const payload = {
+            descricao: String(normalizedEntries['descricao'] ?? normalizedEntries['descrição'] ?? '').trim() || null,
+            unidade: String(normalizedEntries['unidade'] ?? normalizedEntries['unid.'] ?? normalizedEntries['un'] ?? '').trim() || null,
+            tipo: parsedTipo,
+            preco_unitario: toNumber(normalizedEntries['normal'] ?? normalizedEntries['preco unitario'] ?? normalizedEntries['preço unitário'] ?? normalizedEntries['preco_unitario']),
+            preco_sabado: toNumber(normalizedEntries['sabado'] ?? normalizedEntries['sábado'] ?? normalizedEntries['preco sabado'] ?? normalizedEntries['preço sábado'] ?? normalizedEntries['preco_sabado']),
+            preco_domingo_feriado: toNumber(normalizedEntries['dom/fer'] ?? normalizedEntries['domingo/feriado'] ?? normalizedEntries['domingo feriado'] ?? normalizedEntries['preco domingo feriado'] ?? normalizedEntries['preço domingo feriado'] ?? normalizedEntries['preco_domingo_feriado']),
+          };
+
+          const definedPayload = Object.fromEntries(
+            Object.entries(payload).filter(([, value]) => value !== null)
+          );
+
+          if (Object.keys(definedPayload).length === 0) return null;
+
+          return { id, payload: definedPayload };
+        })
+        .filter((item): item is { id: string; payload: Record<string, string | number> } => Boolean(item));
+
+      if (!updates.length) {
+        throw new Error('Nenhuma linha válida foi encontrada. Use a coluna Código e pelo menos um campo editável.');
+      }
+
+      const failures: string[] = [];
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('tcpo_insumos')
+          .update(update.payload)
+          .eq('id', update.id);
+
+        if (error) {
+          failures.push(`${update.id}: ${error.message}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new Error(`Alguns insumos não puderam ser atualizados. ${failures.slice(0, 3).join(' | ')}`);
+      }
+
+      setMessage({ text: `${updates.length} insumos atualizados com sucesso pela planilha.`, type: 'success' });
+      await fetchInsumos();
+    } catch (error) {
+      console.error('Error importing insumos spreadsheet:', error);
+      setMessage({
+        text: error instanceof Error ? error.message : 'Não foi possível importar a planilha.',
+        type: 'error',
+      });
+    } finally {
+      setIsImporting(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const exportToExcel = () => {
+    setIsExporting(true);
+    try {
+      const dataToExport = filteredInsumos.map((insumo) => ({
+        'Código': insumo.id,
+        'Descrição': insumo.descricao,
+        'Unidade': insumo.unidade,
+        'Tipo': getTypeName(insumo.tipo),
+        'Normal': roundCurrencyValue(insumo.preco_unitario),
+        'Sábado': roundCurrencyValue(insumo.preco_sabado),
+        'Dom/Fer': roundCurrencyValue(insumo.preco_domingo_feriado),
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Insumos');
+      XLSX.writeFile(workbook, `Insumos_${new Date().toISOString().split('T')[0]}.xlsx`);
+    } catch (error) {
+      console.error('Error exporting insumos to Excel:', error);
+      setMessage({ text: 'Não foi possível exportar a planilha de insumos.', type: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToWord = async () => {
+    setIsExporting(true);
+    try {
+      const tableRows = [
+        new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Código', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Descrição', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Un', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Tipo', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Normal (R$)', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Sáb. (R$)', bold: true })] })] }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Dom/Fer (R$)', bold: true })] })] }),
+          ],
+        }),
+        ...filteredInsumos.map((insumo) => new TableRow({
+          children: [
+            new TableCell({ children: [new Paragraph(insumo.id)] }),
+            new TableCell({ children: [new Paragraph(insumo.descricao)] }),
+            new TableCell({ children: [new Paragraph(insumo.unidade)] }),
+            new TableCell({ children: [new Paragraph(getTypeName(insumo.tipo))] }),
+            new TableCell({ children: [new Paragraph(roundCurrencyValue(insumo.preco_unitario).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph(roundCurrencyValue(insumo.preco_sabado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph(roundCurrencyValue(insumo.preco_domingo_feriado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
+          ],
+        })),
+      ];
+
+      const doc = new Document({
+        sections: [{
+          properties: {},
+          children: [
+            new Paragraph({
+              text: 'Listagem de Insumos',
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+            }),
+            new Paragraph({ text: '' }),
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows: tableRows,
+            }),
+          ],
+        }],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `Insumos_${new Date().toISOString().split('T')[0]}.docx`);
+    } catch (error) {
+      console.error('Error exporting insumos to Word:', error);
+      setMessage({ text: 'Não foi possível exportar o Word de insumos.', type: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const filteredInsumos = insumos
     .filter(i => {
       const matchesSearch = i.descricao.toLowerCase().includes(searchTerm.toLowerCase()) || i.id.toLowerCase().includes(searchTerm.toLowerCase());
@@ -297,6 +527,40 @@ export default function InsumosPage() {
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">Cadastro e precificação base para composições</p>
         </div>
         <div className="flex items-center gap-3">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(event) => void handleImportExcel(event)}
+          />
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            disabled={loading || isImporting}
+            className="bg-white/5 hover:bg-white/10 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            {isImporting ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+            {isImporting ? 'Importando...' : 'Importar Excel'}
+          </button>
+          <button
+            type="button"
+            onClick={exportToExcel}
+            disabled={loading || isExporting || filteredInsumos.length === 0}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <FileSpreadsheet size={16} />
+            Excel
+          </button>
+          <button
+            type="button"
+            onClick={() => void exportToWord()}
+            disabled={loading || isExporting || filteredInsumos.length === 0}
+            className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50"
+          >
+            <FileText size={16} />
+            Word
+          </button>
           <button 
             onClick={handleRecalculate}
             disabled={isRecalculating}
@@ -373,7 +637,7 @@ export default function InsumosPage() {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Normal</label>
                   <input
                     type="text"
-                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_unitario || 0)}`}
+                    value={formatCurrency(newInsumo.preco_unitario)}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
                       const cents = parseInt(val || "0", 10);
@@ -394,7 +658,7 @@ export default function InsumosPage() {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Sábado</label>
                   <input
                     type="text"
-                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_sabado || 0)}`}
+                    value={formatCurrency(newInsumo.preco_sabado)}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
                       const cents = parseInt(val || "0", 10);
@@ -409,7 +673,7 @@ export default function InsumosPage() {
                   <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Dom/Fer</label>
                   <input
                     type="text"
-                    value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(newInsumo.preco_domingo_feriado || 0)}`}
+                    value={formatCurrency(newInsumo.preco_domingo_feriado)}
                     onChange={(e) => {
                       const val = e.target.value.replace(/\D/g, "");
                       const cents = parseInt(val || "0", 10);
@@ -577,7 +841,7 @@ export default function InsumosPage() {
                       <div className="flex justify-end">
                         <input
                           type="text"
-                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_unitario || 0)}`}
+                          value={formatCurrency(insumo.preco_unitario)}
                           onChange={(e) => {
                             const val = e.target.value.replace(/\D/g, "");
                             const cents = parseInt(val || "0", 10);
@@ -593,7 +857,7 @@ export default function InsumosPage() {
                       <div className="flex justify-end">
                         <input
                           type="text"
-                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_sabado || 0)}`}
+                          value={formatCurrency(insumo.preco_sabado)}
                           onChange={(e) => {
                             const val = e.target.value.replace(/\D/g, "");
                             const cents = parseInt(val || "0", 10);
@@ -609,7 +873,7 @@ export default function InsumosPage() {
                       <div className="flex justify-end">
                         <input
                           type="text"
-                          value={`R$ ${new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(insumo.preco_domingo_feriado || 0)}`}
+                          value={formatCurrency(insumo.preco_domingo_feriado)}
                           onChange={(e) => {
                             const val = e.target.value.replace(/\D/g, "");
                             const cents = parseInt(val || "0", 10);

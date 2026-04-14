@@ -3,11 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { TCPOItem } from '@/lib/types';
+import { cn } from '@/lib/utils';
 import { 
   Search, 
   FileSpreadsheet, 
   FileText,
   Loader2,
+  Upload,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -24,12 +26,15 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: keyof TCPOItem | 'total'; direction: 'asc' | 'desc' | null }>({
     key: 'id',
     direction: 'asc'
   });
   const saveTimeoutsRef = React.useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const importInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleSort = (key: keyof TCPOItem | 'total') => {
     let direction: 'asc' | 'desc' | null = 'asc';
@@ -54,6 +59,8 @@ export default function ServicesPage() {
     fetchServices();
   }, []);
 
+  const roundCurrencyValue = (value: number | null | undefined) => Number((value ?? 0).toFixed(2));
+
   async function fetchServices() {
     setLoading(true);
     try {
@@ -63,7 +70,16 @@ export default function ServicesPage() {
         .order('id');
 
       if (error) throw error;
-      setServices(data || []);
+      setServices(
+        (data || []).map((service) => ({
+          ...service,
+          custo_mo: roundCurrencyValue(service.custo_mo),
+          custo_mat: roundCurrencyValue(service.custo_mat),
+          custo_eq: roundCurrencyValue(service.custo_eq),
+          custo_sabado: roundCurrencyValue(service.custo_sabado),
+          custo_domingo_feriado: roundCurrencyValue(service.custo_domingo_feriado),
+        }))
+      );
     } catch (error) {
       console.error('Error fetching services:', error);
     } finally {
@@ -107,13 +123,15 @@ export default function ServicesPage() {
   };
 
   const handleUpdateService = async (id: string, field: keyof TCPOItem, value: number) => {
+    const normalizedValue = roundCurrencyValue(value);
+
     // Optimistic update
-    setServices(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setServices(prev => prev.map(s => s.id === id ? { ...s, [field]: normalizedValue } : s));
 
     try {
       const { error } = await supabase
         .from('tcpo_itens')
-        .update({ [field]: value })
+        .update({ [field]: normalizedValue })
         .eq('id', id);
 
       if (error) throw error;
@@ -135,12 +153,12 @@ export default function ServicesPage() {
     if (hasDecimalSeparator) {
       const normalized = cleaned.replace(/\./g, '').replace(',', '.');
       const parsed = Number(normalized);
-      return Number.isFinite(parsed) ? parsed : 0;
+      return Number.isFinite(parsed) ? Number(parsed.toFixed(2)) : 0;
     }
 
     const digitsOnly = cleaned.replace(/\D/g, '');
     if (!digitsOnly) return 0;
-    return Number(digitsOnly) / 100;
+    return Number((Number(digitsOnly) / 100).toFixed(2));
   };
 
   const getFieldDraftKey = (serviceId: string, field: keyof TCPOItem) => `${serviceId}:${field}`;
@@ -185,6 +203,124 @@ export default function ServicesPage() {
       Object.values(saveTimeoutsRef.current).forEach((timeoutId) => clearTimeout(timeoutId));
     };
   }, []);
+
+  const normalizeHeader = (value: unknown) =>
+    String(value ?? '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const toNumber = (value: unknown) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? roundCurrencyValue(value) : null;
+    if (typeof value !== 'string') return null;
+
+    const cleaned = value.replace(/[^\d,.-]/g, '').trim();
+    if (!cleaned) return null;
+
+    if (cleaned.includes(',') || cleaned.includes('.')) {
+      const normalized = cleaned.replace(/\./g, '').replace(',', '.');
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? roundCurrencyValue(parsed) : null;
+    }
+
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    if (!digitsOnly) return null;
+    return roundCurrencyValue(Number(digitsOnly) / 100);
+  };
+
+  const handleImportExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      setFeedbackMessage(null);
+
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const firstSheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: null });
+
+      if (!rows.length) {
+        throw new Error('A planilha está vazia.');
+      }
+
+      const updates = rows
+        .map((row) => {
+          const normalizedEntries = Object.entries(row).reduce<Record<string, unknown>>((acc, [key, value]) => {
+            acc[normalizeHeader(key)] = value;
+            return acc;
+          }, {});
+
+          const id = String(
+            normalizedEntries['codigo'] ??
+            normalizedEntries['código'] ??
+            normalizedEntries['cod'] ??
+            ''
+          ).trim();
+
+          if (!id) return null;
+
+          const payload = {
+            custo_mo: toNumber(normalizedEntries['custo mo (r$)'] ?? normalizedEntries['custo mo']),
+            custo_mat: toNumber(normalizedEntries['custo mat (r$)'] ?? normalizedEntries['custo mat']),
+            custo_eq: toNumber(normalizedEntries['custo eq (r$)'] ?? normalizedEntries['custo eq']),
+            custo_sabado: toNumber(normalizedEntries['total sabado (r$)'] ?? normalizedEntries['total sab. (r$)'] ?? normalizedEntries['sabado'] ?? normalizedEntries['sábado']),
+            custo_domingo_feriado: toNumber(normalizedEntries['total dom./fer. (r$)'] ?? normalizedEntries['dom/fer'] ?? normalizedEntries['domingo/feriado'] ?? normalizedEntries['domingo feriado']),
+          };
+
+          const definedPayload = Object.fromEntries(
+            Object.entries(payload).filter(([, value]) => value !== null)
+          );
+
+          if (Object.keys(definedPayload).length === 0) return null;
+
+          return { id, payload: definedPayload };
+        })
+        .filter((item): item is { id: string; payload: Record<string, number> } => Boolean(item));
+
+      if (!updates.length) {
+        throw new Error('Nenhuma linha válida foi encontrada. Use a coluna Código e pelo menos um campo de valor.');
+      }
+
+      const failures: string[] = [];
+
+      for (const update of updates) {
+        const { error } = await supabase
+          .from('tcpo_itens')
+          .update(update.payload)
+          .eq('id', update.id);
+
+        if (error) {
+          failures.push(`${update.id}: ${error.message}`);
+        }
+      }
+
+      if (failures.length > 0) {
+        throw new Error(`Alguns serviços não puderam ser atualizados. ${failures.slice(0, 3).join(' | ')}`);
+      }
+
+      setFeedbackMessage({
+        type: 'success',
+        text: `${updates.length} serviços atualizados com sucesso pela planilha.`,
+      });
+      await fetchServices();
+    } catch (importError) {
+      console.error('Error importing services spreadsheet:', importError);
+      setFeedbackMessage({
+        type: 'error',
+        text: importError instanceof Error ? importError.message : 'Não foi possível importar a planilha.',
+      });
+    } finally {
+      setIsImporting(false);
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
 
   const exportToExcel = () => {
     setExporting(true);
@@ -232,9 +368,9 @@ export default function ServicesPage() {
             new TableCell({ children: [new Paragraph(s.id)] }),
             new TableCell({ children: [new Paragraph(s.descricao)] }),
             new TableCell({ children: [new Paragraph(s.unidade)] }),
-            new TableCell({ children: [new Paragraph((s.custo_mo + s.custo_mat + s.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
-            new TableCell({ children: [new Paragraph((s.custo_sabado || (s.custo_mo + s.custo_mat + s.custo_eq) * 1.5).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
-            new TableCell({ children: [new Paragraph((s.custo_domingo_feriado || (s.custo_mo + s.custo_mat + s.custo_eq) * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph((s.custo_mo + s.custo_mat + s.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph((s.custo_sabado || (s.custo_mo + s.custo_mat + s.custo_eq) * 1.5).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
+            new TableCell({ children: [new Paragraph((s.custo_domingo_feriado || (s.custo_mo + s.custo_mat + s.custo_eq) * 2).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }))] }),
           ],
         }))
       ];
@@ -277,6 +413,22 @@ export default function ServicesPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            className="hidden"
+            onChange={(event) => void handleImportExcel(event)}
+          />
+          <button
+            type="button"
+            onClick={() => importInputRef.current?.click()}
+            disabled={loading || isImporting}
+            className="flex items-center gap-2 px-6 py-2.5 bg-[#1a1a1a] hover:bg-[#2a2a2a] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border border-slate-800/50"
+          >
+            {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            <span>{isImporting ? 'Importando...' : 'Importar Excel'}</span>
+          </button>
           <button
             onClick={exportToExcel}
             disabled={loading || exporting || filteredServices.length === 0}
@@ -296,6 +448,19 @@ export default function ServicesPage() {
         </div>
       </div>
 
+      {feedbackMessage && (
+        <div
+          className={cn(
+            'rounded-2xl border px-4 py-3 text-xs font-bold uppercase tracking-widest',
+            feedbackMessage.type === 'success'
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400'
+              : 'border-rose-500/20 bg-rose-500/10 text-rose-400'
+          )}
+        >
+          {feedbackMessage.text}
+        </div>
+      )}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
         <input
@@ -313,7 +478,7 @@ export default function ServicesPage() {
             <thead>
               <tr className="bg-[#0a0a0a] text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-800/50">
                 <th className="px-2 py-4 w-[40px]"></th>
-                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-[90px]" onClick={() => handleSort('id')}>
+                <th className="px-2 py-4 cursor-pointer hover:text-white transition-colors w-[130px]" onClick={() => handleSort('id')}>
                   <div className="flex items-center">
                     Código {getSortIcon('id')}
                   </div>
@@ -387,7 +552,7 @@ export default function ServicesPage() {
                       </td>
                       <td className="px-2 py-2 text-right">
                         <span className="text-[16px] font-black text-[#d4ff3f]">
-                          R$ {(service.custo_mo + service.custo_mat + service.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {(service.custo_mo + service.custo_mat + service.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </td>
                       <td className="px-2 py-2 text-right">
