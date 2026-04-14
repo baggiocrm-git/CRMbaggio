@@ -328,7 +328,7 @@ export default function ServicesPage() {
                     Un {getSortIcon('unidade')}
                   </div>
                 </th>
-                <th className="px-2 py-4 text-right cursor-pointer hover:text-white transition-colors w-[110px]" onClick={() => handleSort('total')}>
+                <th className="px-2 py-4 text-right cursor-pointer hover:text-white transition-colors w-[145px]" onClick={() => handleSort('total')}>
                   <div className="flex items-center justify-end">
                     Total Normal {getSortIcon('total')}
                   </div>
@@ -376,17 +376,17 @@ export default function ServicesPage() {
                         )}
                       </td>
                       <td className="px-2 py-2">
-                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate">{service.id}</p>
+                        <p className="text-[13px] font-black text-slate-500 uppercase tracking-widest truncate">{service.id}</p>
                       </td>
                       <td className="px-2 py-2 overflow-hidden">
-                        <div className="text-sm font-bold text-white truncate" title={service.descricao}>{service.descricao}</div>
-                        <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-0.5 truncate">{service.categoria}</div>
+                        <div className="text-[16px] font-bold text-white truncate" title={service.descricao}>{service.descricao}</div>
+                        <div className="text-[13px] font-black text-slate-500 uppercase tracking-widest mt-0.5 truncate">{service.categoria}</div>
                       </td>
                       <td className="px-2 py-2">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{service.unidade}</span>
+                        <span className="text-[13px] font-black text-slate-400 uppercase tracking-widest">{service.unidade}</span>
                       </td>
                       <td className="px-2 py-2 text-right">
-                        <span className="text-sm font-black text-[#d4ff3f]">
+                        <span className="text-[16px] font-black text-[#d4ff3f]">
                           R$ {(service.custo_mo + service.custo_mat + service.custo_eq).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                         </span>
                       </td>
@@ -409,7 +409,7 @@ export default function ServicesPage() {
                             }}
                             onFocus={(e) => e.target.select()}
                             onClick={(e) => (e.target as HTMLInputElement).select()}
-                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-orange-400 text-right outline-none focus:ring-2 focus:ring-orange-400/30 transition-all"
+                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-orange-400 text-right outline-none focus:ring-2 focus:ring-orange-400/30 transition-all"
                           />
                         </div>
                       </td>
@@ -432,7 +432,7 @@ export default function ServicesPage() {
                             }}
                             onFocus={(e) => e.target.select()}
                             onClick={(e) => (e.target as HTMLInputElement).select()}
-                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-rose-400 text-right outline-none focus:ring-2 focus:ring-rose-400/30 transition-all"
+                            className="w-28 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-rose-400 text-right outline-none focus:ring-2 focus:ring-rose-400/30 transition-all"
                           />
                         </div>
                       </td>
@@ -466,7 +466,7 @@ export default function ServicesPage() {
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}
-                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-blue-500 text-left outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-blue-500 text-left outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
                                 />
                               </div>
                               <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/50">
@@ -488,7 +488,7 @@ export default function ServicesPage() {
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}
-                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-orange-500 text-left outline-none focus:ring-2 focus:ring-orange-500/30 transition-all"
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-orange-500 text-left outline-none focus:ring-2 focus:ring-orange-500/30 transition-all"
                                 />
                               </div>
                               <div className="p-4 bg-[#0a0a0a] rounded-2xl border border-slate-800/50">
@@ -510,7 +510,7 @@ export default function ServicesPage() {
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onClick={(e) => (e.target as HTMLInputElement).select()}
-                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-sm font-black text-purple-500 text-left outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
+                                  className="w-full bg-[#1a1a1a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-purple-500 text-left outline-none focus:ring-2 focus:ring-purple-500/30 transition-all"
                                 />
                               </div>
                             </div>

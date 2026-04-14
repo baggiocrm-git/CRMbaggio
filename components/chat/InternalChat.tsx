@@ -72,27 +72,34 @@ interface ChatUserPreferences {
 const EMOJIS = ['\u{1F600}', '\u{1F602}', '\u{1F60D}', '\u{1F525}', '\u{1F44D}', '\u{1F44F}', '\u{1F64F}', '\u2705', '\u{1F389}', '\u{1F680}', '\u{1F4AC}', '\u{1F4CE}', '\u{1F4CC}', '\u{1F440}', '\u2764\uFE0F', '\u{1F605}'];
 const ACCEPTED_ATTACHMENTS = 'image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip';
 const PRESENCE_TIMEOUT_MS = 90000;
-const DEFAULT_AVATAR_STYLE = 'homem_moreno';
+const DEFAULT_AVATAR_STYLE = 'homem01';
 const AVATAR_STYLES: Record<
   string,
   {
     label: string;
-    skin: string;
-    hair: string;
-    shirt: string;
-    accent?: string;
-    feminine?: boolean;
-    elder?: boolean;
+    src: string;
+    group: 'men' | 'women';
   }
 > = {
-  homem_moreno: { label: 'Homem Moreno', skin: '#c58c66', hair: '#2f241f', shirt: '#3b82f6' },
-  homem_loiro: { label: 'Homem Loiro', skin: '#f0c7a4', hair: '#d9b44a', shirt: '#0ea5e9' },
-  mulher_morena: { label: 'Mulher Morena', skin: '#c48a67', hair: '#3a251c', shirt: '#ec4899', feminine: true },
-  mulher_loira: { label: 'Mulher Loira', skin: '#f2ceb1', hair: '#e5c158', shirt: '#f472b6', feminine: true },
-  senhor_moreno: { label: 'Senhor Moreno', skin: '#b98260', hair: '#5c5c5c', shirt: '#6366f1', elder: true },
-  senhor_loiro: { label: 'Senhor Loiro', skin: '#efc6a6', hair: '#d2d6db', shirt: '#8b5cf6', elder: true },
-  senhora_morena: { label: 'Senhora Morena', skin: '#be8562', hair: '#6b7280', shirt: '#f43f5e', feminine: true, elder: true },
-  senhora_loira: { label: 'Senhora Loira', skin: '#f1ccb0', hair: '#d8dce0', shirt: '#fb7185', feminine: true, elder: true },
+  homem01: { label: 'Homem 01', src: '/chat-avatars/Homem01.jpg', group: 'men' },
+  homem02: { label: 'Homem 02', src: '/chat-avatars/Homem02.jpg', group: 'men' },
+  homem03: { label: 'Homem 03', src: '/chat-avatars/Homem03.jpg', group: 'men' },
+  homem04: { label: 'Homem 04', src: '/chat-avatars/Homem04.jpg', group: 'men' },
+  mulher01: { label: 'Mulher 01', src: '/chat-avatars/Mulher01.jpg', group: 'women' },
+  mulher02: { label: 'Mulher 02', src: '/chat-avatars/Mulher02.jpg', group: 'women' },
+  mulher03: { label: 'Mulher 03', src: '/chat-avatars/Mulher03.jpg', group: 'women' },
+};
+
+const LEGACY_AVATAR_STYLE_MAP: Record<string, string> = {
+  homem_moreno: 'homem01',
+  homem_loiro: 'homem02',
+  homem_barba: 'homem03',
+  senhor_moreno: 'homem04',
+  senhor_loiro: 'homem04',
+  mulher_morena: 'mulher01',
+  mulher_loira: 'mulher02',
+  senhora_morena: 'mulher03',
+  senhora_loira: 'mulher03',
 };
 
 function formatTime(value: string) {
@@ -114,25 +121,19 @@ function getFirstName(name: string) {
 }
 
 function getAvatarPreset(styleKey?: string) {
-  return AVATAR_STYLES[styleKey || DEFAULT_AVATAR_STYLE] || AVATAR_STYLES[DEFAULT_AVATAR_STYLE];
+  const resolvedStyleKey = (styleKey && (AVATAR_STYLES[styleKey] ? styleKey : LEGACY_AVATAR_STYLE_MAP[styleKey])) || DEFAULT_AVATAR_STYLE;
+  return AVATAR_STYLES[resolvedStyleKey] || AVATAR_STYLES[DEFAULT_AVATAR_STYLE];
 }
 
 function renderAvatar(styleKey?: string, offline?: boolean) {
   const preset = getAvatarPreset(styleKey);
 
   return (
-    <svg viewBox="0 0 64 64" className={cn('size-full', offline && 'opacity-65 grayscale')}>
-      <circle cx="32" cy="32" r="31" fill="#f4f4f5" />
-      <path d={preset.feminine ? 'M17 27c2-12 12-18 15-18s13 6 15 18v7H17z' : 'M18 24c3-10 11-15 14-15s11 5 14 15v8H18z'} fill={preset.hair} />
-      <circle cx="32" cy="28" r={preset.elder ? '11.5' : '12'} fill={preset.skin} />
-      {preset.elder && <path d="M24 30c2 2 5 3 8 3s6-1 8-3" stroke="#f5f5f5" strokeWidth="1.6" strokeLinecap="round" />}
-      {preset.feminine && <path d="M19 28c1 8 5 13 13 13s12-5 13-13" fill={preset.hair} opacity="0.3" />}
-      <circle cx="27.5" cy="27.5" r="1.2" fill="#1f2937" />
-      <circle cx="36.5" cy="27.5" r="1.2" fill="#1f2937" />
-      <path d="M28.5 33.5c1.2 1 2.5 1.5 3.5 1.5s2.3-.5 3.5-1.5" stroke="#7c2d12" strokeWidth="1.5" strokeLinecap="round" fill="none" />
-      <path d={preset.feminine ? 'M18 58c1-10 7-15 14-15s13 5 14 15z' : 'M16 58c2-9 8-13 16-13s14 4 16 13z'} fill={preset.shirt} />
-      {preset.feminine && <path d="M26 44l6 6 6-6" fill={preset.shirt} opacity="0.8" />}
-    </svg>
+    <img
+      src={preset.src}
+      alt={preset.label}
+      className={cn('size-full object-cover', offline && 'opacity-65 grayscale')}
+    />
   );
 }
 
@@ -1296,7 +1297,7 @@ export default function InternalChat() {
                   <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Homens</p>
                   <div className="grid grid-cols-4 gap-2">
                     {Object.entries(AVATAR_STYLES)
-                      .filter(([key]) => key.startsWith('homem_') || key.startsWith('senhor_'))
+                      .filter(([, style]) => style.group === 'men')
                       .map(([key, style], index) => (
                         <button
                           key={`male-avatar-${key || index}`}
@@ -1322,7 +1323,7 @@ export default function InternalChat() {
                   <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-slate-500">Mulheres</p>
                   <div className="grid grid-cols-4 gap-2">
                     {Object.entries(AVATAR_STYLES)
-                      .filter(([key]) => key.startsWith('mulher_') || key.startsWith('senhora_'))
+                      .filter(([, style]) => style.group === 'women')
                       .map(([key, style], index) => (
                         <button
                           key={`female-avatar-${key || index}`}

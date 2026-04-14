@@ -519,13 +519,10 @@ export default function InsumosPage() {
                     Unid. {getSortIcon('unidade')}
                   </div>
                 </th>
-                <th className="px-2 py-2 text-center cursor-pointer hover:text-white transition-colors w-[110px]" onClick={() => handleSort('tipo')}>
+                <th className="px-2 py-2 text-center cursor-pointer hover:text-white transition-colors w-[145px]" onClick={() => handleSort('tipo')}>
                   <div className="flex items-center justify-center">
                     Tipo {getSortIcon('tipo')}
                   </div>
-                </th>
-                <th className="px-2 py-2 text-center text-slate-500 text-[10px] font-black uppercase tracking-widest w-[60px]">
-                  Norm
                 </th>
                 <th className="px-2 py-2 text-right cursor-pointer hover:text-white transition-colors w-[100px]" onClick={() => handleSort('preco_unitario')}>
                   <div className="flex items-center justify-end">
@@ -548,14 +545,14 @@ export default function InsumosPage() {
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <Loader2 size={24} className="text-[#d4ff3f] animate-spin mx-auto mb-2" />
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Carregando insumos...</p>
                   </td>
                 </tr>
               ) : filteredInsumos.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-500 text-sm font-bold">
                     Nenhum insumo encontrado.
                   </td>
                 </tr>
@@ -566,20 +563,15 @@ export default function InsumosPage() {
                       <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest truncate">{insumo.id}</p>
                     </td>
                     <td className="px-2 py-1.5 overflow-hidden">
-                      <p className="text-sm font-bold text-white truncate" title={insumo.descricao}>{insumo.descricao}</p>
+                      <p className="text-[16px] font-bold text-white truncate" title={insumo.descricao}>{insumo.descricao}</p>
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{insumo.unidade}</span>
+                      <span className="text-[13px] font-black text-slate-400 uppercase tracking-widest">{insumo.unidade}</span>
                     </td>
                     <td className="px-2 py-1.5 text-center">
-                      <span className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${getTypeColor(insumo.tipo)}`}>
+                      <span className={`px-2 py-1 rounded-lg text-[11px] font-black uppercase tracking-widest ${getTypeColor(insumo.tipo)}`}>
                         {getTypeName(insumo.tipo)}
                       </span>
-                    </td>
-                    <td className="px-2 py-1.5 text-center">
-                      <div className="bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] inline-block min-w-[40px]">
-                        {Math.floor(insumo.preco_unitario || 0)}
-                      </div>
                     </td>
                     <td className="px-2 py-1.5 text-right">
                       <div className="flex justify-end">
@@ -593,7 +585,7 @@ export default function InsumosPage() {
                           }}
                           onFocus={(e) => e.target.select()}
                           onClick={(e) => (e.target as HTMLInputElement).select()}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
@@ -609,7 +601,7 @@ export default function InsumosPage() {
                           }}
                           onFocus={(e) => e.target.select()}
                           onClick={(e) => (e.target as HTMLInputElement).select()}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>
@@ -625,7 +617,7 @@ export default function InsumosPage() {
                           }}
                           onFocus={(e) => e.target.select()}
                           onClick={(e) => (e.target as HTMLInputElement).select()}
-                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[10px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+                          className="w-24 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-2 py-1 text-[13px] font-black text-[#d4ff3f] text-right outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
                         />
                       </div>
                     </td>

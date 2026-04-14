@@ -604,12 +604,12 @@ export default function CalendarPage() {
         <div 
           key={day.toString()} 
           className={cn(
-            "min-h-[120px] p-2 border-r border-b border-white/20 flex flex-col gap-1 transition-colors",
+            "min-h-[152px] px-2 py-3 border-r border-b border-white/20 flex flex-col gap-2 transition-colors",
             !isSameMonth(day, monthStart) ? "bg-[#141414]/50 opacity-30" : "bg-[#141414]",
             isToday(day) && "bg-gradient-to-b from-orange-400/22 via-orange-400/12 to-orange-400/8 ring-1 ring-inset ring-orange-400/35 shadow-[inset_0_0_0_1px_rgba(251,146,60,0.10)]"
           )}
         >
-          <div className="flex justify-between items-center mb-1">
+          <div className="flex justify-between items-center mb-2">
             <span className={cn(
               "text-[10px] font-black",
               isToday(day) ? "text-[#d4ff3f]" : "text-slate-500"
@@ -619,7 +619,7 @@ export default function CalendarPage() {
             {isToday(day) && <div className="size-1 rounded-full bg-orange-400" />}
           </div>
           
-          <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar max-h-[80px]">
+          <div className="flex flex-col gap-1.5 overflow-y-auto custom-scrollbar max-h-[104px]">
             {dayEvents.map(event => (
               <div 
                 key={event.id}
