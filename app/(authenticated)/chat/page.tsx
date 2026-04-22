@@ -817,6 +817,7 @@ export default function ChatPage() {
                   alt="Logo" 
                   fill
                   sizes="128px"
+                  priority
                   className="object-contain opacity-20 grayscale"
                   referrerPolicy="no-referrer"
                 />

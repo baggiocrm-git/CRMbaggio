@@ -345,6 +345,7 @@ export default function LoginPage() {
               alt="Logo" 
               fill
               sizes="112px"
+              priority
               className="object-contain relative z-10"
               referrerPolicy="no-referrer"
             />
