@@ -20,18 +20,24 @@ interface HeaderProps {
 
 const Header = React.memo(function Header({ title, subtitle, searchValue, onSearch, onRefresh, isRefreshing, extraAction, action }: HeaderProps) {
   return (
-    <header className="h-20 border-b border-slate-800/50 bg-[#0a0a0a] px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
-      <div className="flex items-center gap-4">
-        <div className="flex flex-col">
-          <h2 className="text-xl font-black text-white tracking-tight leading-none">{title}</h2>
-          {subtitle && <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">{subtitle}</p>}
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-[linear-gradient(180deg,rgba(6,10,24,0.94),rgba(7,16,31,0.82))] px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="hidden h-12 w-[3px] rounded-full bg-[linear-gradient(180deg,#d4ff3f,rgba(125,211,252,0.45))] sm:block" />
+          <div className="flex flex-col">
+            <div className="mb-1 inline-flex w-fit items-center rounded-full border border-lime-300/15 bg-lime-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.28em] text-lime-200">
+              Painel operacional
+            </div>
+            <h2 className="text-2xl font-black leading-none tracking-tight text-white">{title}</h2>
+            {subtitle && <p className="mt-2 text-[10px] font-bold uppercase tracking-[0.24em] text-slate-500">{subtitle}</p>}
+          </div>
         </div>
         {onRefresh && (
           <button 
             onClick={onRefresh}
             disabled={isRefreshing}
             className={cn(
-              "p-2 rounded-xl bg-[#1a1a1a] text-slate-500 hover:text-[#d4ff3f] transition-all",
+              "rounded-2xl border border-white/10 bg-white/5 p-2.5 text-slate-400 transition-all hover:border-lime-300/20 hover:text-[#d4ff3f]",
               isRefreshing && "opacity-50"
             )}
           >
@@ -40,24 +46,24 @@ const Header = React.memo(function Header({ title, subtitle, searchValue, onSear
         )}
       </div>
 
-      <div className="flex items-center gap-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:justify-end">
         {onSearch && (
-          <div className="hidden md:flex items-center gap-3 bg-[#1a1a1a] rounded-2xl px-4 py-2 border border-slate-800/50 focus-within:border-[#d4ff3f]/50 transition-all">
+          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 transition-all focus-within:border-[#d4ff3f]/50 sm:min-w-[18rem] lg:min-w-[22rem]">
             <Search size={18} className="text-slate-500" />
             <input 
               type="text" 
               placeholder="Pesquisar..." 
               value={searchValue ?? ''}
               onChange={(e) => onSearch(e.target.value)}
-              className="bg-transparent border-none focus:ring-0 text-sm text-white w-64 placeholder:text-slate-700 font-bold"
+              className="w-full border-none bg-transparent text-sm font-bold text-white placeholder:text-slate-700 focus:ring-0"
             />
           </div>
         )}
 
-        <div className="flex items-center gap-3 border-l border-slate-800/50 pl-6">
-          <button className="size-10 flex items-center justify-center rounded-2xl bg-[#1a1a1a] text-slate-500 hover:text-[#d4ff3f] hover:bg-[#2a2a2a] transition-all relative group">
+        <div className="flex items-center gap-3 sm:border-l sm:border-white/10 sm:pl-4 lg:pl-6">
+          <button className="group relative flex size-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-slate-500 transition-all hover:border-lime-300/20 hover:text-[#d4ff3f]">
             <Bell size={20} className="group-hover:scale-110 transition-transform" />
-            <span className="absolute top-2.5 right-2.5 size-2 bg-rose-500 rounded-full border-2 border-[#0a0a0a]"></span>
+            <span className="absolute right-2.5 top-2.5 size-2 rounded-full bg-rose-500 ring-2 ring-[#09111f]"></span>
           </button>
 
           {extraAction}
@@ -65,7 +71,7 @@ const Header = React.memo(function Header({ title, subtitle, searchValue, onSear
           {action && (
             <button 
               onClick={action.onClick}
-              className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2 active:scale-95"
+              className="flex items-center gap-2 rounded-2xl bg-[#d4ff3f] px-5 py-3 text-[10px] font-black uppercase tracking-[0.24em] text-[#0a0a0a] shadow-[0_18px_40px_rgba(212,255,63,0.16)] transition-all hover:bg-[#c4ef2f] active:scale-95"
             >
               <Plus size={18} />
               {action.label}

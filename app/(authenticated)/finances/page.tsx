@@ -13,7 +13,8 @@ import {
   ArrowRight,
   Wallet,
   ClipboardList,
-  CheckCircle2
+  CheckCircle2,
+  ReceiptText
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -193,6 +194,12 @@ export default function FinanceDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => window.location.href = '/finances/invoices'}
+            className="flex items-center gap-2 px-4 py-2 bg-[#d4ff3f] text-[#0a0a0a] rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
+          >
+            <ReceiptText size={14} /> Notas Fiscais
+          </button>
           <button 
             onClick={fetchData}
             className="flex items-center gap-2 px-4 py-2 bg-[#1a1a1a] border border-slate-800 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-[#2a2a2a] transition-all"

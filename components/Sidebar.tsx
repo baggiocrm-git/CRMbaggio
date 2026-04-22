@@ -21,7 +21,8 @@ import {
   Layers,
   ClipboardList,
   Calendar,
-  BarChart3
+  BarChart3,
+  ReceiptText
 } from 'lucide-react';
 
 interface NavItem {
@@ -52,6 +53,7 @@ const navItems: NavGroup[] = [
     { name: 'Contas a Receber', icon: TrendingUp, href: '/finances/receivables' },
     { name: 'Contas a Pagar', icon: TrendingDown, href: '/finances/payables' },
     { name: 'Centros de Custo', icon: Layers, href: '/finances/cost-centers' },
+    { name: 'Notas Fiscais', icon: ReceiptText, href: '/finances/invoices' },
   ]},
   { group: 'ENGENHARIA', items: [
     { name: 'Projetos', icon: Briefcase, href: '/projects' },
@@ -64,9 +66,11 @@ const navItems: NavGroup[] = [
 
 interface SidebarProps {
   user?: User | null;
+  isMobileOpen?: boolean;
+  onClose?: () => void;
 }
 
-export default function Sidebar({ user: propUser }: SidebarProps) {
+export default function Sidebar({ user: propUser, isMobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const [internalUser, setInternalUser] = React.useState<User | null>(null);
 
@@ -161,93 +165,127 @@ export default function Sidebar({ user: propUser }: SidebarProps) {
   }).filter(group => group.items.length > 0);
 
   return (
-    <aside className="w-64 flex-shrink-0 border-r border-slate-800/50 bg-[#0a0a0a] flex flex-col h-screen sticky top-0">
-      <div className="px-6 pt-6 pb-4 border-b border-slate-800/50 flex flex-col items-center gap-1">
-        <div className="size-16 relative">
-          <Image 
-            src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true" 
-            alt="Logo" 
-            fill
-            sizes="64px"
-            priority
-            className="object-contain"
-            referrerPolicy="no-referrer"
-          />
+    <aside
+      className={cn(
+        "fixed inset-y-0 left-0 z-40 w-[19rem] flex-shrink-0 p-3 transition-transform duration-300 lg:sticky lg:top-0 lg:z-20 lg:h-screen lg:w-[21rem] lg:translate-x-0",
+        isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+      )}
+    >
+      <div className="flex h-full flex-col overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(10,14,28,0.96),rgba(6,10,22,0.96))] shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl">
+        <div className="flex flex-col items-center gap-2 border-b border-white/10 px-6 pb-5 pt-6">
+          <div className="relative size-16">
+            <Image
+              src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true"
+              alt="Logo"
+              fill
+              sizes="64px"
+              priority
+              className="object-contain"
+              referrerPolicy="no-referrer"
+            />
+          </div>
+          <div className="text-center leading-none">
+            <h1 className="whitespace-nowrap text-[10px] font-medium uppercase leading-none tracking-tight text-white">Construtora Baggio Silveira Ltda.</h1>
+            <span className="mt-2 block text-[8px] font-bold uppercase leading-none tracking-[0.32em] text-[#d4ff3f]">Gestão de Engenharia</span>
+          </div>
+          <div className="mt-2 inline-flex items-center rounded-full border border-lime-300/20 bg-lime-300/10 px-3 py-1 text-[9px] font-black uppercase tracking-[0.28em] text-lime-200">
+            Espaço Operacional
+          </div>
         </div>
-        <div className="text-center leading-none">
-          <h1 className="font-medium text-[10px] leading-none tracking-tight text-white uppercase whitespace-nowrap">Construtora Baggio Silveira Ltda.</h1>
-          <span className="block mt-2 font-bold text-[8px] leading-none text-[#d4ff3f] uppercase tracking-widest">Gestão de Engenharia</span>
-        </div>
-      </div>
 
-      <nav className="flex-1 p-4 space-y-6 overflow-y-auto custom-scrollbar">
-        {filteredNavItems.map((group) => (
-          <div key={group.group} className="space-y-1">
-            <div className="text-[10px] font-black text-slate-600 uppercase tracking-widest px-3 mb-2">{group.group}</div>
-            {group.items.map((item) => {
-              const isActive = pathname === item.href;
-              return (
-                <Link 
-                  key={item.name} 
-                  href={item.href}
+        <nav className="custom-scrollbar flex-1 space-y-6 overflow-y-auto p-4">
+          {filteredNavItems.map((group) => (
+            <div key={group.group} className="space-y-1">
+              <div className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{group.group}</div>
+              {group.items.map((item) => {
+                const isActive = pathname === item.href;
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={onClose}
+                    className={cn(
+                      "group flex items-center justify-between rounded-2xl border px-3 py-3 transition-all",
+                      isActive
+                        ? "border-lime-300/20 bg-lime-300/10 text-[#d4ff3f] shadow-lg shadow-lime-950/20"
+                        : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "flex size-9 items-center justify-center rounded-xl border transition-all",
+                          isActive
+                            ? "border-lime-300/20 bg-lime-300/10 text-[#d4ff3f]"
+                            : "border-white/10 bg-white/[0.03] text-slate-500 group-hover:border-white/15 group-hover:text-white"
+                        )}
+                      >
+                        <item.icon size={18} />
+                      </span>
+                      <span className="text-xs font-bold">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {item.badge && (
+                        <span className="flex size-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-black text-white">
+                          {item.badge}
+                        </span>
+                      )}
+                      {isActive && <div className="size-1.5 rounded-full bg-[#d4ff3f]" />}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          ))}
+
+          <div className="border-t border-white/10 pt-4">
+            <Link
+              href="/settings"
+              onClick={onClose}
+              className={cn(
+                "group flex items-center justify-between rounded-2xl border px-3 py-3 transition-all",
+                pathname === '/settings'
+                  ? "border-lime-300/20 bg-[#d4ff3f]/10 text-[#d4ff3f]"
+                  : "border-transparent text-slate-400 hover:border-white/10 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <div className="flex items-center gap-3">
+                <span
                   className={cn(
-                    "flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group",
-                    isActive 
-                      ? "bg-[#1a1a1a] text-[#d4ff3f] shadow-lg shadow-black/20" 
-                      : "text-slate-400 hover:bg-[#1a1a1a] hover:text-white"
+                    "flex size-9 items-center justify-center rounded-xl border transition-all",
+                    pathname === '/settings'
+                      ? "border-lime-300/20 bg-lime-300/10 text-[#d4ff3f]"
+                      : "border-white/10 bg-white/[0.03] text-slate-500 group-hover:border-white/15 group-hover:text-white"
                   )}
                 >
-                  <div className="flex items-center gap-3">
-                    <item.icon size={18} className={cn(isActive ? "text-[#d4ff3f]" : "text-slate-500 group-hover:text-white transition-colors")} />
-                    <span className="text-xs font-bold">{item.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {item.badge && (
-                      <span className="size-5 flex items-center justify-center bg-rose-500 text-white text-[10px] font-black rounded-full">
-                        {item.badge}
-                      </span>
-                    )}
-                    {isActive && <div className="size-1.5 rounded-full bg-[#d4ff3f]" />}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        ))}
+                  <Settings size={18} />
+                </span>
+                <span className="text-xs font-bold">Configurações</span>
+              </div>
+              {pathname === '/settings' && <div className="size-1.5 rounded-full bg-[#d4ff3f]" />}
+            </Link>
 
-        <div className="pt-4 border-t border-slate-800/50">
-          <Link 
-            href="/settings"
-            className={cn(
-              "flex items-center justify-between px-3 py-2.5 rounded-xl transition-all group",
-              pathname === '/settings' ? "bg-[#d4ff3f]/10 text-[#d4ff3f]" : "text-slate-400 hover:bg-[#1a1a1a] hover:text-white"
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <Settings size={18} className={cn(pathname === '/settings' ? "text-[#d4ff3f]" : "text-slate-500 group-hover:text-white transition-colors")} />
-              <span className="text-xs font-bold">Configurações</span>
+            <button
+              onClick={handleLogout}
+              className="group mt-1 flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-rose-500/80 transition-all hover:bg-rose-500/10 hover:text-rose-400"
+            >
+              <span className="flex size-9 items-center justify-center rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400/80 transition-transform group-hover:scale-105">
+                <LogOut size={18} />
+              </span>
+              <span className="text-xs font-bold">Sair</span>
+            </button>
+          </div>
+        </nav>
+
+        <div className="border-t border-white/10 p-4">
+          <div className="flex items-center gap-3 rounded-[24px] border border-white/10 bg-white/[0.04] p-3">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-[#d4ff3f] text-xs font-black text-[#0a0a0a] shadow-[0_10px_30px_rgba(212,255,63,0.18)]">
+              {userInitials}
             </div>
-            {pathname === '/settings' && <div className="size-1.5 rounded-full bg-[#d4ff3f]" />}
-          </Link>
-
-          <button 
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-rose-500/80 hover:bg-rose-500/10 hover:text-rose-500 rounded-xl transition-all mt-1 group"
-          >
-            <LogOut size={18} className="text-rose-500/50 group-hover:scale-110 transition-transform" />
-            <span className="text-xs font-bold">Sair</span>
-          </button>
-        </div>
-      </nav>
-
-      <div className="p-4 border-t border-slate-800/50">
-        <div className="flex items-center gap-3 p-3 bg-[#1a1a1a] rounded-2xl border border-slate-800/50">
-          <div className="size-8 rounded-full bg-[#d4ff3f] flex items-center justify-center text-[#0a0a0a] font-black text-xs">
-            {userInitials}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold text-white truncate">{userName}</p>
-            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter truncate">{userRole} â€¢ {userEmail}</p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white">{userName}</p>
+              <p className="truncate text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">{userRole} • {userEmail}</p>
+            </div>
           </div>
         </div>
       </div>
