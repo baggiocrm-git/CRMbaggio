@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { Lock, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { getDefaultPathForRole, getRoleFromUser } from '@/lib/navigation';
 
 const CLIENT_PORTAL_CLOSE_LOGOUT_KEY = 'client-portal-force-logout';
 
@@ -28,7 +29,7 @@ export default function LoginPage() {
     for (let attempt = 0; attempt < 8; attempt++) {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.push('/dashboard');
+        router.push(getDefaultPathForRole(getRoleFromUser(session.user)));
         return;
       }
       await new Promise((resolve) => setTimeout(resolve, 300));
@@ -111,7 +112,7 @@ export default function LoginPage() {
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {
           console.log('LoginPage: Login detectado via onAuthStateChange, redirecionando...');
-          router.push('/dashboard');
+          router.push(getDefaultPathForRole(getRoleFromUser(session.user)));
         } else if (event === 'SIGNED_OUT') {
           setActiveSessionEmail(null);
         }
@@ -165,7 +166,9 @@ export default function LoginPage() {
   };
 
   const handleContinueSession = () => {
-    router.push('/dashboard');
+    void supabase.auth.getUser().then(({ data: { user } }) => {
+      router.push(getDefaultPathForRole(getRoleFromUser(user)));
+    });
   };
 
 
@@ -211,7 +214,7 @@ export default function LoginPage() {
         localStorage.removeItem('remembered_email');
       }
 
-      const userRole = data.user?.user_metadata?.role;
+      const userRole = getRoleFromUser(data.user);
       if (userRole === 'Cliente') {
         // Fetch the project linked to this client
         const { data: projectData } = await supabase
@@ -225,10 +228,10 @@ export default function LoginPage() {
           router.push(`/client/rdo/${projectData.id}`);
         } else {
           // If no project linked, maybe show a message or just go to dashboard (which will likely deny access)
-          router.push('/dashboard');
+          router.push(getDefaultPathForRole(userRole));
         }
       } else {
-        router.push('/dashboard');
+        router.push(getDefaultPathForRole(userRole));
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Credenciais inválidas';

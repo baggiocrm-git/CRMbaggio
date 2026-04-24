@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { getFinanceEntryPathForRole, getRoleFromUser, isAdminRole, isAuxAdminLevel1Role, isAuxAdminLevel2Role, isFinancialAdminLevel1Role, isFinancialAdminLevel2Role } from '@/lib/navigation';
 import type { User } from '@supabase/supabase-js';
 import { 
   LayoutDashboard, 
@@ -36,9 +37,6 @@ interface NavGroup {
   group: string;
   items: NavItem[];
 }
-
-const AUXILIAR_ADMIN_NIVEL_1 = 'Auxiliar Administrativo Nível 1';
-const AUXILIAR_ADMIN_NIVEL_2 = 'Auxiliar Administrativo Nível 2';
 
 const navItems: NavGroup[] = [
   { group: 'PRINCIPAL', items: [
@@ -81,7 +79,7 @@ export default function Sidebar({ user: propUser, isMobileOpen = false, onClose 
     if (propUser !== undefined) return; // Skip if controlled by prop
 
     // Listen for auth state changes to catch the user as soon as they log in
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('Sidebar: Auth state changed:', event, !!session);
       if (session?.user) {
         setInternalUser(session.user);
@@ -92,12 +90,10 @@ export default function Sidebar({ user: propUser, isMobileOpen = false, onClose 
 
     // Initial check
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setInternalUser(user);
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      setInternalUser(session?.user ?? null);
     };
-    checkUser();
+    void checkUser();
 
     return () => {
       subscription.unsubscribe();
@@ -128,12 +124,15 @@ export default function Sidebar({ user: propUser, isMobileOpen = false, onClose 
     'Conectado'
   ).toLowerCase().trim();
   
-  const userRole = user?.user_metadata?.role || 'Usuário';
-  const isAdmin = userRole === 'Administrador';
-  const isAuxAdminLevel1 = userRole === AUXILIAR_ADMIN_NIVEL_1;
-  const isAuxAdminLevel2 = userRole === AUXILIAR_ADMIN_NIVEL_2;
+  const userRole = getRoleFromUser(user) || 'Usuário';
+  const isAdmin = isAdminRole(userRole);
+  const isAuxAdminLevel1 = isAuxAdminLevel1Role(userRole);
+  const isAuxAdminLevel2 = isAuxAdminLevel2Role(userRole);
+  const isFinancialAdminLevel1 = isFinancialAdminLevel1Role(userRole);
+  const isFinancialAdminLevel2 = isFinancialAdminLevel2Role(userRole);
   const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
   const userInitials = userName.split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+  const financeEntryHref = isAdmin ? '/finances' : getFinanceEntryPathForRole(userRole);
 
   const filteredNavItems = navItems.map(group => {
     if (isAuxAdminLevel2) {
@@ -145,6 +144,34 @@ export default function Sidebar({ user: propUser, isMobileOpen = false, onClose 
 
     if (isAuxAdminLevel1) {
       if (group.group === 'PRINCIPAL' || group.group === 'FINANCEIRO' || group.group === 'OUTROS') {
+        return { ...group };
+      }
+      return { ...group, items: [] };
+    }
+
+    if (isFinancialAdminLevel1) {
+      if (group.group === 'FINANCEIRO') {
+        return {
+          ...group,
+          items: group.items.filter((item) =>
+            item.href === '/finances/receivables' || item.href === '/finances/payables'
+          ),
+        };
+      }
+      if (group.group === 'OUTROS') {
+        return { ...group };
+      }
+      return { ...group, items: [] };
+    }
+
+    if (isFinancialAdminLevel2) {
+      if (group.group === 'FINANCEIRO') {
+        return {
+          ...group,
+          items: group.items.filter((item) => item.href === '/finances/invoices'),
+        };
+      }
+      if (group.group === 'OUTROS') {
         return { ...group };
       }
       return { ...group, items: [] };
@@ -196,7 +223,17 @@ export default function Sidebar({ user: propUser, isMobileOpen = false, onClose 
         <nav className="custom-scrollbar flex-1 space-y-6 overflow-y-auto p-4">
           {filteredNavItems.map((group) => (
             <div key={group.group} className="space-y-1">
-              <div className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{group.group}</div>
+              {group.group === 'FINANCEIRO' ? (
+                <Link
+                  href={financeEntryHref}
+                  onClick={onClose}
+                  className="mb-2 block px-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 transition-colors hover:text-white"
+                >
+                  {group.group}
+                </Link>
+              ) : (
+                <div className="mb-2 px-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">{group.group}</div>
+              )}
               {group.items.map((item) => {
                 const isActive = pathname === item.href;
                 return (

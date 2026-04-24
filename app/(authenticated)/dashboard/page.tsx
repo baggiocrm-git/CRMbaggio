@@ -1,14 +1,20 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { ArrowRight, Lock, LogOut } from 'lucide-react';
 import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { cn } from '@/lib/utils';
-import { HUB_MODULES, canAccessPathForRole } from '@/lib/navigation';
+import {
+  HUB_MODULES,
+  canAccessPathForRole,
+  getFinanceEntryPathForRole,
+  getRoleFromUser,
+} from '@/lib/navigation';
 
 const MODULE_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
   documentos: { x: 5.8, y: -0.3 },
@@ -22,24 +28,36 @@ const MODULE_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [authResolved, setAuthResolved] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const lastHoveredIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
 
     const syncUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (mounted) {
         setUser(session?.user ?? null);
+        setAuthResolved(true);
       }
     };
 
-    syncUser();
+    void syncUser();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted) {
         setUser(session?.user ?? null);
+        setAuthResolved(true);
       }
     });
 
@@ -49,9 +67,55 @@ export default function DashboardPage() {
     };
   }, []);
 
-  const userRole = typeof user?.user_metadata?.role === 'string' ? user.user_metadata.role : 'Usuário';
-  const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
-  const availableModules = HUB_MODULES.filter((module) => canAccessPathForRole(userRole, module.href));
+  useEffect(() => {
+    const unlockAudio = () => {
+      if (typeof window === 'undefined') return;
+
+      const AudioContextClass = window.AudioContext || (window as typeof window & {
+        webkitAudioContext?: typeof AudioContext;
+      }).webkitAudioContext;
+
+      if (!AudioContextClass) return;
+
+      const audioContext = audioContextRef.current ?? new AudioContextClass();
+      audioContextRef.current = audioContext;
+
+      if (audioContext.state === 'suspended') {
+        void audioContext.resume();
+      }
+
+      setAudioUnlocked(true);
+    };
+
+    window.addEventListener('pointerdown', unlockAudio, { passive: true });
+    window.addEventListener('keydown', unlockAudio);
+
+    return () => {
+      window.removeEventListener('pointerdown', unlockAudio);
+      window.removeEventListener('keydown', unlockAudio);
+    };
+  }, []);
+
+  const userRole = getRoleFromUser(user);
+  const userName =
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split('@')[0] ||
+    'Usuario';
+
+  const getModuleHref = (moduleId: string) => {
+    if (!authResolved) return '#';
+
+    if (moduleId !== 'financeiro') {
+      return HUB_MODULES.find((module) => module.id === moduleId)?.href || '/dashboard';
+    }
+
+    return getFinanceEntryPathForRole(userRole);
+  };
+
+  const availableModules = authResolved
+    ? HUB_MODULES.filter((module) => canAccessPathForRole(userRole, getModuleHref(module.id)))
+    : [];
   const highlightedId = hoveredId ?? availableModules[0]?.id ?? null;
 
   const handleLogout = async () => {
@@ -62,8 +126,93 @@ export default function DashboardPage() {
     }
   };
 
+  const getOrCreateAudioContext = () => {
+    if (typeof window === 'undefined') return null;
+
+    const AudioContextClass = window.AudioContext || (window as typeof window & {
+      webkitAudioContext?: typeof AudioContext;
+    }).webkitAudioContext;
+
+    if (!AudioContextClass) return null;
+
+    const audioContext = audioContextRef.current ?? new AudioContextClass();
+    audioContextRef.current = audioContext;
+
+    return audioContext;
+  };
+
+  const playHoverSound = (force = false) => {
+    if (typeof window === 'undefined' || (!audioUnlocked && !force)) return;
+
+    const audioContext = getOrCreateAudioContext();
+    if (!audioContext) return;
+
+    const now = audioContext.currentTime;
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const filterNode = audioContext.createBiquadFilter();
+
+    oscillator.type = 'triangle';
+    oscillator.frequency.setValueAtTime(820, now);
+    oscillator.frequency.exponentialRampToValueAtTime(640, now + 0.045);
+
+    filterNode.type = 'lowpass';
+    filterNode.frequency.setValueAtTime(1200, now);
+
+    gainNode.gain.setValueAtTime(0.0001, now);
+    gainNode.gain.exponentialRampToValueAtTime(0.032, now + 0.008);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+
+    oscillator.connect(filterNode);
+    filterNode.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.065);
+  };
+
+  const handleModuleNavigation = (href: string, isAvailable: boolean) => {
+    if (!isAvailable || href === '#') return;
+
+    if (typeof window === 'undefined') {
+      router.push(href);
+      return;
+    }
+
+    const audioContext = getOrCreateAudioContext();
+
+    if (audioContext?.state === 'suspended') {
+      void audioContext.resume();
+    }
+
+    setAudioUnlocked(true);
+    playHoverSound(true);
+
+    window.setTimeout(() => {
+      router.push(href);
+    }, 95);
+  };
+
+  const handleModuleHover = (moduleId: string, isAvailable: boolean) => {
+    if (!isAvailable) return;
+
+    setHoveredId(moduleId);
+
+    if (lastHoveredIdRef.current !== moduleId) {
+      lastHoveredIdRef.current = moduleId;
+      playHoverSound();
+    }
+  };
+
+  const handleModuleLeave = (isAvailable: boolean) => {
+    if (!isAvailable) return;
+
+    setHoveredId(null);
+    lastHoveredIdRef.current = null;
+  };
+
   return (
-    <div className="relative flex min-h-screen flex-col overflow-hidden px-4 py-2 sm:px-6 lg:px-10">
+    <div className="dashboard-radial-theme relative flex min-h-screen flex-col overflow-hidden px-4 py-2 sm:px-6 lg:px-10">
       <div className="flex flex-col gap-4 rounded-[32px] border border-white/10 bg-[#081120]/72 p-5 shadow-[0_30px_120px_rgba(0,0,0,0.35)] backdrop-blur-xl sm:p-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
@@ -75,18 +224,19 @@ export default function DashboardPage() {
                 ERP CBSL
               </div>
             </div>
-            <div>
-              <p className="mt-2 max-w-lg text-[11px] leading-relaxed text-slate-500 sm:text-xs">
-                Escolha um setor para entrar em tela cheia. Itens disponíveis para o seu perfil recebem destaque neon e animação; os bloqueados permanecem desabilitados.
-              </p>
-            </div>
           </div>
 
           <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center">
-            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-3">
-              <p className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Usuário ativo</p>
-              <p className="mt-1 text-sm font-bold text-white">{userName}</p>
-              <p className="mt-1 text-[10px] font-black uppercase tracking-[0.24em] text-lime-300">{userRole}</p>
+            <div className="rounded-[24px] border border-white/10 bg-white/[0.04] px-4 py-1.5">
+              <p className="ui-condensed text-[10px] font-black uppercase tracking-normal leading-none text-lime-300">
+                USUARIO ATIVO
+              </p>
+              <div className="mt-0 flex flex-col gap-0">
+                <p className="text-sm font-bold leading-none text-white">{userName}</p>
+                <p className="ui-condensed mt-0 text-[10px] font-black uppercase tracking-normal leading-none text-slate-500">
+                  {userRole || 'Carregando perfil'}
+                </p>
+              </div>
             </div>
 
             <button
@@ -112,7 +262,8 @@ export default function DashboardPage() {
                   const y1 = 50 + Math.sin(angle) * 14;
                   const x2 = 50 + Math.cos(angle) * 29;
                   const y2 = 50 + Math.sin(angle) * 29;
-                  const isAvailable = canAccessPathForRole(userRole, module.href);
+                  const isAvailable =
+                    authResolved && canAccessPathForRole(userRole, getModuleHref(module.id));
                   const isHighlighted = highlightedId === module.id && isAvailable;
 
                   return (
@@ -126,7 +277,11 @@ export default function DashboardPage() {
                       strokeWidth={isHighlighted ? 0.8 : 0.55}
                       strokeLinecap="round"
                       className={cn(isAvailable && 'transition-all duration-300')}
-                      style={isHighlighted ? { filter: 'drop-shadow(0 0 8px rgba(212,255,63,0.85))' } : undefined}
+                      style={
+                        isHighlighted
+                          ? { filter: 'drop-shadow(0 0 8px rgba(212,255,63,0.85))' }
+                          : undefined
+                      }
                     />
                   );
                 })}
@@ -134,15 +289,15 @@ export default function DashboardPage() {
 
               <div className="absolute left-1/2 top-1/2 flex h-[19rem] w-[19rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-cyan-200/30 bg-[radial-gradient(circle_at_center,rgba(100,200,255,0.28),rgba(8,17,32,0.95)_68%)] shadow-[0_0_90px_rgba(113,203,255,0.2)]">
                 <div className="relative h-40 w-40 rounded-full border border-white/15 bg-white/5">
-                    <Image
-                      src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true"
-                      alt="CBSL"
-                      fill
-                      sizes="160px"
-                      className="object-contain p-3 drop-shadow-[0_0_18px_rgba(106,214,255,0.3)]"
-                      priority
-                      referrerPolicy="no-referrer"
-                    />
+                  <Image
+                    src="https://github.com/baggiocrm-git/imagens/blob/main/LOGO%20CBSL_sem%20escrita_Pequeno.png?raw=true"
+                    alt="CBSL"
+                    fill
+                    sizes="160px"
+                    className="object-contain p-3 drop-shadow-[0_0_18px_rgba(106,214,255,0.3)]"
+                    priority
+                    referrerPolicy="no-referrer"
+                  />
                 </div>
               </div>
 
@@ -154,7 +309,8 @@ export default function DashboardPage() {
                 const offset = MODULE_LABEL_OFFSETS[module.id] ?? { x: 0, y: 0 };
                 const x = baseX + offset.x;
                 const y = baseY + offset.y;
-                const isAvailable = canAccessPathForRole(userRole, module.href);
+                const moduleHref = getModuleHref(module.id);
+                const isAvailable = authResolved && canAccessPathForRole(userRole, moduleHref);
                 const isHighlighted = highlightedId === module.id && isAvailable;
                 const title = module.shortTitle || module.title;
 
@@ -166,19 +322,19 @@ export default function DashboardPage() {
                       'group flex min-w-[11rem] flex-col items-center gap-0.5 text-center transition-all duration-300',
                       isAvailable ? 'cursor-pointer' : 'cursor-not-allowed opacity-45'
                     )}
-                    onMouseEnter={() => {
-                      if (isAvailable) setHoveredId(module.id);
-                    }}
-                    onMouseLeave={() => {
-                      if (isAvailable) setHoveredId(null);
-                    }}
+                    onMouseEnter={() => handleModuleHover(module.id, isAvailable)}
+                    onMouseLeave={() => handleModuleLeave(isAvailable)}
                   >
                     <span
                       className={cn(
                         'font-black uppercase tracking-[0.14em] transition-all duration-300',
                         isAvailable ? 'text-[#d4ff3f]' : 'text-slate-500'
                       )}
-                      style={isHighlighted ? { textShadow: '0 0 16px rgba(212,255,63,0.9)' } : undefined}
+                      style={
+                        isHighlighted
+                          ? { textShadow: '0 0 16px rgba(212,255,63,0.9)' }
+                          : undefined
+                      }
                     >
                       {title}
                     </span>
@@ -195,7 +351,17 @@ export default function DashboardPage() {
                     style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
                   >
                     {isAvailable ? (
-                      <Link href={module.href} className="block">
+                      <Link
+                        href={moduleHref}
+                        className="block"
+                        onPointerDown={(event) => {
+                          event.preventDefault();
+                          handleModuleNavigation(moduleHref, isAvailable);
+                        }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                        }}
+                      >
                         {itemContent}
                       </Link>
                     ) : (
@@ -208,19 +374,16 @@ export default function DashboardPage() {
 
             <div className="relative space-y-4 lg:hidden">
               {HUB_MODULES.map((module) => {
-                const isAvailable = canAccessPathForRole(userRole, module.href);
+                const moduleHref = getModuleHref(module.id);
+                const isAvailable = authResolved && canAccessPathForRole(userRole, moduleHref);
                 const isHighlighted = highlightedId === module.id && isAvailable;
 
                 const mobileCard = (
                   <motion.div
                     animate={isAvailable ? { scale: isHighlighted ? 1.02 : 1 } : { scale: 1 }}
                     whileHover={isAvailable ? { scale: 1.02 } : undefined}
-                    onHoverStart={() => {
-                      if (isAvailable) setHoveredId(module.id);
-                    }}
-                    onHoverEnd={() => {
-                      if (isAvailable) setHoveredId(null);
-                    }}
+                    onHoverStart={() => handleModuleHover(module.id, isAvailable)}
+                    onHoverEnd={() => handleModuleLeave(isAvailable)}
                     className={cn(
                       'rounded-[26px] border px-4 py-4 transition-all',
                       isAvailable
@@ -238,7 +401,9 @@ export default function DashboardPage() {
                         >
                           {module.title}
                         </p>
-                          <p className="mt-0.5 px-0.5 text-xs leading-[1.25] text-slate-400">{module.description}</p>
+                        <p className="mt-0.5 px-0.5 text-xs leading-[1.25] text-slate-400">
+                          {module.description}
+                        </p>
                       </div>
                       <div
                         className={cn(
@@ -254,16 +419,25 @@ export default function DashboardPage() {
                   </motion.div>
                 );
 
-                return (
-                  isAvailable ? (
-                    <Link key={module.id} href={module.href} className="block">
-                      {mobileCard}
-                    </Link>
-                  ) : (
-                    <div key={module.id} className="block pointer-events-none">
-                      {mobileCard}
-                    </div>
-                  )
+                return isAvailable ? (
+                  <Link
+                    key={module.id}
+                    href={moduleHref}
+                    className="block"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      handleModuleNavigation(moduleHref, isAvailable);
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                    }}
+                  >
+                    {mobileCard}
+                  </Link>
+                ) : (
+                  <div key={module.id} className="block pointer-events-none">
+                    {mobileCard}
+                  </div>
                 );
               })}
             </div>

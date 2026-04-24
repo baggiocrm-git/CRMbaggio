@@ -513,7 +513,7 @@ export default function ReceivablesPage() {
   const totalPages = Math.ceil(filteredReceivables.length / itemsPerPage);
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-black tracking-tight italic">

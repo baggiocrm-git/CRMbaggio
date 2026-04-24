@@ -292,7 +292,7 @@ export default function SettingsPage() {
   const userInitials = profile.fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'U';
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
+    <div className="settings-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
       <header className="p-8 border-b border-slate-800/50">
         <h1 className="text-4xl font-black tracking-tight italic">
           Configurações <span className="text-[#d4ff3f]">do Sistema</span>

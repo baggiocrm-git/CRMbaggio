@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -544,7 +545,14 @@ export default function PayablesPage() {
   const totalPages = Math.ceil(filteredPayables.length / itemsPerPage);
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+      <Link
+        href="/finances/receivables"
+        className="fixed left-[12.75rem] top-4 z-40 hidden items-center rounded-full border border-orange-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.18)] backdrop-blur-xl transition hover:border-orange-300/40 hover:text-orange-300 sm:inline-flex lg:left-[14.5rem]"
+      >
+        Ir Para Contas a Receber
+      </Link>
+
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-4xl font-black tracking-tight italic">

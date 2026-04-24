@@ -16,8 +16,8 @@ import {
   CheckCircle2,
   ReceiptText
 } from 'lucide-react';
-import { 
-  BarChart, 
+import {
+  BarChart,
   Bar, 
   XAxis, 
   YAxis, 
@@ -27,6 +27,8 @@ import {
   Cell
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { getRoleFromUser, isFinancialAdminLevel1Role, isFinancialAdminLevel2Role } from '@/lib/navigation';
 
 interface Receivable {
   id: string;
@@ -51,6 +53,7 @@ interface Payable {
 }
 
 export default function FinanceDashboard() {
+  const router = useRouter();
   const [isMounted, setIsMounted] = useState(false);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
@@ -61,13 +64,22 @@ export default function FinanceDashboard() {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (isFinancialAdminLevel1Role(userRole)) {
+      router.replace('/finances/payables');
+      return;
+    }
+
+    if (isFinancialAdminLevel2Role(userRole)) {
+      router.replace('/finances/invoices');
+    }
+  }, [router, userRole]);
+
   const fetchData = async () => {
     try {
       console.log('FinanceDashboard: Iniciando busca de dados...');
       const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUserRole(typeof session.user.user_metadata?.role === 'string' ? session.user.user_metadata.role : null);
-      }
+      setUserRole(getRoleFromUser(session?.user));
 
       const [recRes, payRes] = await Promise.all([
         supabase.from('contas_receber').select('*'),

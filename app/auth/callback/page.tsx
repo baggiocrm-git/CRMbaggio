@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { getDefaultPathForRole, getRoleFromUser } from '@/lib/navigation'
 
 export default function AuthCallbackPage() {
   const router = useRouter()
@@ -44,8 +44,8 @@ export default function AuthCallbackPage() {
             // Small delay to ensure message is sent before closing
             setTimeout(() => window.close(), 500);
           } else {
-            console.log('AuthCallbackPage: Redirecionando para dashboard...');
-            router.push('/dashboard');
+            console.log('AuthCallbackPage: Redirecionando para rota padrão do perfil...');
+            router.push(getDefaultPathForRole(getRoleFromUser(session.user)));
           }
         } else {
           console.warn('AuthCallbackPage: Nenhuma sessão encontrada após o callback.');

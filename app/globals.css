@@ -106,10 +106,50 @@ body {
   font-size: calc(16px * var(--font-scale));
 }
 
+.ui-condensed {
+  display: inline-block;
+  font-family: "Bahnschrift SemiCondensed", "Bahnschrift Condensed", "Roboto Condensed",
+    "Arial Narrow", "Helvetica Neue Condensed", "Franklin Gothic Medium",
+    var(--font-sans), sans-serif;
+  font-stretch: 85%;
+  transform: scaleX(0.9);
+  transform-origin: left center;
+}
+
 :root.light .themed-app,
 :root.light .themed-app body {
   background-color: #f5f5f4;
   color: #0f172a;
+}
+
+:root.light [class*="bg-[#050816]"],
+:root.light [class*="bg-[#020617]"],
+:root.light [class*="bg-[#0f172a]"],
+:root.light [class*="bg-[#111827]"] {
+  background-color: #f5f5f4 !important;
+}
+
+:root.light [class*="bg-[#081120]"],
+:root.light [class*="bg-[#081120]/"],
+:root.light [class*="bg-[#141414]"],
+:root.light [class*="bg-[#141414]/"] {
+  background-color: #ffffff !important;
+}
+
+:root.light [class*="bg-[linear-gradient"] {
+  background-image: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.92)) !important;
+}
+
+:root.light [class*="bg-[radial-gradient"] {
+  background-image: radial-gradient(circle at center, rgba(219, 234, 254, 0.72), rgba(248, 250, 252, 0.96) 68%) !important;
+}
+
+:root.light [class*="bg-white/[0.04]"],
+:root.light [class*="bg-white/[0.03]"],
+:root.light [class*="bg-white/[0.02]"],
+:root.light [class*="bg-white/5"],
+:root.light [class*="bg-white/10"] {
+  background-color: rgba(255, 255, 255, 0.82) !important;
 }
 
 :root.light [class*="bg-[#0a0a0a]"] {
@@ -127,6 +167,12 @@ body {
 :root.light [class*="border-slate-800/50"],
 :root.light [class*="border-slate-800/30"],
 :root.light [class*="border-slate-800"] {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+
+:root.light [class*="border-white/20"],
+:root.light [class*="border-white/15"],
+:root.light [class*="border-white/10"] {
   border-color: rgba(15, 23, 42, 0.12) !important;
 }
 
@@ -163,6 +209,12 @@ body {
   color: #2563eb !important;
 }
 
+:root.light [class*="text-lime-200"],
+:root.light [class*="text-lime-300"],
+:root.light [class*="text-lime-400"],
+:root.light [class*="text-lime-500"],
+:root.light [class*="text-green-400"],
+:root.light [class*="text-green-500"],
 :root.light [class*="text-emerald-500"] {
   color: #2563eb !important;
 }
@@ -183,11 +235,50 @@ body {
   border-color: rgba(37, 99, 235, 0.35) !important;
 }
 
+:root.light [class*="border-lime-300/20"],
+:root.light [class*="border-lime-300/30"],
+:root.light [class*="border-lime-300/40"],
+:root.light [class*="border-lime-400/20"],
+:root.light [class*="border-lime-400/30"],
+:root.light [class*="border-green-500/20"],
+:root.light [class*="border-emerald-500/20"],
+:root.light [class*="border-emerald-500/30"] {
+  border-color: rgba(37, 99, 235, 0.35) !important;
+}
+
 :root.light [class*="bg-[#d4ff3f]/10"],
 :root.light [class*="bg-[#d4ff3f]/5"],
+:root.light [class*="bg-lime-300/10"],
+:root.light [class*="bg-lime-300/20"],
+:root.light [class*="bg-lime-400/10"],
+:root.light [class*="bg-green-500/10"],
 :root.light [class*="bg-emerald-500/10"],
 :root.light [class*="bg-blue-500/10"] {
   background-color: rgba(37, 99, 235, 0.1) !important;
+}
+
+:root.light [class*="bg-[#d4ff3f]"],
+:root.light [class*="bg-lime-300"],
+:root.light [class*="bg-lime-400"],
+:root.light [class*="bg-emerald-500"],
+:root.light [class*="bg-green-500"] {
+  background-color: #2563eb !important;
+}
+
+:root.light [class*="shadow-[#d4ff3f]"],
+:root.light [class*="shadow-lime-"],
+:root.light [class*="shadow-emerald-"],
+:root.light [class*="shadow-green-"] {
+  --tw-shadow-color: rgba(37, 99, 235, 0.2) !important;
+}
+
+:root.light [class*="bg-[#d4ff3f]"][class*="text-black"],
+:root.light [class*="bg-[#d4ff3f]"][class*="text-[#0a0a0a]"],
+:root.light [class*="bg-lime-300"][class*="text-black"],
+:root.light [class*="bg-lime-400"][class*="text-black"],
+:root.light [class*="bg-emerald-500"][class*="text-black"],
+:root.light [class*="bg-green-500"][class*="text-black"] {
+  color: #ffffff !important;
 }
 
 :root.light button[class*="bg-[#d4ff3f]"],
@@ -204,6 +295,12 @@ body {
 
 /* Explicit Tailwind utility overrides for light theme accents */
 :root.light .text-\[\#d4ff3f\],
+:root.light .text-lime-200,
+:root.light .text-lime-300,
+:root.light .text-lime-400,
+:root.light .text-lime-500,
+:root.light .text-green-400,
+:root.light .text-green-500,
 :root.light .text-emerald-500,
 :root.light .text-emerald-400,
 :root.light .text-blue-500,
@@ -213,15 +310,34 @@ body {
 
 :root.light .bg-\[\#d4ff3f\]\/10,
 :root.light .bg-\[\#d4ff3f\]\/5,
+:root.light .bg-lime-300\/10,
+:root.light .bg-lime-300\/20,
+:root.light .bg-lime-400\/10,
+:root.light .bg-green-500\/10,
 :root.light .bg-emerald-500\/10,
 :root.light .bg-blue-500\/10 {
   background-color: rgba(37, 99, 235, 0.1) !important;
 }
 
+:root.light .bg-\[\#d4ff3f\],
+:root.light .bg-lime-300,
+:root.light .bg-lime-400,
+:root.light .bg-emerald-500,
+:root.light .bg-green-500 {
+  background-color: #2563eb !important;
+}
+
 :root.light .border-\[\#d4ff3f\],
 :root.light .border-\[\#d4ff3f\]\/50,
 :root.light .border-\[\#d4ff3f\]\/30,
-:root.light .border-\[\#d4ff3f\]\/20 {
+:root.light .border-\[\#d4ff3f\]\/20,
+:root.light .border-lime-300\/20,
+:root.light .border-lime-300\/30,
+:root.light .border-lime-300\/40,
+:root.light .border-lime-400\/20,
+:root.light .border-emerald-500\/20,
+:root.light .border-emerald-500\/30,
+:root.light .border-green-500\/20 {
   border-color: rgba(37, 99, 235, 0.35) !important;
 }
 
@@ -229,7 +345,29 @@ body {
   --tw-shadow-color: rgba(37, 99, 235, 0.2) !important;
 }
 
+:root.light .shadow-\[\#d4ff3f\]\/20,
+:root.light .shadow-\[\#d4ff3f\]\/25,
+:root.light .shadow-lime-950\/20,
+:root.light .shadow-lime-950\/10,
+:root.light .shadow-lime-300\/10 {
+  --tw-shadow-color: rgba(37, 99, 235, 0.22) !important;
+}
+
+:root.light .bg-\[\#d4ff3f\].text-black,
+:root.light .bg-\[\#d4ff3f\].text-\[\#0a0a0a\],
+:root.light .bg-lime-300.text-black,
+:root.light .bg-lime-400.text-black,
+:root.light .bg-emerald-500.text-black,
+:root.light .bg-green-500.text-black {
+  color: #ffffff !important;
+}
+
 :root.light .hover\:text-\[\#d4ff3f\]:hover,
+:root.light .hover\:text-lime-300:hover,
+:root.light .hover\:text-lime-400:hover,
+:root.light .hover\:text-lime-500:hover,
+:root.light .hover\:text-emerald-500:hover,
+:root.light .hover\:text-green-500:hover,
 :root.light .group:hover .group-hover\:text-\[\#d4ff3f\] {
   color: #2563eb !important;
 }
@@ -365,4 +503,66 @@ body {
 :root.light .staff-theme .staff-directory-icon:hover {
   background-color: #bfdbfe !important;
   color: #1d4ed8 !important;
+}
+
+/* Dashboard radial light theme */
+:root.light .dashboard-radial-theme [class*="bg-[#081120]"],
+:root.light .dashboard-radial-theme [class*="bg-[radial-gradient"],
+:root.light .dashboard-radial-theme [class*="bg-[linear-gradient"] {
+  background-color: #ffffff !important;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.96)) !important;
+}
+
+:root.light .dashboard-radial-theme [class*="shadow-[0_30px_120px"],
+:root.light .dashboard-radial-theme [class*="shadow-[0_0_90px"] {
+  box-shadow: 0 24px 70px rgba(148, 163, 184, 0.16) !important;
+}
+
+:root.light .dashboard-radial-theme line[stroke="#d4ff3f"],
+:root.light .dashboard-radial-theme line[stroke="#b7d51f"] {
+  stroke: #2563eb !important;
+}
+
+/* Finance ledger light theme */
+:root.light .finance-ledger-theme,
+:root.light .finance-ledger-theme [class*="bg-[#0a0a0a]"] {
+  background-color: #f8fafc !important;
+}
+
+:root.light .finance-ledger-theme [class*="bg-[#1a1a1a]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light .finance-ledger-theme tr[class*="hover:bg-[#0a0a0a]"]:hover,
+:root.light .finance-ledger-theme [class*="hover:bg-[#0a0a0a]"]:hover {
+  background-color: #f8fbff !important;
+}
+
+:root.light .finance-ledger-theme [class*="text-emerald-500"],
+:root.light .finance-ledger-theme [class*="bg-emerald-500/10"],
+:root.light .finance-ledger-theme [class*="border-emerald-500/20"] {
+  color: #2563eb !important;
+  background-color: rgba(37, 99, 235, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.25) !important;
+}
+
+/* Settings light theme */
+:root.light .settings-theme,
+:root.light .settings-theme header,
+:root.light .settings-theme [class*="bg-[#0a0a0a]"] {
+  background-color: #f8fafc !important;
+}
+
+:root.light .settings-theme [class*="bg-[#1a1a1a]"] {
+  background-color: #ffffff !important;
+}
+
+:root.light .settings-theme [class*="shadow-black/20"] {
+  --tw-shadow-color: rgba(148, 163, 184, 0.16) !important;
+}
+
+:root.light .settings-theme input,
+:root.light .settings-theme select,
+:root.light .settings-theme textarea {
+  background-color: #ffffff !important;
 }

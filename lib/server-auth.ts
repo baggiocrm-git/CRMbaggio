@@ -9,6 +9,8 @@ export type AppRole =
   | 'Cliente'
   | 'Auxiliar Administrativo Nível 1'
   | 'Auxiliar Administrativo Nível 2'
+  | 'Administrativo Financeiro 1'
+  | 'Administrativo Financeiro 2'
   | 'Administrador Master'
   | 'Administrador Financeiro';
 

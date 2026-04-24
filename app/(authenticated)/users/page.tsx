@@ -26,7 +26,9 @@ type ManagedRole =
   | 'Usuário'
   | 'Cliente'
   | 'Auxiliar Administrativo Nível 1'
-  | 'Auxiliar Administrativo Nível 2';
+  | 'Auxiliar Administrativo Nível 2'
+  | 'Administrativo Financeiro 1'
+  | 'Administrativo Financeiro 2';
 
 export default function UsersManagementPage() {
   const [users, setUsers] = useState<SupabaseUser[]>([]);
@@ -385,7 +387,7 @@ export default function UsersManagementPage() {
                   <div>
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Privilégios</label>
                     <div className="grid grid-cols-2 gap-2">
-                      {(['Usuário', 'Administrador', 'Cliente', 'Auxiliar Administrativo Nível 1', 'Auxiliar Administrativo Nível 2'] as const).map((r) => (
+                      {(['Usuário', 'Administrador', 'Cliente', 'Auxiliar Administrativo Nível 1', 'Auxiliar Administrativo Nível 2', 'Administrativo Financeiro 1', 'Administrativo Financeiro 2'] as const).map((r) => (
                         <button
                           key={r}
                           type="button"

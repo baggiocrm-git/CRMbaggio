@@ -7,7 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { usePathname, useRouter } from 'next/navigation';
 import { Loader2, AlertCircle, House } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import { canAccessPathForRole, findModuleByPath, getDefaultPathForRole } from '@/lib/navigation';
+import { canAccessPathForRole, findModuleByPath, getDefaultPathForRole, getRoleFromUser } from '@/lib/navigation';
 
 const CLIENT_PORTAL_CLOSE_LOGOUT_KEY = 'client-portal-force-logout';
 
@@ -50,7 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           '';
 
         const userEmail = rawEmail.toLowerCase().trim();
-        let userRole = userData.user_metadata?.role;
+        let userRole = getRoleFromUser(userData);
 
         if (!userRole && userEmail === 'lucabaggio28@gmail.com') {
           userRole = 'Administrador';
