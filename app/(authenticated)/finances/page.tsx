@@ -194,9 +194,9 @@ export default function FinanceDashboard() {
   ].sort((a, b) => b.date - a.date).slice(0, 5);
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar">
+    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar px-8 pb-8 pt-3">
       {/* Header */}
-      <header className="p-8 flex justify-between items-start">
+      <header className="mb-8 flex justify-between items-start">
         <div>
           <h1 className="text-4xl font-black tracking-tight italic">
             Dashboard <span className="text-[#d4ff3f]">Financeiro</span>

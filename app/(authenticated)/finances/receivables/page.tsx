@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, 
@@ -21,12 +22,21 @@ import {
   CheckCircle2,
   AlertCircle,
   Building2,
+  ArrowRight,
+  Landmark,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 // import * as XLSX from 'xlsx';
 import CurrencyInput from '@/components/CurrencyInput';
 import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
+import {
+  createCollectionCharge,
+  listAuditLogs,
+  listCollectionChargesByContaReceber,
+  writeAuditLog,
+} from '@/lib/banking';
+import type { AuditLogRow, CollectionChargeRow } from '@/lib/banking';
 
 interface Receivable {
   id: string;
@@ -38,11 +48,26 @@ interface Receivable {
   valor_recebido: number;
   situacao: 'Aberto' | 'Recebido' | 'REC. PARCIAL';
   created_at?: string;
+  collection_status?: string | null;
+  collection_charge_id?: string | null;
+  bank_account_id?: string | null;
+  partner_collection_status?: string | null;
+  received_at?: string | null;
+  last_event_at?: string | null;
 }
 
 interface ReceivablePayer {
   id: string;
   nome: string;
+}
+
+interface BankAccountOption {
+  id: string;
+  bank_connection_id: string;
+  banco_nome: string | null;
+  conta_mascarada: string | null;
+  holder_name: string | null;
+  is_active: boolean;
 }
 
 interface ExcelRow {
@@ -90,6 +115,11 @@ export default function ReceivablesPage() {
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [collectionCharges, setCollectionCharges] = useState<CollectionChargeRow[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
+  const [bankingBusy, setBankingBusy] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const NEW_PAYER_OPTION = '__novo_pagador__';
 
   const normalizePayerName = (value: string) =>
@@ -250,10 +280,50 @@ export default function ReceivablesPage() {
     }
   }, []);
 
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, bank_connection_id, banco_nome, conta_mascarada, holder_name, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBankAccounts((data as BankAccountOption[]) || []);
+    } catch (bankError) {
+      console.error('Error fetching active bank accounts:', bankError);
+      setBankAccounts([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchReceivables();
     fetchPayers();
-  }, [fetchReceivables, fetchPayers]);
+    fetchBankAccounts();
+  }, [fetchReceivables, fetchPayers, fetchBankAccounts]);
+
+  useEffect(() => {
+    if (!isModalOpen || !editingItem) {
+      setCollectionCharges([]);
+      setAuditLogs([]);
+      return;
+    }
+
+    const loadBankingContext = async () => {
+      try {
+        const [charges, logs] = await Promise.all([
+          listCollectionChargesByContaReceber(editingItem.id),
+          listAuditLogs('contas_receber', editingItem.id),
+        ]);
+        setCollectionCharges(charges);
+        setAuditLogs(logs);
+      } catch (contextError) {
+        console.error('Error loading banking context for receivable:', contextError);
+      }
+    };
+
+    loadBankingContext();
+  }, [editingItem, isModalOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -269,6 +339,7 @@ export default function ReceivablesPage() {
 
   const handleOpenModal = (item?: Receivable) => {
     if (item) {
+      setSelectedBankAccountId(item.bank_account_id || '');
       setIsCustomPayer(!payerOptions.some((payer) => normalizePayerName(payer) === normalizePayerName(item.cliente)));
       setEditingItem(item);
       setFormData({
@@ -281,6 +352,7 @@ export default function ReceivablesPage() {
         situacao: item.situacao
       });
     } else {
+      setSelectedBankAccountId('');
       setIsCustomPayer(false);
       setEditingItem(null);
       setFormData({
@@ -324,6 +396,7 @@ export default function ReceivablesPage() {
         cliente: finalCliente,
         data_recebimento: formData.data_recebimento || null,
         situacao: resolvedSituation,
+        bank_account_id: selectedBankAccountId || null,
       };
 
       if (editingItem) {
@@ -370,6 +443,107 @@ export default function ReceivablesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setIsCustomPayer(false);
+    setSelectedBankAccountId('');
+  };
+
+  const getCurrentUserId = async () => {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    return data.user?.id || null;
+  };
+
+  const refreshReceivableBankingContext = async (receivableId: string) => {
+    await fetchReceivables();
+    const { data: refreshedItem } = await supabase
+      .from('contas_receber')
+      .select('*')
+      .eq('id', receivableId)
+      .single();
+    if (refreshedItem) {
+      setEditingItem(refreshedItem as Receivable);
+    }
+    const [charges, logs] = await Promise.all([
+      listCollectionChargesByContaReceber(receivableId),
+      listAuditLogs('contas_receber', receivableId),
+    ]);
+    setCollectionCharges(charges);
+    setAuditLogs(logs);
+  };
+
+  const generateReceivableCharge = async (item: Receivable) => {
+    setBankingBusy(true);
+    try {
+      const bankAccountId = selectedBankAccountId || item.bank_account_id || bankAccounts[0]?.id || null;
+      if (!bankAccountId) {
+        alert('Cadastre e selecione uma conta bancária ativa antes de gerar cobrança.');
+        return;
+      }
+      const userId = await getCurrentUserId();
+      const charge = await createCollectionCharge({
+        contaReceberId: item.id,
+        bankAccountId,
+        chargeType: 'manual',
+        valor: item.valor,
+        createdBy: userId,
+        dueDate: item.data_vencimento,
+        payerName: item.cliente,
+        metadata: {
+          descricao: item.descricao,
+          origem: 'contas_receber_ui',
+        },
+      });
+
+      await writeAuditLog({
+        entityType: 'contas_receber',
+        entityId: item.id,
+        action: 'collection_charge_created',
+        actorUserId: userId,
+        newData: { collection_charge_id: charge.id, status: charge.status },
+      });
+
+      alert('Cobrança gerada com sucesso.');
+      await refreshReceivableBankingContext(item.id);
+    } catch (actionError) {
+      console.error('Error generating collection charge:', actionError);
+      alert('Não foi possível gerar a cobrança.');
+    } finally {
+      setBankingBusy(false);
+    }
+  };
+
+  const getBankAccountLabel = (account: BankAccountOption) => {
+    const bankName = account.banco_nome || 'Banco';
+    const accountMask = account.conta_mascarada || 'Conta sem máscara';
+    const holder = account.holder_name ? ` · ${account.holder_name}` : '';
+    return `${bankName} · ${accountMask}${holder}`;
+  };
+
+  const getBankAccountLabelById = (bankAccountId?: string | null) => {
+    if (!bankAccountId) return 'Sem conta vinculada';
+    const account = bankAccounts.find((item) => item.id === bankAccountId);
+    return account ? getBankAccountLabel(account) : 'Conta não encontrada';
+  };
+
+  const handleGenerateCharge = async () => {
+    if (!editingItem) return;
+    await generateReceivableCharge(editingItem);
+  };
+
+  const getCollectionStatusTone = (status?: string | null) => {
+    switch (status) {
+      case 'recebido_total':
+      case 'recebido_parcial':
+      case 'cobranca_gerada':
+        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400';
+      case 'aguardando_pagamento':
+        return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+      case 'cancelado':
+      case 'falhou':
+      case 'vencido':
+        return 'border-rose-500/20 bg-rose-500/10 text-rose-400';
+      default:
+        return 'border-slate-500/20 bg-slate-500/10 text-slate-400';
+    }
   };
 
   const handleExport = async () => {
@@ -513,28 +687,45 @@ export default function ReceivablesPage() {
   const totalPages = Math.ceil(filteredReceivables.length / itemsPerPage);
 
   return (
-    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] px-8 pb-8 pt-3 text-white overflow-y-auto custom-scrollbar">
+      <div className="mb-2 flex items-center gap-2">
+        <Link
+          href="/finances/payables"
+          className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.18)] backdrop-blur-xl transition hover:border-orange-300/40 hover:text-orange-300"
+        >
+          <ArrowRight size={14} />
+          Ir Para Contas a Pagar
+        </Link>
+        <Link
+          href="/finances/banking"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.14)] backdrop-blur-xl transition hover:border-cyan-300/40 hover:text-cyan-200"
+        >
+          <Landmark size={14} />
+          Conexões Bancárias
+        </Link>
+      </div>
+
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-black tracking-tight italic">
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-2xl font-black tracking-tight italic">
           Contas a <span className="text-[#d4ff3f]">receber</span>
         </h1>
         <div className="flex items-center gap-4">
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-3.5 py-1.5 rounded-xl text-[7px] font-black uppercase tracking-[0.18em] shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-1.5"
           >
-            <Plus size={18} /> CONTA A RECEBER
+            <Plus size={11} /> CONTA A RECEBER
           </button>
           <div ref={filterRef} className="relative">
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-xs font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-1.5 px-3.5 py-1.5 border rounded-xl text-[7px] font-black uppercase tracking-[0.18em] transition-all",
                 isFilterOpen ? "bg-[#1a1a1a] border-[#d4ff3f] text-[#d4ff3f]" : "bg-[#1a1a1a] border-slate-800/50 text-slate-500 hover:text-white"
               )}
             >
-              <Filter size={16} /> FILTROS
+              <Filter size={10} /> FILTROS
             </button>
             
             <AnimatePresence>
@@ -595,15 +786,15 @@ export default function ReceivablesPage() {
           </div>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[7px] font-black uppercase tracking-[0.18em] hover:text-white transition-all text-slate-500"
           >
-            <Download size={16} /> EXPORTAR
+            <Download size={10} /> EXPORTAR
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-xs font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[7px] font-black uppercase tracking-[0.18em] hover:text-white transition-all text-slate-500"
           >
-            <Upload size={16} /> IMPORTAR
+            <Upload size={10} /> IMPORTAR
           </button>
           <input 
             type="file" 
@@ -634,20 +825,20 @@ export default function ReceivablesPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Valor', value: formatCurrency(totalValue), icon: TrendingUp, color: 'text-slate-500' },
           { label: 'Valor recebido', value: formatCurrency(receivedValue), icon: CheckCircle2, color: 'text-emerald-500' },
           { label: 'Valor em aberto', value: formatCurrency(openValue), icon: AlertCircle, color: 'text-orange-500' },
           { label: 'Saldo parcial', value: formatCurrency(partialDebtValue), icon: Building2, color: 'text-amber-400' },
         ].map((card) => (
-          <div key={card.label} className="bg-[#1a1a1a] p-6 rounded-2xl border border-slate-800/50 shadow-sm flex items-center gap-4">
-            <div className={cn("p-3 rounded-xl bg-[#0a0a0a]", card.color)}>
-              <card.icon size={24} />
+          <div key={card.label} className="bg-[#1a1a1a] px-4 py-3 rounded-2xl border border-slate-800/50 shadow-sm flex items-center gap-3">
+            <div className={cn("p-2 rounded-lg bg-[#0a0a0a]", card.color)}>
+              <card.icon size={18} />
             </div>
             <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-2xl font-black text-white">{card.value}</p>
+              <p className="text-slate-500 text-[11px] font-bold uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-lg font-black text-white">{card.value}</p>
             </div>
           </div>
         ))}
@@ -655,7 +846,7 @@ export default function ReceivablesPage() {
 
       {/* Table Section */}
       <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-slate-800/50 flex items-center justify-between">
           <div className="relative w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
@@ -732,6 +923,28 @@ export default function ReceivablesPage() {
                   >
                     <td className="px-2 py-2">
                       <p className="font-bold text-white leading-tight truncate" title={item.cliente}>{item.cliente}</p>
+                      <span
+                        className={cn(
+                          'mt-1 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest',
+                          item.bank_account_id
+                            ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300'
+                            : 'border-slate-500/20 bg-slate-500/10 text-slate-400'
+                        )}
+                        title={getBankAccountLabelById(item.bank_account_id)}
+                      >
+                        <Landmark size={10} className="shrink-0" />
+                        <span className="truncate">{getBankAccountLabelById(item.bank_account_id)}</span>
+                      </span>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest', getCollectionStatusTone(item.collection_status))}>
+                          {item.collection_status || 'nao_cobrado'}
+                        </span>
+                        {item.partner_collection_status && (
+                          <span className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cyan-300">
+                            {item.partner_collection_status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <p className="text-slate-400 leading-tight truncate" title={item.descricao}>{item.descricao}</p>
@@ -758,6 +971,18 @@ export default function ReceivablesPage() {
                       )}>
                         {item.situacao}
                       </span>
+                      {item.situacao !== 'Recebido' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void generateReceivableCharge(item);
+                          }}
+                          className="mt-2 block rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20"
+                        >
+                          Cobrar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -821,7 +1046,7 @@ export default function ReceivablesPage() {
       <div className="mt-8 bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
         <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-black tracking-tight">Recebimentos Parciais</h3>
+            <h3 className="text-sm font-black tracking-tight">Recebimentos Parciais</h3>
             <p className="text-xs font-bold uppercase tracking-widest text-slate-500 mt-1">
               Clientes com saldo devedor ainda não totalizado
             </p>
@@ -898,10 +1123,10 @@ export default function ReceivablesPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-[#1a1a1a] rounded-3xl shadow-2xl overflow-hidden border border-slate-800/50"
+              className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-[#1a1a1a] rounded-3xl shadow-2xl border border-slate-800/50 custom-scrollbar"
             >
-              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
-                <h3 className="text-lg font-black tracking-tight text-white">
+              <div className="px-5 py-4 border-b border-slate-800/50 flex items-center justify-between">
+                <h3 className="text-sm font-black tracking-tight text-white">
                   {editingItem ? 'Editar Conta' : 'Nova Conta a Receber'}
                 </h3>
                 <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
@@ -909,8 +1134,8 @@ export default function ReceivablesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Pagador</label>
                     <select
@@ -928,7 +1153,7 @@ export default function ReceivablesPage() {
                         setFormData({ ...formData, cliente: value });
                       }}
                       className={cn(
-                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
+                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
                         isCustomPayer ? "text-[#d4ff3f]" : "text-white"
                       )}
                     >
@@ -946,7 +1171,7 @@ export default function ReceivablesPage() {
                         type="text"
                         value={formData.cliente}
                         onChange={(e) => setFormData({ ...formData, cliente: e.target.value })}
-                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                         placeholder="Digite o nome do novo pagador"
                       />
                     )}
@@ -958,7 +1183,7 @@ export default function ReceivablesPage() {
                       type="text" 
                       value={formData.descricao}
                       onChange={(e) => setFormData({...formData, descricao: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="O que está sendo cobrado?"
                     />
                   </div>
@@ -969,7 +1194,7 @@ export default function ReceivablesPage() {
                       type="date" 
                       value={formData.data_vencimento}
                       onChange={(e) => setFormData({...formData, data_vencimento: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     />
                   </div>
                   <div>
@@ -978,7 +1203,7 @@ export default function ReceivablesPage() {
                       type="date" 
                       value={formData.data_recebimento}
                       onChange={(e) => setFormData({...formData, data_recebimento: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     />
                   </div>
                   <div>
@@ -996,7 +1221,7 @@ export default function ReceivablesPage() {
                       transformRawValue={transformRawCurrencyValue}
                       value={formData.valor}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor: Number(v || 0)}))}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
                   </div>
@@ -1014,7 +1239,7 @@ export default function ReceivablesPage() {
                       transformRawValue={transformRawCurrencyValue}
                       value={formData.valor_recebido}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor_recebido: Number(v || 0)}))}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
                   </div>
@@ -1027,7 +1252,7 @@ export default function ReceivablesPage() {
                           type="button"
                           onClick={() => setFormData({...formData, situacao: s as Receivable['situacao']})}
                           className={cn(
-                            "px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                            "px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all",
                             formData.situacao === s 
                               ? "bg-[#d4ff3f] border-[#d4ff3f] text-[#0a0a0a]" 
                               : "bg-[#0a0a0a] border-slate-800/50 text-slate-500 hover:border-slate-700"
@@ -1038,20 +1263,115 @@ export default function ReceivablesPage() {
                       ))}
                     </div>
                   </div>
+                  {editingItem && (
+                    <div className="col-span-2 rounded-2xl border border-slate-800/50 bg-[#0a0a0a] p-3">
+                      <div>
+                        <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Conta Bancária Operacional
+                        </label>
+                        {bankAccounts.length === 0 && (
+                          <div className="mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">
+                              Nenhuma conta bancária ativa cadastrada.
+                            </p>
+                            <Link
+                              href="/finances/banking"
+                              className="mt-2 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-200 hover:text-white"
+                            >
+                              <Landmark size={12} />
+                              Ir para Conexões Bancárias
+                            </Link>
+                          </div>
+                        )}
+                        <select
+                          value={selectedBankAccountId}
+                          onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                          className="w-full rounded-xl border border-slate-800/50 bg-[#050505] px-3 py-2.5 text-sm font-bold text-white outline-none transition-all focus:ring-2 focus:ring-[#d4ff3f]/30"
+                        >
+                          <option value="">Selecione uma conta ativa</option>
+                          {bankAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {getBankAccountLabel(account)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest', getCollectionStatusTone(editingItem.collection_status))}>
+                          Cobrança: {editingItem.collection_status || 'nao_cobrado'}
+                        </span>
+                        {editingItem.partner_collection_status && (
+                          <span className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-300">
+                            Banco: {editingItem.partner_collection_status}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {editingItem.situacao !== 'Recebido' && (
+                          <button
+                            type="button"
+                            disabled={bankingBusy}
+                            onClick={handleGenerateCharge}
+                            className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20 disabled:opacity-50"
+                          >
+                            Gerar Cobrança
+                          </button>
+                        )}
+                      </div>
+                      {collectionCharges.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Cobranças Recentes</p>
+                          <div className="space-y-2">
+                            {collectionCharges.slice(0, 3).map((charge) => (
+                              <div key={charge.id} className="rounded-xl border border-slate-800/50 px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-white">{charge.charge_type}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                      {formatDate(charge.created_at)}
+                                    </span>
+                                    <span className={cn('rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest', getCollectionStatusTone(charge.status))}>
+                                      {charge.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="mt-1 text-[10px] font-bold text-slate-400">{formatCurrency(charge.valor)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {auditLogs.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Auditoria</p>
+                          <div className="space-y-2">
+                            {auditLogs.slice(0, 3).map((log) => (
+                              <div key={log.id} className="rounded-xl border border-slate-800/50 px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-white">{log.action}</p>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">{formatDate(log.created_at)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-4 flex flex-col gap-3">
+                <div className="pt-2 flex flex-col gap-2">
                   <div className="flex gap-3">
                     <button 
                       type="button"
                       onClick={handleCloseModal}
-                      className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
+                      className="flex-1 px-4 py-2.5 border border-slate-800/50 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
+                      className="flex-1 px-4 py-2.5 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
                     >
                       {editingItem ? 'Salvar Alterações' : 'Adicionar Conta'}
                     </button>
@@ -1065,7 +1385,7 @@ export default function ReceivablesPage() {
                           handleCloseModal();
                         }
                       }}
-                      className="w-full px-4 py-3 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="w-full px-4 py-2.5 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
                     >
                       Excluir Conta
                     </button>
@@ -1079,3 +1399,4 @@ export default function ReceivablesPage() {
     </div>
   );
 }
+

@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Clock,
+  ArrowRight,
+  Landmark,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
@@ -29,6 +31,14 @@ import { cn } from '@/lib/utils';
 import CurrencyInput from '@/components/CurrencyInput';
 import { handleFixedDecimalValueChange, transformRawCurrencyValue } from '@/lib/currency';
 import { COST_CATEGORIES, CONSTRUCTION_STAGES } from '@/lib/constants';
+import {
+  approvePaymentRequest,
+  createPaymentRequest,
+  listAuditLogs,
+  listPaymentRequestsByContaPagar,
+  writeAuditLog,
+} from '@/lib/banking';
+import type { AuditLogRow, PaymentRequestRow } from '@/lib/banking';
 
 interface Payable {
   id: string;
@@ -45,6 +55,12 @@ interface Payable {
   centro_custo_tipo?: 'Obra' | 'Administrativo' | 'Pessoal';
   socio_id?: string;
   created_at?: string;
+  approval_status?: string | null;
+  payment_request_id?: string | null;
+  bank_account_id?: string | null;
+  partner_payment_status?: string | null;
+  paid_at?: string | null;
+  last_event_at?: string | null;
 }
 
 interface TeamMember {
@@ -60,6 +76,15 @@ interface Project {
 interface PayableSupplier {
   id: string;
   nome: string;
+}
+
+interface BankAccountOption {
+  id: string;
+  bank_connection_id: string;
+  banco_nome: string | null;
+  conta_mascarada: string | null;
+  holder_name: string | null;
+  is_active: boolean;
 }
 
 interface ExcelRow {
@@ -114,6 +139,11 @@ export default function PayablesPage() {
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequestRow[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
+  const [bankingBusy, setBankingBusy] = useState(false);
+  const [bankAccounts, setBankAccounts] = useState<BankAccountOption[]>([]);
+  const [selectedBankAccountId, setSelectedBankAccountId] = useState('');
   const NEW_SUPPLIER_OPTION = '__novo_fornecedor__';
 
   const normalizeSupplierName = (value: string) =>
@@ -132,10 +162,27 @@ export default function PayablesPage() {
     if (data) setTeamMembers(data);
   };
 
+  const fetchBankAccounts = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('bank_accounts')
+        .select('id, bank_connection_id, banco_nome, conta_mascarada, holder_name, is_active')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setBankAccounts((data as BankAccountOption[]) || []);
+    } catch (bankError) {
+      console.error('Error fetching active bank accounts:', bankError);
+      setBankAccounts([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchProjects();
     fetchTeamMembers();
-  }, []);
+    fetchBankAccounts();
+  }, [fetchBankAccounts]);
 
   const generateNextId = async () => {
     const now = new Date();
@@ -281,6 +328,29 @@ export default function PayablesPage() {
   }, [fetchPayables, fetchSuppliers]);
 
   useEffect(() => {
+    if (!isModalOpen || !editingItem) {
+      setPaymentRequests([]);
+      setAuditLogs([]);
+      return;
+    }
+
+    const loadBankingContext = async () => {
+      try {
+        const [requests, logs] = await Promise.all([
+          listPaymentRequestsByContaPagar(editingItem.id),
+          listAuditLogs('contas_pagar', editingItem.id),
+        ]);
+        setPaymentRequests(requests);
+        setAuditLogs(logs);
+      } catch (contextError) {
+        console.error('Error loading banking context for payable:', contextError);
+      }
+    };
+
+    loadBankingContext();
+  }, [editingItem, isModalOpen]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (!isFilterOpen) return;
       if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
@@ -294,6 +364,7 @@ export default function PayablesPage() {
 
   const handleOpenModal = (item?: Payable) => {
     if (item) {
+      setSelectedBankAccountId(item.bank_account_id || '');
       setIsCustomSupplier(!supplierOptions.some((supplier) => normalizeSupplierName(supplier) === normalizeSupplierName(item.fornecedor)));
       setEditingItem(item);
       setFormData({
@@ -311,6 +382,7 @@ export default function PayablesPage() {
         socio_id: item.socio_id || ''
       });
     } else {
+      setSelectedBankAccountId('');
       setIsCustomSupplier(false);
       setEditingItem(null);
       setFormData({
@@ -365,6 +437,7 @@ export default function PayablesPage() {
       if (formData.etapa_obra) payload.etapa_obra = formData.etapa_obra;
       if (formData.centro_custo_tipo) payload.centro_custo_tipo = formData.centro_custo_tipo;
       if (formData.socio_id && formData.centro_custo_tipo === 'Pessoal') payload.socio_id = formData.socio_id;
+      if (selectedBankAccountId) payload.bank_account_id = selectedBankAccountId;
 
       if (editingItem) {
         const { error } = await supabase
@@ -410,6 +483,141 @@ export default function PayablesPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setIsCustomSupplier(false);
+    setSelectedBankAccountId('');
+  };
+
+  const getCurrentUserId = async () => {
+    const { data, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    return data.user?.id || null;
+  };
+
+  const refreshPayableBankingContext = async (payableId: string) => {
+    await fetchPayables();
+    const { data: refreshedItem } = await supabase
+      .from('contas_pagar')
+      .select('*')
+      .eq('id', payableId)
+      .single();
+    if (refreshedItem) {
+      setEditingItem(refreshedItem as Payable);
+    }
+    const [requests, logs] = await Promise.all([
+      listPaymentRequestsByContaPagar(payableId),
+      listAuditLogs('contas_pagar', payableId),
+    ]);
+    setPaymentRequests(requests);
+    setAuditLogs(logs);
+  };
+
+  const submitPayableForApproval = async (item: Payable) => {
+    setBankingBusy(true);
+    try {
+      const bankAccountId = selectedBankAccountId || item.bank_account_id || bankAccounts[0]?.id || null;
+      if (!bankAccountId) {
+        alert('Cadastre e selecione uma conta bancária ativa antes de enviar para aprovação.');
+        return;
+      }
+      const userId = await getCurrentUserId();
+      const request = await createPaymentRequest({
+        contaPagarId: item.id,
+        bankAccountId,
+        requestType: 'manual',
+        favorecidoNome: item.fornecedor,
+        valor: item.valor,
+        requestedBy: userId,
+        metadata: {
+          descricao: item.descricao,
+          origem: 'contas_pagar_ui',
+        },
+      });
+
+      await writeAuditLog({
+        entityType: 'contas_pagar',
+        entityId: item.id,
+        action: 'payment_request_created',
+        actorUserId: userId,
+        newData: { payment_request_id: request.id, status: request.status },
+      });
+
+      alert('Solicitação enviada para aprovação.');
+      await refreshPayableBankingContext(item.id);
+    } catch (actionError) {
+      console.error('Error sending payable for approval:', actionError);
+      alert('Não foi possível enviar para aprovação.');
+    } finally {
+      setBankingBusy(false);
+    }
+  };
+
+  const getBankAccountLabel = (account: BankAccountOption) => {
+    const bankName = account.banco_nome || 'Banco';
+    const accountMask = account.conta_mascarada || 'Conta sem máscara';
+    const holder = account.holder_name ? ` · ${account.holder_name}` : '';
+    return `${bankName} · ${accountMask}${holder}`;
+  };
+
+  const getBankAccountLabelById = (bankAccountId?: string | null) => {
+    if (!bankAccountId) return 'Sem conta vinculada';
+    const account = bankAccounts.find((item) => item.id === bankAccountId);
+    return account ? getBankAccountLabel(account) : 'Conta não encontrada';
+  };
+
+  const handleSendForApproval = async () => {
+    if (!editingItem) return;
+    await submitPayableForApproval(editingItem);
+  };
+
+  const approvePayablePayment = async (item: Payable) => {
+    if (!item.payment_request_id) return;
+    setBankingBusy(true);
+    try {
+      const userId = await getCurrentUserId();
+      await approvePaymentRequest({
+        paymentRequestId: item.payment_request_id,
+        approverUserId: userId || 'sistema',
+        decision: 'aprovado',
+        comment: 'Aprovado via painel financeiro.',
+      });
+
+      await writeAuditLog({
+        entityType: 'contas_pagar',
+        entityId: item.id,
+        action: 'payment_request_approved',
+        actorUserId: userId,
+        newData: { payment_request_id: item.payment_request_id, decision: 'aprovado' },
+      });
+
+      alert('Pagamento aprovado.');
+      await refreshPayableBankingContext(item.id);
+    } catch (actionError) {
+      console.error('Error approving payable:', actionError);
+      alert('Não foi possível aprovar o pagamento.');
+    } finally {
+      setBankingBusy(false);
+    }
+  };
+
+  const handleApproveCurrentPayment = async () => {
+    if (!editingItem) return;
+    await approvePayablePayment(editingItem);
+  };
+
+  const getApprovalStatusTone = (status?: string | null) => {
+    switch (status) {
+      case 'aprovado':
+      case 'pago':
+        return 'border-emerald-500/20 bg-emerald-500/10 text-emerald-400';
+      case 'pendente_aprovacao':
+        return 'border-amber-500/20 bg-amber-500/10 text-amber-300';
+      case 'rejeitado':
+      case 'falhou':
+        return 'border-rose-500/20 bg-rose-500/10 text-rose-400';
+      case 'enviado_banco':
+        return 'border-blue-500/20 bg-blue-500/10 text-blue-400';
+      default:
+        return 'border-slate-500/20 bg-slate-500/10 text-slate-400';
+    }
   };
 
   const handleExport = async () => {
@@ -545,35 +753,45 @@ export default function PayablesPage() {
   const totalPages = Math.ceil(filteredPayables.length / itemsPerPage);
 
   return (
-    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
-      <Link
-        href="/finances/receivables"
-        className="fixed left-[12.75rem] top-4 z-40 hidden items-center rounded-full border border-orange-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.18)] backdrop-blur-xl transition hover:border-orange-300/40 hover:text-orange-300 sm:inline-flex lg:left-[14.5rem]"
-      >
-        Ir Para Contas a Receber
-      </Link>
+    <div className="finance-ledger-theme flex-1 bg-[#0a0a0a] px-8 pb-8 pt-3 text-white overflow-y-auto custom-scrollbar">
+      <div className="mb-2 flex items-center gap-2">
+        <Link
+          href="/finances/receivables"
+          className="inline-flex items-center gap-2 rounded-full border border-orange-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-orange-400 shadow-[0_0_30px_rgba(251,146,60,0.18)] backdrop-blur-xl transition hover:border-orange-300/40 hover:text-orange-300"
+        >
+          <ArrowRight size={14} />
+          Ir Para Contas a Receber
+        </Link>
+        <Link
+          href="/finances/banking"
+          className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-cyan-300 shadow-[0_0_30px_rgba(34,211,238,0.14)] backdrop-blur-xl transition hover:border-cyan-300/40 hover:text-cyan-200"
+        >
+          <Landmark size={14} />
+          Conexões Bancárias
+        </Link>
+      </div>
 
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-black tracking-tight italic">
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-2xl font-black tracking-tight italic">
           Contas a <span className="text-[#d4ff3f]">pagar</span>
         </h1>
         <div className="flex items-center gap-4">
           <button 
             onClick={() => handleOpenModal()}
-            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-6 py-2.5 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-2"
+            className="bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] px-3.5 py-1.5 rounded-xl text-[7px] leading-none font-black uppercase tracking-[0.18em] shadow-lg shadow-[#d4ff3f]/10 transition-all flex items-center gap-1.5"
           >
-            <Plus size={18} /> CONTA A PAGAR
+            <Plus size={11} /> CONTA A PAGAR
           </button>
           <div ref={filterRef} className="relative">
             <button 
               onClick={() => setIsFilterOpen(!isFilterOpen)}
               className={cn(
-                "flex items-center gap-2 px-6 py-2.5 border rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest transition-all",
+                "flex items-center gap-1.5 px-3.5 py-1.5 border rounded-xl text-[7px] leading-none font-black uppercase tracking-[0.18em] transition-all",
                 isFilterOpen ? "bg-[#1a1a1a] border-[#d4ff3f] text-[#d4ff3f]" : "bg-[#1a1a1a] border-slate-800/50 text-slate-500 hover:text-white"
               )}
             >
-              <Filter size={16} /> FILTROS
+              <Filter size={10} /> FILTROS
             </button>
             
             <AnimatePresence>
@@ -637,15 +855,15 @@ export default function PayablesPage() {
           </div>
           <button 
             onClick={handleExport}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[7px] leading-none font-black uppercase tracking-[0.18em] hover:text-white transition-all text-slate-500"
           >
-            <Download size={16} /> EXPORTAR
+            <Download size={10} /> EXPORTAR
           </button>
           <button 
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#1a1a1a] border border-slate-800/50 rounded-2xl text-[12px] leading-none font-black uppercase tracking-widest hover:text-white transition-all text-slate-500"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#1a1a1a] border border-slate-800/50 rounded-xl text-[7px] leading-none font-black uppercase tracking-[0.18em] hover:text-white transition-all text-slate-500"
           >
-            <Upload size={16} /> IMPORTAR
+            <Upload size={10} /> IMPORTAR
           </button>
           <input 
             type="file" 
@@ -676,20 +894,20 @@ export default function PayablesPage() {
       )}
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Valor', value: formatCurrency(totalValue), icon: TrendingUp, color: 'text-slate-500' },
           { label: 'Valor pago', value: formatCurrency(paidValue), icon: CheckCircle2, color: 'text-emerald-500' },
           { label: 'Valor em aberto', value: formatCurrency(openValue), icon: AlertCircle, color: 'text-orange-500' },
           { label: 'Valor em andamento', value: formatCurrency(inProgressValue), icon: Clock, color: 'text-blue-500' },
         ].map((card) => (
-          <div key={card.label} className="bg-[#1a1a1a] p-6 rounded-2xl border border-slate-800/50 shadow-sm flex items-center gap-4">
-            <div className={cn("p-3 rounded-xl bg-[#0a0a0a]", card.color)}>
-              <card.icon size={24} />
+          <div key={card.label} className="bg-[#1a1a1a] px-4 py-3 rounded-2xl border border-slate-800/50 shadow-sm flex items-center gap-3">
+            <div className={cn("p-2 rounded-lg bg-[#0a0a0a]", card.color)}>
+              <card.icon size={18} />
             </div>
             <div>
-              <p className="text-slate-500 text-[12px] leading-none font-bold uppercase tracking-widest mb-1">{card.label}</p>
-              <p className="text-[24px] leading-none font-black text-white">{card.value}</p>
+              <p className="text-slate-500 text-[11px] leading-none font-bold uppercase tracking-widest mb-1">{card.label}</p>
+              <p className="text-lg leading-none font-black text-white">{card.value}</p>
             </div>
           </div>
         ))}
@@ -697,7 +915,7 @@ export default function PayablesPage() {
 
       {/* Table Section */}
       <div className="bg-[#1a1a1a] rounded-3xl border border-slate-800/50 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
+        <div className="px-6 py-3 border-b border-slate-800/50 flex items-center justify-between">
           <div className="relative w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
@@ -705,7 +923,7 @@ export default function PayablesPage() {
               placeholder="Pesquisar fornecedor ou descrição..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl pl-10 pr-4 py-2.5 text-[14px] leading-tight text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
+              className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl pl-10 pr-4 py-2.5 text-sm leading-tight text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/30 transition-all"
             />
           </div>
         </div>
@@ -770,10 +988,32 @@ export default function PayablesPage() {
                   <tr 
                     key={item.id} 
                     onClick={() => handleOpenModal(item)}
-                    className="hover:bg-[#0a0a0a] transition-colors group text-[14px] leading-tight cursor-pointer"
+                    className="hover:bg-[#0a0a0a] transition-colors group text-sm leading-tight cursor-pointer"
                   >
                     <td className="px-2 py-2">
                       <p className="font-bold text-white leading-tight truncate" title={item.fornecedor}>{item.fornecedor}</p>
+                      <span
+                        className={cn(
+                          'mt-1 inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest',
+                          item.bank_account_id
+                            ? 'border-cyan-500/20 bg-cyan-500/10 text-cyan-300'
+                            : 'border-slate-500/20 bg-slate-500/10 text-slate-400'
+                        )}
+                        title={getBankAccountLabelById(item.bank_account_id)}
+                      >
+                        <Landmark size={10} className="shrink-0" />
+                        <span className="truncate">{getBankAccountLabelById(item.bank_account_id)}</span>
+                      </span>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className={cn('inline-flex items-center rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest', getApprovalStatusTone(item.approval_status))}>
+                          {item.approval_status || 'nao_enviado'}
+                        </span>
+                        {item.partner_payment_status && (
+                          <span className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-cyan-300">
+                            {item.partner_payment_status}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-2 py-2">
                       <p className="text-slate-400 leading-tight truncate" title={item.descricao}>{item.descricao}</p>
@@ -799,6 +1039,30 @@ export default function PayablesPage() {
                       )}>
                         {item.situacao}
                       </span>
+                      {item.situacao !== 'Pago' && !item.payment_request_id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void submitPayableForApproval(item);
+                          }}
+                          className="mt-2 block rounded-lg border border-amber-500/20 bg-amber-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-300 transition-all hover:bg-amber-500/20"
+                        >
+                          Aprovar
+                        </button>
+                      )}
+                      {item.approval_status === 'pendente_aprovacao' && item.payment_request_id && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void approvePayablePayment(item);
+                          }}
+                          className="mt-2 block rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20"
+                        >
+                          Confirmar
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -874,10 +1138,10 @@ export default function PayablesPage() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-[#1a1a1a] rounded-3xl shadow-2xl overflow-hidden border border-slate-800/50"
+              className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto bg-[#1a1a1a] rounded-3xl shadow-2xl border border-slate-800/50 custom-scrollbar"
             >
-              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between">
-                <h3 className="text-lg font-black tracking-tight text-white">
+              <div className="px-5 py-4 border-b border-slate-800/50 flex items-center justify-between">
+                <h3 className="text-sm font-black tracking-tight text-white">
                   {editingItem ? 'Editar Conta' : 'Nova Conta a Pagar'}
                 </h3>
                 <button onClick={handleCloseModal} className="text-slate-500 hover:text-white transition-colors">
@@ -885,8 +1149,8 @@ export default function PayablesPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form onSubmit={handleSubmit} className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5 ml-1">Fornecedor</label>
                     <select
@@ -904,7 +1168,7 @@ export default function PayablesPage() {
                         setFormData({ ...formData, fornecedor: value });
                       }}
                       className={cn(
-                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
+                        "w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all",
                         isCustomSupplier ? "text-slate-400" : "text-white"
                       )}
                     >
@@ -922,7 +1186,7 @@ export default function PayablesPage() {
                         type="text"
                         value={formData.fornecedor}
                         onChange={(e) => setFormData({ ...formData, fornecedor: e.target.value })}
-                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        className="w-full mt-3 bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                         placeholder="Digite o nome do novo fornecedor"
                       />
                     )}
@@ -934,7 +1198,7 @@ export default function PayablesPage() {
                       type="text" 
                       value={formData.descricao}
                       onChange={(e) => setFormData({...formData, descricao: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="O que está sendo pago?"
                     />
                   </div>
@@ -945,7 +1209,7 @@ export default function PayablesPage() {
                       type="date" 
                       value={formData.data_vencimento}
                       onChange={(e) => setFormData({...formData, data_vencimento: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     />
                   </div>
                   <div>
@@ -954,7 +1218,7 @@ export default function PayablesPage() {
                       type="date" 
                       value={formData.data_pagamento}
                       onChange={(e) => setFormData({...formData, data_pagamento: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     />
                   </div>
                   <div>
@@ -972,7 +1236,7 @@ export default function PayablesPage() {
                       transformRawValue={transformRawCurrencyValue}
                       value={formData.valor}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor: Number(v || 0)}))}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
                   </div>
@@ -990,7 +1254,7 @@ export default function PayablesPage() {
                       transformRawValue={transformRawCurrencyValue}
                       value={formData.valor_pago}
                       onValueChange={(value) => handleFixedDecimalValueChange(value, (v) => setFormData({...formData, valor_pago: Number(v || 0)}))}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       placeholder="R$ 0,00"
                     />
                   </div>
@@ -1003,7 +1267,7 @@ export default function PayablesPage() {
                           type="button"
                           onClick={() => setFormData({...formData, centro_custo_tipo: t as 'Obra' | 'Administrativo' | 'Pessoal'})}
                           className={cn(
-                            "px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                            "px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all",
                             formData.centro_custo_tipo === t 
                               ? "bg-[#d4ff3f] border-[#d4ff3f] text-black shadow-[0_0_20px_rgba(212,255,63,0.3)]"
                               : "bg-[#0a0a0a] border-slate-800/50 text-slate-400 hover:border-slate-700"
@@ -1021,7 +1285,7 @@ export default function PayablesPage() {
                       <select 
                         value={formData.projeto_id}
                         onChange={(e) => setFormData({...formData, projeto_id: e.target.value})}
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       >
                         <option value="">Nenhum</option>
                         {projects.map(p => (
@@ -1037,7 +1301,7 @@ export default function PayablesPage() {
                       <select 
                         value={formData.socio_id}
                         onChange={(e) => setFormData({...formData, socio_id: e.target.value})}
-                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                        className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                       >
                         <option value="">Selecione um Sócio</option>
                         {teamMembers.map(m => (
@@ -1051,7 +1315,7 @@ export default function PayablesPage() {
                     <select 
                       value={formData.categoria_custo}
                       onChange={(e) => setFormData({...formData, categoria_custo: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     >
                       <option value="">Nenhuma</option>
                       {COST_CATEGORIES.map(c => (
@@ -1064,7 +1328,7 @@ export default function PayablesPage() {
                     <select 
                       value={formData.etapa_obra}
                       onChange={(e) => setFormData({...formData, etapa_obra: e.target.value})}
-                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-2xl px-4 py-3 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
+                      className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl px-3 py-2.5 text-sm text-white font-bold focus:ring-2 focus:ring-[#d4ff3f]/30 outline-none transition-all"
                     >
                       <option value="">Nenhuma</option>
                       {CONSTRUCTION_STAGES.map(s => (
@@ -1081,7 +1345,7 @@ export default function PayablesPage() {
                           type="button"
                           onClick={() => setFormData({...formData, situacao: s as Payable['situacao']})}
                           className={cn(
-                            "px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all",
+                            "px-3 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all",
                             formData.situacao === s 
                               ? "bg-[#d4ff3f] border-[#d4ff3f] text-[#0a0a0a]" 
                               : "bg-[#0a0a0a] border-slate-800/50 text-slate-500 hover:border-slate-700"
@@ -1092,20 +1356,125 @@ export default function PayablesPage() {
                       ))}
                     </div>
                   </div>
+                  {editingItem && (
+                    <div className="col-span-2 rounded-2xl border border-slate-800/50 bg-[#0a0a0a] p-3">
+                      <div>
+                        <label className="mb-1.5 ml-1 block text-[10px] font-black uppercase tracking-widest text-slate-500">
+                          Conta Bancária Operacional
+                        </label>
+                        {bankAccounts.length === 0 && (
+                          <div className="mb-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2.5">
+                            <p className="text-[10px] font-black uppercase tracking-widest text-amber-300">
+                              Nenhuma conta bancária ativa cadastrada.
+                            </p>
+                            <Link
+                              href="/finances/banking"
+                              className="mt-2 inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-amber-200 hover:text-white"
+                            >
+                              <Landmark size={12} />
+                              Ir para Conexões Bancárias
+                            </Link>
+                          </div>
+                        )}
+                        <select
+                          value={selectedBankAccountId}
+                          onChange={(e) => setSelectedBankAccountId(e.target.value)}
+                          className="w-full rounded-xl border border-slate-800/50 bg-[#050505] px-3 py-2.5 text-sm font-bold text-white outline-none transition-all focus:ring-2 focus:ring-[#d4ff3f]/30"
+                        >
+                          <option value="">Selecione uma conta ativa</option>
+                          {bankAccounts.map((account) => (
+                            <option key={account.id} value={account.id}>
+                              {getBankAccountLabel(account)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={cn('inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest', getApprovalStatusTone(editingItem.approval_status))}>
+                          Aprovação: {editingItem.approval_status || 'nao_enviado'}
+                        </span>
+                        {editingItem.partner_payment_status && (
+                          <span className="inline-flex items-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-cyan-300">
+                            Banco: {editingItem.partner_payment_status}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {!editingItem.payment_request_id && editingItem.situacao !== 'Pago' && (
+                          <button
+                            type="button"
+                            disabled={bankingBusy}
+                            onClick={handleSendForApproval}
+                            className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-amber-300 transition-all hover:bg-amber-500/20 disabled:opacity-50"
+                          >
+                            Enviar para Aprovação
+                          </button>
+                        )}
+                        {editingItem.approval_status === 'pendente_aprovacao' && editingItem.payment_request_id && (
+                          <button
+                            type="button"
+                            disabled={bankingBusy}
+                            onClick={handleApproveCurrentPayment}
+                            className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-widest text-emerald-300 transition-all hover:bg-emerald-500/20 disabled:opacity-50"
+                          >
+                            Aprovar Pagamento
+                          </button>
+                        )}
+                      </div>
+                      {paymentRequests.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Solicitações Recentes</p>
+                          <div className="space-y-2">
+                            {paymentRequests.slice(0, 3).map((request) => (
+                              <div key={request.id} className="rounded-xl border border-slate-800/50 px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-white">{request.request_type}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">
+                                      {formatDate(request.created_at)}
+                                    </span>
+                                    <span className={cn('rounded-full border px-2 py-1 text-[9px] font-black uppercase tracking-widest', getApprovalStatusTone(request.status))}>
+                                      {request.status}
+                                    </span>
+                                  </div>
+                                </div>
+                                <p className="mt-1 text-[10px] font-bold text-slate-400">{formatCurrency(request.valor)}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {auditLogs.length > 0 && (
+                        <div className="mt-3">
+                          <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-slate-500">Auditoria</p>
+                          <div className="space-y-2">
+                            {auditLogs.slice(0, 3).map((log) => (
+                              <div key={log.id} className="rounded-xl border border-slate-800/50 px-3 py-2">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-[10px] font-black uppercase tracking-widest text-white">{log.action}</p>
+                                  <p className="text-[9px] font-bold uppercase tracking-widest text-slate-500">{formatDate(log.created_at)}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                <div className="pt-4 flex flex-col gap-3">
+                <div className="pt-2 flex flex-col gap-2">
                   <div className="flex gap-3">
                     <button 
                       type="button"
                       onClick={handleCloseModal}
-                      className="flex-1 px-4 py-3 border border-slate-800/50 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
+                      className="flex-1 px-4 py-2.5 border border-slate-800/50 rounded-xl text-[9px] font-black uppercase tracking-widest text-slate-500 hover:bg-[#0a0a0a] transition-all"
                     >
                       Cancelar
                     </button>
                     <button 
                       type="submit"
-                      className="flex-1 px-4 py-3 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
+                      className="flex-1 px-4 py-2.5 bg-[#d4ff3f] hover:bg-[#c4ef2f] text-[#0a0a0a] rounded-xl text-[9px] font-black uppercase tracking-widest shadow-lg shadow-[#d4ff3f]/10 transition-all"
                     >
                       {editingItem ? 'Salvar Alterações' : 'Adicionar Conta'}
                     </button>
@@ -1119,7 +1488,7 @@ export default function PayablesPage() {
                           handleCloseModal();
                         }
                       }}
-                      className="w-full px-4 py-3 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="w-full px-4 py-2.5 border border-rose-500/20 text-rose-500 hover:bg-rose-500/10 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all"
                     >
                       Excluir Conta
                     </button>
@@ -1133,3 +1502,4 @@ export default function PayablesPage() {
     </div>
   );
 }
+

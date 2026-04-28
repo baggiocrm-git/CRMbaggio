@@ -985,10 +985,10 @@ export default function FinanceInvoicesPage() {
   };
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8 space-y-8">
-      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-5">
+    <div className="flex-1 bg-[#0a0a0a] px-8 pb-8 pt-3 text-white overflow-y-auto custom-scrollbar space-y-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <h1 className="text-4xl font-black tracking-tight italic">
+          <h1 className="text-3xl font-black tracking-tight italic">
             Emissão de <span className="text-[#d4ff3f]">Notas Fiscais</span>
           </h1>
           <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mt-1">
@@ -996,13 +996,13 @@ export default function FinanceInvoicesPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="px-4 py-2 rounded-2xl border border-slate-800/60 bg-[#1a1a1a] text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <div className="px-3 py-1.5 rounded-xl border border-slate-800/60 bg-[#1a1a1a] text-[10px] font-black uppercase tracking-widest text-slate-400">
             Rascunho e histórico salvos neste navegador
           </div>
           <button
             type="button"
             onClick={resetCurrentDraft}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl border border-slate-800/60 bg-[#1a1a1a] hover:bg-[#242424] text-[10px] font-black uppercase tracking-widest transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-800/60 bg-[#1a1a1a] hover:bg-[#242424] text-[10px] font-black uppercase tracking-widest transition-all"
           >
             <RefreshCw size={14} />
             Novo Rascunho
@@ -1010,7 +1010,7 @@ export default function FinanceInvoicesPage() {
           <button
             type="button"
             onClick={() => void saveCurrentRecord()}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#d4ff3f] text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest hover:bg-[#c4ef2f] transition-all"
           >
             <Save size={14} />
             Salvar no Histórico
@@ -1018,7 +1018,7 @@ export default function FinanceInvoicesPage() {
           <button
             type="button"
             onClick={() => void saveCurrentRecord('Emitida')}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-500 transition-all"
           >
             <CheckCircle2 size={14} />
             Marcar Emitida
@@ -1026,7 +1026,7 @@ export default function FinanceInvoicesPage() {
           <button
             type="button"
             onClick={() => void exportCurrentMirror()}
-            className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-blue-500 transition-all"
           >
             <ReceiptText size={14} />
             Exportar Espelho
@@ -1046,7 +1046,8 @@ export default function FinanceInvoicesPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
+      <div className="hidden grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sincronização do Histórico</p>
@@ -1065,22 +1066,22 @@ export default function FinanceInvoicesPage() {
                 navigator.clipboard.writeText(INVOICE_HISTORY_SQL);
                 setFeedbackMessage({ type: 'success', text: 'Script SQL copiado para ativar o histórico compartilhado.' });
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
             >
-              <Copy size={14} />
+              <Copy size={13} />
               Copiar SQL
             </button>
           )}
         </div>
 
         {!isRemoteHistoryEnabled && !isSyncingHistory && (
-          <pre className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+          <pre className="max-h-44 w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-3 text-[10px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
             {INVOICE_HISTORY_SQL}
           </pre>
         )}
       </div>
 
-      <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
+        <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Persistência NFS-e</p>
@@ -1092,14 +1093,14 @@ export default function FinanceInvoicesPage() {
                   : 'Persistência compartilhada da NFS-e ainda não ativada. O navegador segue como fallback.'}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => void saveRemoteNfseSettings()}
               disabled={isSavingNfseSettings}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 disabled:opacity-50 text-[10px] font-black uppercase tracking-widest transition-all"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 disabled:opacity-50 text-[10px] font-black uppercase tracking-widest transition-all"
             >
-              {isSavingNfseSettings ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+              {isSavingNfseSettings ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
               Salvar Configuração
             </button>
             {!isRemoteNfseSettingsEnabled && !isSyncingNfseSettings && (
@@ -1109,9 +1110,9 @@ export default function FinanceInvoicesPage() {
                   navigator.clipboard.writeText(NFSE_SETTINGS_SQL);
                   setFeedbackMessage({ type: 'success', text: 'Script SQL copiado para ativar a persistência da NFS-e.' });
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
               >
-                <Copy size={14} />
+                <Copy size={13} />
                 Copiar SQL
               </button>
             )}
@@ -1119,13 +1120,16 @@ export default function FinanceInvoicesPage() {
         </div>
 
         {!isRemoteNfseSettingsEnabled && !isSyncingNfseSettings && (
-          <pre className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+          <pre className="max-h-44 w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-3 text-[10px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
             {NFSE_SETTINGS_SQL}
           </pre>
         )}
       </div>
 
-      <div className="rounded-3xl border border-slate-800/60 bg-[#1a1a1a] p-6 space-y-5">
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.55fr)_minmax(280px,0.95fr)]">
+        <div className="rounded-3xl border border-slate-800/60 bg-[#1a1a1a] p-4 space-y-4">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Integração Prefeitura de Ponta Grossa</p>
@@ -1139,7 +1143,7 @@ export default function FinanceInvoicesPage() {
               type="button"
               onClick={() => void handleTestPontaGrossa()}
               disabled={isTestingPontaGrossa}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 disabled:opacity-50 text-[10px] font-black uppercase tracking-widest transition-all"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 disabled:opacity-50 text-[10px] font-black uppercase tracking-widest transition-all"
             >
               {isTestingPontaGrossa ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
               Testar Consulta
@@ -1148,7 +1152,7 @@ export default function FinanceInvoicesPage() {
               type="button"
               onClick={() => void handleEmitPontaGrossa()}
               disabled={isEmittingPontaGrossa}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest transition-all"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-[#0a0a0a] text-[10px] font-black uppercase tracking-widest transition-all"
             >
               {isEmittingPontaGrossa ? <Loader2 size={14} className="animate-spin" /> : <ReceiptText size={14} />}
               Emitir Síncrono
@@ -1156,82 +1160,160 @@ export default function FinanceInvoicesPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5">
           <p className="text-[10px] font-black uppercase tracking-widest text-emerald-300">Segurança</p>
           <p className="mt-1 text-sm text-emerald-100/90">
             Certificado A1, senha do certificado e senha do webservice podem ser carregados pelo servidor via <code>.env.local</code>.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-          <label className="space-y-1">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12">
+          <label className="space-y-1 xl:col-span-2 xl:order-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">CNPJ</span>
-            <input value={pontaGrossaConfig.cnpj} onChange={(e) => updatePontaGrossaConfig('cnpj', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.cnpj} onChange={(e) => updatePontaGrossaConfig('cnpj', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-2.5 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Inscrição Municipal</span>
-            <input value={pontaGrossaConfig.inscricaoMunicipal} onChange={(e) => updatePontaGrossaConfig('inscricaoMunicipal', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+          <label className="space-y-1 xl:col-span-2 xl:order-3">
+            <span className="text-[10px] font-black uppercase tracking-normal text-slate-500">INSC. MUN.</span>
+            <input value={pontaGrossaConfig.inscricaoMunicipal} onChange={(e) => updatePontaGrossaConfig('inscricaoMunicipal', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-2.5 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Série RPS</span>
-            <input value={pontaGrossaConfig.serieRps} onChange={(e) => updatePontaGrossaConfig('serieRps', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+          <label className="space-y-1 xl:col-span-1 xl:order-4">
+            <span className="text-[10px] font-black uppercase tracking-normal text-slate-500">SÉRIE</span>
+            <input value={pontaGrossaConfig.serieRps} onChange={(e) => updatePontaGrossaConfig('serieRps', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-2 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Próximo RPS</span>
-            <input type="number" value={pontaGrossaConfig.nextRpsNumber} onChange={(e) => updatePontaGrossaConfig('nextRpsNumber', Number(e.target.value || 1))} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+          <label className="space-y-1 xl:col-span-2 xl:order-5">
+            <span className="text-[10px] font-black uppercase tracking-normal text-slate-500">PRÓX. RPS</span>
+            <input type="number" value={pontaGrossaConfig.nextRpsNumber} onChange={(e) => updatePontaGrossaConfig('nextRpsNumber', Number(e.target.value || 1))} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-2 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 xl:col-span-2 xl:order-6">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Próximo Lote</span>
-            <input type="number" value={pontaGrossaConfig.nextLotNumber} onChange={(e) => updatePontaGrossaConfig('nextLotNumber', Number(e.target.value || 1))} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input type="number" value={pontaGrossaConfig.nextLotNumber} onChange={(e) => updatePontaGrossaConfig('nextLotNumber', Number(e.target.value || 1))} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 xl:col-span-2 xl:order-7">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Item Lista Serviço</span>
-            <input value={pontaGrossaConfig.municipalServiceCode} onChange={(e) => updatePontaGrossaConfig('municipalServiceCode', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.municipalServiceCode} onChange={(e) => updatePontaGrossaConfig('municipalServiceCode', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 xl:col-span-2 xl:order-8">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">CNAE</span>
-            <input value={pontaGrossaConfig.cnaeCode} onChange={(e) => updatePontaGrossaConfig('cnaeCode', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.cnaeCode} onChange={(e) => updatePontaGrossaConfig('cnaeCode', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 xl:col-span-5 xl:order-1">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Razão Social Prestador</span>
             <input value={pontaGrossaConfig.issuerRazaoSocial} onChange={(e) => updatePontaGrossaConfig('issuerRazaoSocial', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+          <label className="space-y-1 xl:col-span-2 xl:order-9">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Produção</span>
-            <select value={pontaGrossaConfig.production ? 'production' : 'homologation'} onChange={(e) => updatePontaGrossaConfig('production', e.target.value === 'production')} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none">
+            <select value={pontaGrossaConfig.production ? 'production' : 'homologation'} onChange={(e) => updatePontaGrossaConfig('production', e.target.value === 'production')} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none">
               <option value="production">Produção</option>
               <option value="homologation">Homologação</option>
             </select>
           </label>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3">
           <label className="space-y-1 xl:col-span-2">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Endereço Prestador</span>
             <input value={pontaGrossaConfig.issuerStreet} onChange={(e) => updatePontaGrossaConfig('issuerStreet', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
           </label>
-          <label className="space-y-1">
+                <label className="space-y-1 xl:order-1">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Número</span>
-            <input value={pontaGrossaConfig.issuerNumber} onChange={(e) => updatePontaGrossaConfig('issuerNumber', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.issuerNumber} onChange={(e) => updatePontaGrossaConfig('issuerNumber', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
           <label className="space-y-1">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Bairro</span>
-            <input value={pontaGrossaConfig.issuerNeighborhood} onChange={(e) => updatePontaGrossaConfig('issuerNeighborhood', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.issuerNeighborhood} onChange={(e) => updatePontaGrossaConfig('issuerNeighborhood', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
           <label className="space-y-1">
             <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">CEP</span>
-            <input value={pontaGrossaConfig.issuerCep} onChange={(e) => updatePontaGrossaConfig('issuerCep', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none" />
+            <input value={pontaGrossaConfig.issuerCep} onChange={(e) => updatePontaGrossaConfig('issuerCep', e.target.value)} className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none" />
           </label>
         </div>
 
         {pontaGrossaResult && (
-          <pre className="w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-4 text-[11px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+          <pre className="max-h-56 w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-3 text-[10px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
             {JSON.stringify(pontaGrossaResult, null, 2)}
           </pre>
         )}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sincronização do Histórico</p>
+                <p className="text-sm text-slate-300 mt-1">
+                  {isSyncingHistory
+                    ? 'Validando histórico compartilhado no Supabase...'
+                    : isRemoteHistoryEnabled
+                      ? 'Histórico compartilhado ativo entre usuários e máquinas.'
+                      : 'Histórico compartilhado ainda não ativado. A página segue usando o navegador como fallback.'}
+                </p>
+              </div>
+              {!isRemoteHistoryEnabled && !isSyncingHistory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(INVOICE_HISTORY_SQL);
+                    setFeedbackMessage({ type: 'success', text: 'Script SQL copiado para ativar o histórico compartilhado.' });
+                  }}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
+                >
+                  <Copy size={13} />
+                  Copiar SQL
+                </button>
+              )}
+            </div>
+
+            {!isRemoteHistoryEnabled && !isSyncingHistory && (
+              <pre className="max-h-44 w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-3 text-[10px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+                {INVOICE_HISTORY_SQL}
+              </pre>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-slate-800/60 bg-[#1a1a1a] p-4 flex flex-col gap-3">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Persistência NFS-e</p>
+                <p className="text-sm text-slate-300 mt-1">
+                  {isSyncingNfseSettings
+                    ? 'Carregando configuração compartilhada da NFS-e...'
+                    : isRemoteNfseSettingsEnabled
+                      ? 'Numeração de RPS/lote e parâmetros fiscais compartilhados entre usuários e máquinas.'
+                      : 'Persistência compartilhada da NFS-e ainda não ativada. O navegador segue como fallback.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveRemoteNfseSettings()}
+                  disabled={isSavingNfseSettings}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 disabled:opacity-50 text-[10px] font-black uppercase tracking-widest transition-all"
+                >
+                  {isSavingNfseSettings ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                  Salvar Configuração
+                </button>
+                {!isRemoteNfseSettingsEnabled && !isSyncingNfseSettings && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(NFSE_SETTINGS_SQL);
+                      setFeedbackMessage({ type: 'success', text: 'Script SQL copiado para ativar a persistência da NFS-e.' });
+                    }}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0a0a0a] hover:bg-[#141414] border border-slate-800/60 text-[10px] font-black uppercase tracking-widest transition-all"
+                  >
+                    <Copy size={13} />
+                    Copiar SQL
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {!isRemoteNfseSettingsEnabled && !isSyncingNfseSettings && (
+              <pre className="max-h-44 w-full bg-[#0a0a0a] border border-slate-800/50 rounded-xl p-3 text-[10px] font-mono text-slate-300 overflow-x-auto custom-scrollbar leading-relaxed">
+                {NFSE_SETTINGS_SQL}
+              </pre>
+            )}
+          </div>
         {(['labor', 'mixed'] as InvoiceMode[]).map((mode) => {
           const meta = invoiceMeta[mode];
           const Icon = meta.icon;
@@ -1242,7 +1324,7 @@ export default function FinanceInvoicesPage() {
               key={mode}
               type="button"
               onClick={() => setActiveMode(mode)}
-              className={`text-left rounded-3xl border p-5 transition-all ${
+              className={`text-left rounded-3xl border p-4 transition-all ${
                 isActive
                   ? `${meta.border} ${meta.surface} shadow-lg shadow-black/20`
                   : 'border-slate-800/60 bg-[#141414] hover:bg-[#1a1a1a]'
@@ -1253,98 +1335,148 @@ export default function FinanceInvoicesPage() {
                   <p className={`text-[10px] font-black uppercase tracking-widest ${isActive ? meta.accent : 'text-slate-500'}`}>
                     {meta.label}
                   </p>
-                  <h2 className="text-xl font-black tracking-tight mt-1">{meta.title}</h2>
+                  <h2 className="text-lg font-black tracking-tight mt-1">{meta.title}</h2>
                   <p className="text-sm text-slate-400 mt-2 leading-relaxed">{meta.systemDescription}</p>
                 </div>
-                <div className={`size-12 rounded-2xl flex items-center justify-center ${isActive ? meta.surface : 'bg-[#0a0a0a]'} ${isActive ? meta.accent : 'text-slate-500'}`}>
-                  <Icon size={22} />
+                <div className={`size-10 rounded-xl flex items-center justify-center ${isActive ? meta.surface : 'bg-[#0a0a0a]'} ${isActive ? meta.accent : 'text-slate-500'}`}>
+                  <Icon size={18} />
                 </div>
-              </div>
-              <div className="mt-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                <ShieldCheck size={12} />
-                Canal operacional: {meta.systemName}
               </div>
             </button>
           );
         })}
+        </div>
+
       </div>
 
       <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1.35fr)_460px] gap-6">
         <div className="space-y-6">
-          <section className="bg-[#1a1a1a] border border-slate-800/60 rounded-3xl p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className={`size-10 rounded-2xl flex items-center justify-center ${currentMeta.surface} ${currentMeta.accent}`}>
+          <section className="bg-[#1a1a1a] border border-slate-800/60 rounded-3xl p-5">
+            <div className="flex items-center gap-3 mb-4">
+              <div className={`size-9 rounded-xl flex items-center justify-center ${currentMeta.surface} ${currentMeta.accent}`}>
                 <ReceiptText size={18} />
               </div>
               <div>
-                <h3 className="text-lg font-black tracking-tight">Dados da Emissão</h3>
+                <h3 className="text-base font-black tracking-tight">Dados da Emissão</h3>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
                   Base operacional da nota selecionada
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              <label className="space-y-1">
+            <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[120px_minmax(0,1.3fr)_150px_minmax(0,1fr)]">
+              <label className="space-y-1 xl:order-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Número Interno</span>
                 <input
                   value={currentDraft.invoiceNumber}
                   onChange={(e) => updateDraft({ invoiceNumber: e.target.value })}
-                  placeholder={`Ex: ${currentMeta.prefix}-2026-0001`}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  placeholder="Ex:NFMO26001"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
+              <label className="space-y-1 xl:order-4">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Emitente</span>
                 <input
                   value={currentDraft.issuerName}
                   onChange={(e) => updateDraft({ issuerName: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
+              <label className="space-y-1 xl:order-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Tomador</span>
                 <input
                   value={currentDraft.clientName}
                   onChange={(e) => updateDraft({ clientName: e.target.value })}
                   placeholder="Nome do cliente / empresa"
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
+              <label className="space-y-1 xl:order-3">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">CPF/CNPJ</span>
                 <input
                   value={currentDraft.clientDocument}
                   onChange={(e) => updateDraft({ clientDocument: e.target.value })}
                   placeholder="Documento do tomador"
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_110px]">
+                <label className="min-w-0 space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Projeto / Obra</span>
                 <input
                   value={currentDraft.projectName}
                   onChange={(e) => updateDraft({ projectName: e.target.value })}
                   placeholder="Nome da obra ou contrato"
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
+              <label className="min-w-0 space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Competência</span>
                 <input
                   value={currentDraft.competence}
                   onChange={(e) => updateDraft({ competence: e.target.value })}
                   placeholder="Ex: 04/2026"
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
-              </label>
+                </label>
+                <label className="hidden">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status Oper.</span>
+                  <select
+                    value={currentDraft.status}
+                    onChange={(e) => updateDraft({ status: e.target.value as InvoiceStatus })}
+                    className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  >
+                    <option>Rascunho</option>
+                    <option>Em emissÃ£o</option>
+                    <option>Emitida</option>
+                  </select>
+                </label>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-[120px_minmax(0,1fr)_260px]">
+                  <label className="space-y-1 xl:order-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status Oper.</span>
+                    <select
+                      value={currentDraft.status}
+                      onChange={(e) => updateDraft({ status: e.target.value as InvoiceStatus })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    >
+                      <option>Rascunho</option>
+                      <option>Em emissÃ£o</option>
+                      <option>Emitida</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1 xl:order-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Data de EmissÃ£o</span>
+                    <input
+                      type="date"
+                      value={currentDraft.issueDate}
+                      onChange={(e) => updateDraft({ issueDate: e.target.value })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    />
+                  </label>
+                  <label className="space-y-1 xl:order-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">MunicÃ­pio da PrestaÃ§Ã£o</span>
+                    <input
+                      value={currentDraft.serviceCity}
+                      onChange={(e) => updateDraft({ serviceCity: e.target.value })}
+                      className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="hidden">
               <label className="space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Data de Emissão</span>
                 <input
                   type="date"
                   value={currentDraft.issueDate}
                   onChange={(e) => updateDraft({ issueDate: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
               <label className="space-y-1">
@@ -1352,38 +1484,43 @@ export default function FinanceInvoicesPage() {
                 <input
                   value={currentDraft.serviceCity}
                   onChange={(e) => updateDraft({ serviceCity: e.target.value })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 />
               </label>
-              <label className="space-y-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status Operacional</span>
+              <label className="hidden">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Status Oper.</span>
                 <select
                   value={currentDraft.status}
                   onChange={(e) => updateDraft({ status: e.target.value as InvoiceStatus })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20"
                 >
                   <option>Rascunho</option>
                   <option>Em emissão</option>
                   <option>Emitida</option>
                 </select>
               </label>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] gap-4 mt-4">
+            <div className="grid grid-cols-1 gap-3 mt-3">
               <label className="space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Descrição do Serviço / Destaque da Nota</span>
                 <textarea
                   value={currentDraft.serviceDescription}
                   onChange={(e) => updateDraft({ serviceDescription: e.target.value })}
-                  rows={5}
+                  rows={4}
                   placeholder="Descreva o serviço que será destacado na nota fiscal."
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20 resize-none"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-2 focus:ring-[#d4ff3f]/20 resize-none"
                 />
               </label>
-              <div className={`rounded-2xl border p-4 ${currentMeta.border} ${currentMeta.surface}`}>
+              <div className={`rounded-2xl border px-4 py-3 ${currentMeta.border} ${currentMeta.surface}`}>
                 <p className={`text-[10px] font-black uppercase tracking-widest ${currentMeta.accent}`}>Canal de emissão atual</p>
-                <h4 className="text-base font-black tracking-tight mt-2">{currentMeta.systemName}</h4>
-                <p className="text-sm text-slate-300 leading-relaxed mt-2">{currentMeta.systemDescription}</p>
+                <div className="flex flex-col gap-2 xl:flex-row xl:items-start xl:justify-between xl:gap-6">
+                  <div className="xl:min-w-[230px]">
+                    <h4 className="text-base font-black tracking-tight mt-1">{currentMeta.systemName}</h4>
+                  </div>
+                  <p className="text-sm text-slate-300 leading-relaxed xl:flex-1">{currentMeta.systemDescription}</p>
+                </div>
               </div>
             </div>
           </section>
@@ -1578,7 +1715,7 @@ export default function FinanceInvoicesPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+            <div className="grid grid-cols-1 gap-3 mt-4 md:grid-cols-[100px_100px_minmax(0,1fr)]">
               <label className="space-y-1">
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">ISS %</span>
                 <input
@@ -1587,7 +1724,7 @@ export default function FinanceInvoicesPage() {
                   step="0.01"
                   value={currentDraft.issRate}
                   onChange={(e) => updateDraft({ issRate: Number(e.target.value || 0) })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none"
                 />
               </label>
               <label className="space-y-1">
@@ -1598,7 +1735,7 @@ export default function FinanceInvoicesPage() {
                   step="0.01"
                   value={currentDraft.inssRate}
                   onChange={(e) => updateDraft({ inssRate: Number(e.target.value || 0) })}
-                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-2xl px-4 py-3 text-sm text-white outline-none"
+                  className="w-full bg-[#0a0a0a] border border-slate-800/60 rounded-xl px-3 py-2 text-sm text-white outline-none"
                 />
               </label>
               <label className="space-y-1">

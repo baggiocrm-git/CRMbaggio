@@ -191,7 +191,7 @@ export default function CostCentersPage() {
   }
 
   return (
-    <div className="flex-1 bg-[#0a0a0a] text-white overflow-y-auto custom-scrollbar p-8">
+    <div className="flex-1 bg-[#0a0a0a] px-8 pb-8 pt-3 text-white overflow-y-auto custom-scrollbar">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-4xl font-black tracking-tight italic">

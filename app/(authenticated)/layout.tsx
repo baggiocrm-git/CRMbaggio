@@ -275,6 +275,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   const isHubPage = pathname === '/dashboard';
+  const inlineTopNavPrefixes = [
+    '/finances',
+    '/calendar',
+    '/documents',
+    '/contacts',
+    '/staff',
+    '/projects',
+  ];
+  const useInlineTopNav = inlineTopNavPrefixes.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
   const activeModule = findModuleByPath(pathname);
 
   return (
@@ -286,11 +297,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.02),transparent_35%,rgba(212,255,63,0.02)_100%)]" />
       </div>
 
-      {!isHubPage && (
+      {!isHubPage && !useInlineTopNav && (
         <div className="pointer-events-none fixed inset-x-0 top-0 z-40 flex items-center justify-between p-4">
           <Link
             href="/dashboard"
-            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-[0.28em] text-lime-200 shadow-[0_0_30px_rgba(212,255,63,0.1)] backdrop-blur-xl transition hover:border-lime-300/40 hover:text-[#d4ff3f]"
+            className="pointer-events-auto inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-lime-200 shadow-[0_0_30px_rgba(212,255,63,0.1)] backdrop-blur-xl transition hover:border-lime-300/40 hover:text-[#d4ff3f]"
           >
             <House size={14} />
             Voltar ao Início
@@ -305,7 +316,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       <main className="relative z-10 flex min-w-0 flex-1 flex-col">
-        <div className={isHubPage ? 'flex-1' : 'flex-1 pt-20'}>
+        <div className={isHubPage || useInlineTopNav ? 'flex-1' : 'flex-1 pt-20'}>
+          {useInlineTopNav && (
+            <div className="px-8 pt-4">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center gap-2 rounded-full border border-lime-300/20 bg-[#081120]/90 px-4 py-2 text-[10px] font-black uppercase tracking-normal text-lime-200 shadow-[0_0_30px_rgba(212,255,63,0.1)] backdrop-blur-xl transition hover:border-lime-300/40 hover:text-[#d4ff3f]"
+              >
+                <House size={14} />
+                Voltar ao Início
+              </Link>
+            </div>
+          )}
           {children}
         </div>
       </main>

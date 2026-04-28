@@ -198,6 +198,7 @@ const AUX_1_PREFIXES = [
   '/documents',
   '/finances/receivables',
   '/finances/payables',
+  '/finances/banking',
   '/finances/cost-centers',
   '/finances/invoices',
   '/settings',
@@ -215,6 +216,7 @@ const AUX_2_PREFIXES = [
 const FINANCIAL_LEVEL_1_PREFIXES = [
   '/finances/receivables',
   '/finances/payables',
+  '/finances/banking',
 ];
 
 const FINANCIAL_LEVEL_2_PREFIXES = [

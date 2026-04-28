@@ -4,7 +4,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Lock, LogOut } from 'lucide-react';
+import {
+  ArrowRight,
+  Landmark,
+  Layers,
+  LayoutDashboard,
+  Lock,
+  LogOut,
+  ReceiptText,
+  TrendingDown,
+  TrendingUp,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -14,6 +24,7 @@ import {
   canAccessPathForRole,
   getFinanceEntryPathForRole,
   getRoleFromUser,
+  isAdminRole,
 } from '@/lib/navigation';
 
 const MODULE_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
@@ -27,14 +38,49 @@ const MODULE_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
   suprimentos: { x: -12.1, y: 2.7 },
 };
 
+const ADMIN_FINANCE_BRANCHES = [
+  {
+    title: 'Dashboard',
+    href: '/finances',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Contas a Receber',
+    href: '/finances/receivables',
+    icon: TrendingUp,
+  },
+  {
+    title: 'Contas a Pagar',
+    href: '/finances/payables',
+    icon: TrendingDown,
+  },
+  {
+    title: 'Conexoes Bancarias',
+    href: '/finances/banking',
+    icon: Landmark,
+  },
+  {
+    title: 'Centros de Custo',
+    href: '/finances/cost-centers',
+    icon: Layers,
+  },
+  {
+    title: 'Notas Fiscais',
+    href: '/finances/invoices',
+    icon: ReceiptText,
+  },
+] as const;
+
 export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [financeBranchOpen, setFinanceBranchOpen] = useState(false);
   const [authResolved, setAuthResolved] = useState(false);
   const [audioUnlocked, setAudioUnlocked] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
   const lastHoveredIdRef = useRef<string | null>(null);
+  const financeBranchCloseTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -97,6 +143,7 @@ export default function DashboardPage() {
   }, []);
 
   const userRole = getRoleFromUser(user);
+  const isAdmin = isAdminRole(userRole);
   const userName =
     user?.user_metadata?.full_name ||
     user?.user_metadata?.name ||
@@ -116,7 +163,42 @@ export default function DashboardPage() {
   const availableModules = authResolved
     ? HUB_MODULES.filter((module) => canAccessPathForRole(userRole, getModuleHref(module.id)))
     : [];
-  const highlightedId = hoveredId ?? availableModules[0]?.id ?? null;
+  const financeModule = HUB_MODULES.find((module) => module.id === 'financeiro');
+  const financeAngle = financeModule ? (financeModule.angle * Math.PI) / 180 : 0;
+  const financeOffset = MODULE_LABEL_OFFSETS.financeiro ?? { x: 0, y: 0 };
+  const financeAnchor = financeModule
+    ? {
+        x: 50 + Math.cos(financeAngle) * 33.5 + financeOffset.x,
+        y: 50 + Math.sin(financeAngle) * 33.5 + financeOffset.y,
+      }
+    : { x: 50, y: 50 };
+  const showFinanceBranches = isAdmin && (financeBranchOpen || hoveredId === 'financeiro');
+  const highlightedId = showFinanceBranches ? 'financeiro' : hoveredId ?? availableModules[0]?.id ?? null;
+  const financeBranchItems = ADMIN_FINANCE_BRANCHES.filter((item) =>
+    canAccessPathForRole(userRole, item.href)
+  );
+
+  const clearFinanceBranchCloseTimer = () => {
+    if (financeBranchCloseTimeoutRef.current) {
+      window.clearTimeout(financeBranchCloseTimeoutRef.current);
+      financeBranchCloseTimeoutRef.current = null;
+    }
+  };
+
+  const openFinanceBranch = () => {
+    clearFinanceBranchCloseTimer();
+    setFinanceBranchOpen(true);
+    setHoveredId('financeiro');
+  };
+
+  const scheduleFinanceBranchClose = () => {
+    clearFinanceBranchCloseTimer();
+    financeBranchCloseTimeoutRef.current = window.setTimeout(() => {
+      setFinanceBranchOpen(false);
+      setHoveredId(null);
+      lastHoveredIdRef.current = null;
+    }, 220);
+  };
 
   const handleLogout = async () => {
     try {
@@ -196,7 +278,13 @@ export default function DashboardPage() {
   const handleModuleHover = (moduleId: string, isAvailable: boolean) => {
     if (!isAvailable) return;
 
-    setHoveredId(moduleId);
+    if (moduleId === 'financeiro' && isAdmin) {
+      openFinanceBranch();
+    } else {
+      clearFinanceBranchCloseTimer();
+      setFinanceBranchOpen(false);
+      setHoveredId(moduleId);
+    }
 
     if (lastHoveredIdRef.current !== moduleId) {
       lastHoveredIdRef.current = moduleId;
@@ -207,9 +295,21 @@ export default function DashboardPage() {
   const handleModuleLeave = (isAvailable: boolean) => {
     if (!isAvailable) return;
 
+    if (hoveredId === 'financeiro' && isAdmin) {
+      scheduleFinanceBranchClose();
+      return;
+    }
+
     setHoveredId(null);
+    setFinanceBranchOpen(false);
     lastHoveredIdRef.current = null;
   };
+
+  useEffect(() => {
+    return () => {
+      clearFinanceBranchCloseTimer();
+    };
+  }, []);
 
   return (
     <div className="dashboard-radial-theme relative flex min-h-screen flex-col overflow-hidden px-4 py-2 sm:px-6 lg:px-10">
@@ -301,6 +401,56 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {showFinanceBranches ? (
+                <div
+                  className="absolute z-20"
+                  style={{
+                    left: `calc(${financeAnchor.x}% + 6.8rem)`,
+                    top: `${financeAnchor.y}%`,
+                    transform: 'translateY(-50%)',
+                  }}
+                  onMouseEnter={openFinanceBranch}
+                  onMouseLeave={scheduleFinanceBranchClose}
+                >
+                  <div className="absolute left-[-109px] top-1/2 h-[2px] w-[110px] -translate-y-1/2 bg-gradient-to-r from-[#d4ff3f] to-cyan-300 shadow-[0_0_14px_rgba(170,240,255,0.55)]" />
+                  <div className="absolute left-[-12px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full border border-cyan-200/60 bg-[#d4ff3f] shadow-[0_0_12px_rgba(212,255,63,0.8)]" />
+                  <div className="flex w-[15.75rem] flex-col gap-2 rounded-[28px] border border-cyan-200/20 bg-[#06101f]/90 p-3 shadow-[0_0_36px_rgba(103,200,255,0.18)] backdrop-blur-xl">
+                    <div className="px-1">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-200">
+                        Ramificacao Financeira
+                      </p>
+                      <p className="mt-1 text-[11px] leading-tight text-slate-400">
+                        Acessos diretos do modulo para administradores.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {financeBranchItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <Link
+                            key={item.href}
+                            href={item.href}
+                            className="flex min-h-[4.3rem] flex-col justify-between rounded-[18px] border border-cyan-300/15 bg-cyan-300/[0.06] px-3 py-2 text-left transition hover:border-cyan-200/35 hover:bg-cyan-300/[0.11]"
+                            onPointerDown={(event) => {
+                              event.preventDefault();
+                              handleModuleNavigation(item.href, true);
+                            }}
+                            onClick={(event) => {
+                              event.preventDefault();
+                            }}
+                          >
+                            <Icon size={15} className="text-cyan-200" />
+                            <span className="text-[11px] font-bold leading-tight text-white">
+                              {item.title}
+                            </span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               {HUB_MODULES.map((module) => {
                 const angle = (module.angle * Math.PI) / 180;
                 const radius = 33.5;
@@ -377,6 +527,8 @@ export default function DashboardPage() {
                 const moduleHref = getModuleHref(module.id);
                 const isAvailable = authResolved && canAccessPathForRole(userRole, moduleHref);
                 const isHighlighted = highlightedId === module.id && isAvailable;
+                const showMobileFinanceBranch =
+                  isAdmin && module.id === 'financeiro' && isAvailable;
 
                 const mobileCard = (
                   <motion.div
@@ -416,10 +568,34 @@ export default function DashboardPage() {
                         {isAvailable ? <ArrowRight size={18} /> : <Lock size={18} />}
                       </div>
                     </div>
+                    {showMobileFinanceBranch ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-lime-300/10 pt-3">
+                        {financeBranchItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              className="flex items-center gap-2 rounded-[16px] border border-cyan-300/15 bg-[#081120]/55 px-3 py-2 text-[11px] font-bold text-cyan-100 transition hover:border-cyan-200/30 hover:bg-cyan-300/10"
+                              onPointerDown={(event) => {
+                                event.preventDefault();
+                                handleModuleNavigation(item.href, true);
+                              }}
+                              onClick={(event) => {
+                                event.preventDefault();
+                              }}
+                            >
+                              <Icon size={14} className="shrink-0 text-cyan-200" />
+                              <span className="leading-tight">{item.title}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </motion.div>
                 );
 
-                return isAvailable ? (
+                return isAvailable && !showMobileFinanceBranch ? (
                   <Link
                     key={module.id}
                     href={moduleHref}
@@ -434,6 +610,10 @@ export default function DashboardPage() {
                   >
                     {mobileCard}
                   </Link>
+                ) : isAvailable ? (
+                  <div key={module.id} className="block">
+                    {mobileCard}
+                  </div>
                 ) : (
                   <div key={module.id} className="block pointer-events-none">
                     {mobileCard}
